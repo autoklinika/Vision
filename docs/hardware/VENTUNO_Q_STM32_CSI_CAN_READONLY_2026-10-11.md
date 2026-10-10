@@ -76,3 +76,7 @@
 - Osobna decyzja o testach funkcjonalnych STM32, MIPI CSI i CAN oraz ostatecznym Hardware Baseline v1.
 
 Powiązane dokumenty: [raport VENTUNO 2026-10-10](VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md), [baseline](VENTUNO_Q_BASELINE.md), [rejestr dowodów](EVIDENCE_REGISTER_2026-10-10.md).
+
+## 7. Zakończenie sesji / zdalne wyłączenie
+
+Po zapisaniu dokumentacji i utworzeniu PR #6 operator zlecił wyłączenie VENTUNO. Polecenie `systemctl poweroff --no-wall --no-ask-password` zgłosiło `Interactive authentication required`, więc **zdalne wyłączenie nie powiodło się**. Konto `arduino` nie ma dostępnego `sudo -n`; Arduino App CLI nie udostępnia polecenia poweroff. Wyłączenie wymaga interaktywnego `sudo systemctl poweroff` przez uprawnionego operatora. Nie używano obejść kontroli uprawnień i nie deklaruje się urządzenia jako wyłączonego.
