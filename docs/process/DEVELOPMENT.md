@@ -16,6 +16,12 @@
 4. Testy na rzeczywistych urządzeniach z uzgodnionymi ograniczeniami.
 5. Odrębna zgoda na uruchomienie aktuatorów, urządzeń grzewczych i autonomicznego ruchu.
 
+## Reguła obowiązkowa: eMMC vs NVMe
+
+Wszystkie nowe pliki użytkownika i projektu Vision, włącznie z repozytorium Git, zdjęciami, wynikami, cache, plikami tymczasowymi, logami aplikacji i środowiskami deweloperskimi, **muszą** być zapisywane wyłącznie na `/srv/vision-data` (NVMe 1 TB). System i niezbędne pliki systemowe pozostają na eMMC.
+
+PR dodający jakikolwiek zapis pliku musi wskazywać docelową ścieżkę i testować odmowę zapisu, gdy NVMe jest niedostępny; fallback na eMMC jest zabroniony. Normatywny kontrakt: [STORAGE_POLICY.md](../architecture/STORAGE_POLICY.md). Dokumentacja nie oznacza, że taka kontrola jest już wdrożona we wszystkich komponentach.
+
 ## Wrażliwe dane
 
 - GitHub CLI przechowuje poświadczenia lokalnie na VENTUNO — nie kopiować `~/.config/gh/hosts.yml`.
