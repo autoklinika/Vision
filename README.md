@@ -21,6 +21,12 @@ Stanowisko akwizycji obrazu i inspekcji fotograficznej płytek PCB / sterownikó
 
 Wpis na liście nie oznacza, że dane urządzenie jest już podłączone lub wspierane przez sterowniki.
 
+## Bezwzględna polityka przechowywania danych
+
+**Wszystkie dane użytkownika i pliki projektu Vision trafiają na NVMe 1 TB (`/srv/vision-data`). eMMC pozostaje dla Ubuntu oraz plików systemowych.** Dotyczy to repozytorium, zdjęć, termowizji, danych pośrednich, modeli, cache, środowisk, logów aplikacji i artefaktów build. Procesy zapisujące dane muszą sprawdzić prawidłowe zamontowanie NVMe i zakończyć się błędem, jeżeli nośnik nie jest dostępny — **bez fallbacku na eMMC**.
+
+Normatywna specyfikacja: [docs/architecture/STORAGE_POLICY.md](docs/architecture/STORAGE_POLICY.md). Migracja repozytorium: [scripts/storage/migrate_repo_to_nvme.sh](scripts/storage/migrate_repo_to_nvme.sh).
+
 ## Zasady inżynierskie
 
 1. Rozdzielamy akwizycję, jakość/kalibrację, przetwarzanie obrazu, termowizję, sterowanie robotem i integracje.
