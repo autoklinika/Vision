@@ -133,6 +133,9 @@ with tempfile.NamedTemporaryFile(dir=os.environ['TMPDIR'], prefix='vision-smoke-
     f.flush()
     assert f.name.startswith(str(root) + '/')
 print('NVME_WRITE=PASS')
+if not (os.statvfs('/home/arduino').f_flag & getattr(os, 'ST_RDONLY', 1)):
+    raise SystemExit('EMMC_READONLY_MOUNT=FAIL (no write attempted)')
+print('EMMC_READONLY_MOUNT=PASS')
 probe = pathlib.Path('/home/arduino') / ('.vision-emmc-probe-' + uuid.uuid4().hex)
 try:
     with probe.open('wb') as f:
