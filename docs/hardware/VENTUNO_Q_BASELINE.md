@@ -1,33 +1,59 @@
-# VENTUNO Q — bazowy stan stanowiska
+# VENTUNO Q — stan bazowy sprzętu i weryfikacji
 
-**Źródło:** ręczne polecenia i logi z uruchamiania stanowiska w październiku 2026. To nie jest wynik pełnego audytu.
+**Data aktualizacji:** 2026-10-10.
+**Status:** roboczy stan przed finalnym **Vision Hardware Baseline v1**. Nie jest to pełny audyt systemu ani zgoda na rozpoczęcie Vision Core.
 
-## Potwierdzone z terminala użytkownika
+## Sprzęt i oprogramowanie
 
-- Ubuntu 24.04.4 LTS / aarch64.
-- Po aktualizacji i ponownym uruchomieniu: `6.8.0-1084-qcom`.
-- Lokalny użytkownik: `arduino`; hostname: `vision`.
-- OpenSSH: połączenie sieciowe i sesja SSH przekierowana przez USB-C/ADB działają.
-- Tailscale: urządzenie widoczne jako `vision` i połączone z siecią VPN.
-- NetworkManager: Wi-Fi działa i można je konfigurować przez `nmcli`.
-- `git`, `gh`: instalacja, uwierzytelnianie SSH i konto GitHub zweryfikowane.
-- Obecny jest interfejs `docker0`; sama obecność nie potwierdza stanu kontenerów.
-- W systemie widoczne były interfejsy `can0`, `can1`, `can2`; ich działanie i przeznaczenie nie zostały przetestowane.
+- Płyta: Arduino VENTUNO Q, Qualcomm QCS8275, ARM64.
+- System: Ubuntu 24.04.4 LTS, kernel `6.8.0-1084-qcom`.
+- Host: `vision`; standardowy użytkownik: `arduino`.
+- Dostęp: SSH (lokalny / Tailscale, wcześniej również przekierowanie USB-C/ADB) oraz automatycznie dostępny Desktop Commander MCP.
+- Repozytorium i dane projektu: **NVMe `/srv/vision-data`**, repo `/srv/vision-data/projects/Vision`; dane akwizycji `/srv/vision-data/vision/sessions`.
+- Nie przechowujemy w publicznym repo numerów seryjnych, adresów IP, identyfikatorów ADB/MCP, kluczy ani tokenów.
 
-Nie zapisujemy tutaj prywatnych adresów IP, identyfikatorów urządzenia ADB, kluczy ani innych danych dostępowych.
+## Faktycznie sprawdzone funkcje
 
-## Wymaga pomiaru na rzeczywistym urządzeniu
+| Obszar | Status | Zakres dowodu |
+|---|---|---|
+| GPU Adreno 623 | **PASS** | Vulkan sprzętowy API 1.3.318; EGL/GLES render + odczyt RGBA; bez llvmpipe |
+| Hexagon NPU/HTP V75 | **PASS_STRICT_HTP** | ONNX Conv+ReLU przez QNNExecutionProvider, CPU fallback wyłączony |
+| Dysk Lexar SSD PLAY 1 TB | **PASS częściowy** | PCIe Gen4×4 16 GT/s; montowanie ext4 rw; jednorazowy odczyt 64 MiB ~1,7 GB/s |
+| NVMe Write Guard | **PASS unit / hardware UNVERIFIED** | 9/9 unit; fizyczna izolacja przez Bubblewrap niedomknięta; temat odłożony |
+| USB 3.0 / TUSB73x0 | **PASS wykrycia** | Kontroler deklaruje 5 Gb/s; realny transfer nieprzetestowany |
+| USB-C PD / DP Alt Mode | **PASS deklaracji** | Brak testu obrazu i dotyku na pojedynczym kablu |
+| Sony A6100 — PTP/zdjęcia | **PASS warunkowo** | JPEG 24 MP, RAW+JPEG, żywy Preview 1024×680, udane serie z odstępami |
+| Sony A6100 — szybkie sekwencje | **FAIL niektórych prób** | STAB-01/STAB-03: `Could not capture` przy szybkich osobnych sesjach |
+| Sony focus stepping | **UNVERIFIED optycznie** | Polecenia Near/Far działały; zmienność ekspozycji uniemożliwiła rozstrzygnięcie |
+| CAN `can0`/`can1`/`can2`, `docker0` | **UNVERIFIED funkcjonalnie** | Wcześniejsze wykrycie interfejsów nie stanowi testu ruchu |
+| STM32H5, CSI/ISP, Ethernet 2.5 Gb/s, pomiary temperatur | **UNVERIFIED** | Odpowiednie testy jeszcze nie wykonane |
 
-- CPU/SOC, liczba rdzeni, RAM, swap, throttling i temperatury pod obciążeniem.
-- eMMC vs NVMe: rzeczywiste wykrycie, format, mount i wolne miejsce (54,9 GB systemu root **nie dowodzi obecności NVMe**).
-- Adreno: obecność i działanie sterowników/API akceleracji.
-- Hexagon/NPU: biblioteki, urządzenia FastRPC/QNN, zgodność i test rzeczywistej inferencji.
-- CSI/MIPI, USB, V4L2 i wykrywanie kamer.
-- Stan pakietów OEM Arduino/Qualcomm i ścieżka odtwarzania systemu.
-- Obsługa aparatu Sony A6100 przez bibliotekę/SDK dopiero po podłączeniu i teście.
+### Uwaga o stwierdzeniu PASS
 
-## Ochrona środowiska producenta
+`PASS` dotyczy konkretnej próby, nie gotowości produkcyjnej. Szczególnie:
+- GPU: test renderowania nie jest benchmarkiem ani testem kompatybilności OpenCV/AI.
+- NPU: strict execution to nie gwarancja stabilności pod obciążeniem; wcześniej wystąpił błąd konfiguracji backendu, potem test przeszedł.
+- Sony: 10/10 w jednej sesji i 4/4 w osobnych przy odstępach 10 s; szybkie wywołania w osobnych sesjach nie były stabilne.
+- NVMe: wykryty dysk i pojedynczy odczyt nie zastępują SMART, temperatury i pełnego smoke Write Guard.
 
-Nie wykonujemy `do-release-upgrade`, `apt full-upgrade` ani zamiany pakietów kernela/sterowników bez osobnej decyzji i planu wycofania zmian.
+## Raporty źródłowe
 
-Audyt tylko do odczytu: `scripts/audit/vision_audit_v1.sh`. Wynik zachowujemy początkowo poza repozytorium i przeglądamy pod kątem danych wrażliwych.
+- [VENTUNO Q — szczegółowe wyniki i roadmapa](VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md)
+- [Sony A6100 — USB/PTP, Live View, RAW, STAB](SONY_A6100_VERIFICATION_2026-10-10.md)
+- [Rejestr dowodów i ścieżek NVMe](EVIDENCE_REGISTER_2026-10-10.md)
+- [Plan integracji](INTEGRATION_PLAN.md)
+
+## Zasady ochrony środowiska
+
+Nie wykonujemy `do-release-upgrade`, `apt full-upgrade`, zmiany pakietów Qualcomm, sterowników, kernela ani firmware bez osobnej decyzji i planu wycofania. Właściwa aplikacja Vision Core, autonomiczny robot, radiometria i moduły OpenCV/AI nie są jeszcze wdrożone.
+
+## Dalsze bramki hardware
+
+1. STM32H5 i komunikacja Qualcomm ↔ STM32 (start od odczytu, bez flashowania).
+2. MIPI CSI/ISP, wykrywanie i funkcjonalna próba kamery.
+3. Ethernet 2.5 Gb/s, rzeczywisty transfer.
+4. USB-C/DisplayPort Alt Mode na fizycznym monitorze z dotykiem.
+5. Temperatury, SMART NVMe, stabilność sprzętu pod obciążeniem.
+6. Po zatwierdzeniu zakresu: finalny **Vision Hardware Baseline v1**.
+
+Audyt odczytowy: `scripts/audit/vision_audit_v1.sh`; raporty audytu po weryfikacji danych wrażliwych pozostają domyślnie poza Git.
