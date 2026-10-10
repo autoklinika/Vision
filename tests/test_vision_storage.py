@@ -54,6 +54,12 @@ class TestVisionStorage(unittest.TestCase):
         with self.assertRaises(mod.StorageError):
             mod.bubblewrap_args([])
 
+    def test_smoke_protects_emmc_before_attempting_a_write(self):
+        import inspect
+        smoke_source = inspect.getsource(mod.smoke_test)
+        self.assertIn("os.statvfs('/home/arduino')", smoke_source)
+        self.assertLess(smoke_source.index("EMMC_READONLY_MOUNT=FAIL"), smoke_source.index("probe.open('wb')"))
+
     def test_unmounted_root_rejected_before_commands(self):
         with patch.object(mod, "ROOT") as root, patch.object(mod.os, "geteuid", return_value=1000):
             root.is_symlink.return_value = False
