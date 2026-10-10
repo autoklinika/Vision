@@ -1,0 +1,50 @@
+# Dane akwizycji, wygenerowane mozaiki, surowe pomiary, eksporty i modele
+/captures/
+/data/
+/output/
+/outputs/
+/artifacts/
+/reports/
+/models/
+/datasets/
+*.raw
+*.dng
+*.tiff
+*.tif
+*.mp4
+*.mov
+*.bag
+*.onnx
+*.tflite
+*.gguf
+
+# Sekrety, konfiguracje lokalne i logi
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.log
+*.local
+*credentials*.json
+*token*.json
+
+# Python/C++/IDE
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+build/
+cmake-build-*/
+CMakeFiles/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Lokalny raport audytu - nie publikujemy identyfikatorów ani topologii hosta
+vision_audit_report*.txt
