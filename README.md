@@ -27,6 +27,11 @@ Wpis na liście nie oznacza, że dane urządzenie jest już podłączone lub wsp
 
 Normatywna specyfikacja: [docs/architecture/STORAGE_POLICY.md](docs/architecture/STORAGE_POLICY.md). Migracja repozytorium: [scripts/storage/migrate_repo_to_nvme.sh](scripts/storage/migrate_repo_to_nvme.sh).
 
+### Runtime: blokada zapisów poza NVMe
+
+Implementacja dla VENTUNO/Ubuntu: [docs/architecture/NVME_ENFORCEMENT.md](docs/architecture/NVME_ENFORCEMENT.md), skrypt [scripts/storage/vision_run.py](scripts/storage/vision_run.py).
+Launcher weryfikuje zamontowany NVMe po urządzeniu, UUID, etykiecie i systemie plików, następnie uruchamia aplikację w izolacji z systemem tylko do odczytu i zapisywalnym wyłącznie magazynem NVMe. Nie jest to ogólnosystemowa polityka; **każdy przyszły proces Vision musi być uruchamiany przez launcher**. Zgodność z Bubblewrap i test izolacji na prawdziwym VENTUNO pozostają bramką sprzętową, zanim włączymy runtime.
+
 ## Zasady inżynierskie
 
 1. Rozdzielamy akwizycję, jakość/kalibrację, przetwarzanie obrazu, termowizję, sterowanie robotem i integracje.
