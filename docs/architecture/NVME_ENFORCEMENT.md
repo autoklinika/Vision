@@ -29,8 +29,8 @@ python3 -m unittest discover -s tests -p 'test_vision_storage.py' -v
 # Test montowania: nic nie tworzy:
 python3 scripts/storage/vision_run.py --check
 
-# Test fizycznej izolacji: tworzy tylko krótkotrwały plik na NVMe
-# i sprawdza, że zapis do /home/arduino poza repozytorium jest odrzucony:
+# Test fizycznej izolacji: tworzy tylko krótkotrwały plik na NVMe,
+# weryfikuje readonly eMMC PRZED próbą zapisu i oczekuje jej odrzucenia:
 python3 scripts/storage/vision_run.py --smoke
 ```
 
@@ -39,6 +39,7 @@ Oczekiwany wynik:
 ```text
 VISION_STORAGE=PASS (NVMe verified; sandbox executable available)
 NVME_WRITE=PASS
+EMMC_READONLY_MOUNT=PASS
 EMMC_WRITE_DENIED=PASS
 VISION_STORAGE_SANDBOX=PASS
 ```
@@ -63,7 +64,7 @@ W procesie aplikacji można korzystać z /home/arduino/Vision (symlink do NVMe);
 
 ## Testy i kryteria przyjęcia
 
-- Unit: 8 przypadków testowych (dobry mount; złe: device/fs/ro/UUID/label; niedozwolona symlinka cache; budowanie przestrzeni montowania).
+- Unit: 9 przypadków testowych (dobry mount; złe: device/fs/ro/UUID/label; niedozwolona symlinka cache; budowanie przestrzeni montowania).
 - Gate sprzętowy: na rzeczywistym VENTUNO `--check=PASS` i `--smoke=PASS`.
 - Gate awaryjny: na urządzeniu testowym / w bezpiecznym oknie, bez montowania NVMe, proces Vision odmawia startu z kodem 77. Nie odmontowywać produkcyjnego NVMe, gdy działa VS Code i repozytorium.
 - Gate aplikacji: wszystkie entrypointy aplikacji uruchamiane przez launcher, brak miejsc zapisu do eMMC w testach integracyjnych.
