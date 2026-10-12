@@ -4,10 +4,15 @@ Stanowisko akwizycji obrazu i inspekcji fotograficznej płytek PCB / sterownikó
 
 > **Status na 2026-10-10:** projekt bez wdrożonej aplikacji Vision Core. Zakończono część weryfikacji rzeczywistego hardware: GPU, NPU i funkcje USB/PTP Sony A6100, w tym Live View, JPEG 24 MP oraz RAW+JPEG. Stabilność fotografowania pozostaje warunkowa; pełny Hardware Baseline v1 jest nadal otwarty.
 
+**Aktualizacja 2026-10-12:** testy Stream Deck Plus i Sony A6100A: migawka po USB PASS; Bluetooth TELE 1 s porusza obiektywem (obserwacja operatora, PASS); WIDE, integracja pokrętła i równoczesna praca USB+BLE pozostają do zbadania. Wyniki wyłącznie laboratoryjne.
+
 ## Raporty z testów sprzętu
 
 - [VENTUNO Q — matryca wyników GPU, NPU, PCIe/NVMe, USB, roadmapa](docs/hardware/VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md)
 - [Sony A6100 — wszystkie testy USB/PTP, Live View, RAW, focus, STAB-01–06](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md)
+- [Sony A6100 — rozszerzona diagnostyka USB PTP 2 i wyjaśnienie 0xD214](docs/hardware/SONY_A6100_PTP2_CAPABILITIES_2026-10-12.md)
+- [Stream Deck Plus, OpenDeck i Sony A6100 — dziennik testów 2026-10-12](docs/hardware/STREAM_DECK_SONY_BLE_TESTS_2026-10-12.md)
+- [Przekazanie do następnej sesji — BLE TELE potwierdzony, WIDE i USB+BLE do sprawdzenia](docs/hardware/SONY_BLE_STREAM_DECK_HANDOFF_2026-10-12.md)
 - [Lokalne dowody i katalogi sesji na NVMe](docs/hardware/EVIDENCE_REGISTER_2026-10-10.md)
 - [Skrócony stan bazowy VENTUNO](docs/hardware/VENTUNO_Q_BASELINE.md)
 
