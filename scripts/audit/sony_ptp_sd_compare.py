@@ -134,7 +134,7 @@ def sd_guard(root):
     return {"filesystem": "exfat", "readonly": True, "usb_identity": "054c:0f0b"}
 
 
-def compare(manifest, sdroot, output):
+def compare(manifest, sdroot, output, expected_pairs=13):
     af.nvme_guard()
     sd_identity = sd_guard(sdroot)
     if not output.resolve().is_relative_to(af.BASE.resolve()):
@@ -142,8 +142,9 @@ def compare(manifest, sdroot, output):
     if output.exists():
         raise af.GateError("OUTPUT_EXISTS_NO_OVERWRITE")
     source = json.loads(manifest.read_text())
-    if source.get("status") != "PASS" or len(source["shots"]) != 13:
-        raise af.GateError("EXPECTED_13_VERIFIED_PTP_PAIRS")
+    if (not isinstance(expected_pairs, int) or not 1 <= expected_pairs <= 200
+            or source.get("status") != "PASS" or len(source["shots"]) != expected_pairs):
+        raise af.GateError("EXPECTED_VERIFIED_PTP_PAIR_COUNT")
     needed = {}
     for shot in source["shots"]:
         jpeg = next(f for f in shot["files"] if Path(f["path"]).suffix.lower() == ".jpg")
@@ -160,10 +161,10 @@ def compare(manifest, sdroot, output):
                 continue  # Unrelated card files are not part of this comparison.
             if key in candidates:
                 candidates[key].append(path)
-    report = {"test": "PTP_SD_13_RAW_JPEG_PAIRS", "status": "FAIL",
+    report = {"test": "PTP_SD_RAW_JPEG_PAIRS", "expected_pairs": expected_pairs, "status": "FAIL",
               "sd_mount": sd_identity, "shots": [], "raw_full_decode": "UNKNOWN",
               "matching_method": "unique_EXIF_DateTimeOriginal_and_FocalLength_then_bytes",
-              "scope": "13_zoom_AF_test_pairs_only; no_shutter_no_SD_writes"}
+              "scope": "manifest_pairs_only; no_shutter_no_SD_writes"}
     for key, shot in needed.items():
         af.nvme_guard()
         sd_guard(sdroot)
@@ -204,13 +205,13 @@ def compare(manifest, sdroot, output):
             row["status"] = "PASS"
         print("PAIR %s/%02d %s %s" % (shot["session"], shot["shot"], row["status"], result["classification"]), flush=True)
     report["verified_pairs"] = sum(row["status"] == "PASS" for row in report["shots"])
-    report["status"] = "PASS" if report["verified_pairs"] == 13 else "FAIL"
+    report["status"] = "PASS" if report["verified_pairs"] == expected_pairs else "FAIL"
     report["raw_exact_files"] = sum(row.get("raw", {}).get("whole_file_equal", False) for row in report["shots"])
     report["jpeg_exact_files"] = sum(row.get("jpeg", {}).get("whole_file_equal", False) for row in report["shots"])
     report["jpeg_zero_padding_only"] = sum(row.get("jpeg", {}).get("classification") == "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY" for row in report["shots"])
     sd_guard(sdroot)
     af.write_json(output, report)
-    print("FINAL %s %d/13; OUTPUT %s" % (report["status"], report["verified_pairs"], output), flush=True)
+    print("FINAL %s %d/%d; OUTPUT %s" % (report["status"], report["verified_pairs"], expected_pairs, output), flush=True)
     return 0 if report["status"] == "PASS" else 1
 
 
