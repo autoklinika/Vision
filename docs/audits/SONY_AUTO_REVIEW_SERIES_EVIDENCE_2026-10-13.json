@@ -1,0 +1,466 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-13",
+  "scope": "Operator-authorized diagnostics; no production changes",
+  "auto_review_off": "operator_confirmation",
+  "previous_auto_review_value": "UNKNOWN_NOT_REPORTED",
+  "single_after_auto_review_off": {
+    "test": "T3_AUTOREVIEW_OFF_SINGLE_RAW_JPEG_WITH_CONTINUOUS_UVC",
+    "utc": "2026-10-13T20:02:46.153693+00:00",
+    "lighting": "limited_by_operator; not an optical quality comparison",
+    "settings_changed_by_script": false,
+    "shutter_requests": 1,
+    "capture_rc": 0,
+    "capture_duration_s": 5.249,
+    "capture_error": null,
+    "capture_log_has_error": false,
+    "ptp_pair_status": "PASS",
+    "files": [
+      {
+        "file": "ptp-original.arw",
+        "size_bytes": 24918784,
+        "sha256": "9d703fe4f759b27c412b843bfe4f1c3ded90ccec986ac239caea201ea4fd8779",
+        "header_tiff": true,
+        "raw_full_decode": "UNKNOWN"
+      },
+      {
+        "file": "ptp-original.jpg",
+        "size_bytes": 15381590,
+        "sha256": "e509727a0bc4cb46ade7aa4c59163994458c8e2d00b53919229a4191651a3ca3",
+        "dimensions": [
+          6000,
+          4000
+        ],
+        "exif": {
+          "focal_length_mm": "50.0",
+          "f_number": "5.6",
+          "exposure_s": "0.3333333333333333",
+          "iso": "6400",
+          "datetime_original": "2026:10:13 22:02:31"
+        },
+        "full_decode": "PASS"
+      }
+    ],
+    "uvc_frames_received": 399,
+    "uvc_frames_during_capture": 156,
+    "uvc_unique_payload_hashes": 146,
+    "uvc_max_receive_gap_s": 0.132356,
+    "shot_start_s": 4.360068,
+    "shot_end_s": 9.609153,
+    "samples": [
+      {
+        "role": "before",
+        "index": 119,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "mean_luma": 46.705486111111114,
+        "near_black_fraction": 0.15,
+        "file": "uvc-before.jpg"
+      },
+      {
+        "role": "during",
+        "index": 123,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "mean_luma": 46.666875,
+        "near_black_fraction": 0.15,
+        "file": "uvc-during.jpg"
+      },
+      {
+        "role": "after",
+        "index": 339,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "mean_luma": 45.05020833333333,
+        "near_black_fraction": 0.15006944444444445,
+        "file": "uvc-after.jpg"
+      }
+    ],
+    "collector_errors": [],
+    "sd_hash_comparison": "UNKNOWN_PENDING_MASS_STORAGE",
+    "limits": [
+      "Receive timestamps are host pipe delivery timestamps, not sensor or V4L2 acquisition timestamps.",
+      "Uninterrupted valid content and scene freshness require inspection; incoming frames can be black, duplicates, or a held still.",
+      "RAW TIFF header does not establish full sensor decode or RAW bit depth.",
+      "Card persistence and byte identity remain pending direct SD comparison."
+    ]
+  },
+  "single_repeat_analysis": {
+    "auto_review_off": "confirmed_by_operator",
+    "previous_auto_review_value": "UNKNOWN",
+    "longest_runs_after_3s": [
+      {
+        "first_index": 162,
+        "last_index": 181,
+        "count": 20,
+        "start_s": 5.711962,
+        "end_s": 6.344047,
+        "span_s": 0.632085
+      },
+      {
+        "first_index": 118,
+        "last_index": 120,
+        "count": 3,
+        "start_s": 4.180147,
+        "end_s": 4.344381,
+        "span_s": 0.164234
+      },
+      {
+        "first_index": 338,
+        "last_index": 340,
+        "count": 3,
+        "start_s": 11.576082,
+        "end_s": 11.720958,
+        "span_s": 0.144876
+      },
+      {
+        "first_index": 373,
+        "last_index": 375,
+        "count": 3,
+        "start_s": 12.776138,
+        "end_s": 12.845136,
+        "span_s": 0.068998
+      },
+      {
+        "first_index": 101,
+        "last_index": 103,
+        "count": 3,
+        "start_s": 3.611587,
+        "end_s": 3.680169,
+        "span_s": 0.068582
+      },
+      {
+        "first_index": 314,
+        "last_index": 316,
+        "count": 3,
+        "start_s": 10.776555,
+        "end_s": 10.845091,
+        "span_s": 0.068536
+      },
+      {
+        "first_index": 206,
+        "last_index": 208,
+        "count": 3,
+        "start_s": 7.175282,
+        "end_s": 7.243738,
+        "span_s": 0.068456
+      },
+      {
+        "first_index": 242,
+        "last_index": 244,
+        "count": 3,
+        "start_s": 8.3756,
+        "end_s": 8.443762,
+        "span_s": 0.068162
+      }
+    ],
+    "unique_payloads_during_capture": 69,
+    "timing_method": "host_pipe_receive; not_sensor_timestamp"
+  },
+  "series_attempt": {
+    "test": "T4_SERIES10_RAW_JPEG_WITH_CONTINUOUS_UVC",
+    "status": "FAIL_OR_INCOMPLETE",
+    "utc": "2026-10-13T20:09:09.612336+00:00",
+    "session": "sony-uvc-ptp-series10-20261013T200614Z",
+    "shutter_requests": 4,
+    "validated_pairs": 3,
+    "interval_after_validated_pair_s": 10,
+    "auto_review_off": "operator_confirmation",
+    "previous_auto_review_value": "UNKNOWN_NOT_REPORTED",
+    "settings_changed_by_script": false,
+    "persistent_ptp_shell": true,
+    "capture_keep_requested": true,
+    "failure": "AssertionError:PTP_CAPTURE_ERROR_OR_DELETE",
+    "collector_errors": [],
+    "shots": [
+      {
+        "number": 1,
+        "status": "PASS",
+        "capture_duration_s": 4.764,
+        "shot_start_s": 4.538844,
+        "shot_end_s": 9.303231,
+        "uvc_frames_during_capture": 143,
+        "uvc_unique_payloads_during_capture": 62,
+        "files": [
+          {
+            "file": "shot-01/ptp-original.arw",
+            "size_bytes": 24935168,
+            "sha256": "335bb9761be7dd88400b4aa89961288d87290b9db06655871ba0bd298b33b8d5",
+            "header_tiff": true,
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "shot-01/ptp-original.jpg",
+            "size_bytes": 15586059,
+            "sha256": "94d5deda6bd26d7910ecce3da1f2f31d772a593a763106d980128871295bfa6a",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "focal_length_mm": "50.0",
+              "f_number": "5.6",
+              "exposure_s": "0.25",
+              "iso": "6400",
+              "datetime_original": "2026:10:13 22:07:39"
+            },
+            "full_decode": "PASS"
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "status": "PASS",
+        "capture_duration_s": 4.832,
+        "shot_start_s": 19.795637,
+        "shot_end_s": 24.627225,
+        "uvc_frames_during_capture": 145,
+        "uvc_unique_payloads_during_capture": 62,
+        "files": [
+          {
+            "file": "shot-02/ptp-original.arw",
+            "size_bytes": 24910592,
+            "sha256": "ff24718471c82fc8bd2e760406650df4869dd26db716a3a525f94fb4aab7d6e0",
+            "header_tiff": true,
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "shot-02/ptp-original.jpg",
+            "size_bytes": 15193158,
+            "sha256": "29a724534ec513d525b606766a857a36eb41530e1a15c98cd259fa7ac71fb1ac",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "focal_length_mm": "50.0",
+              "f_number": "5.6",
+              "exposure_s": "0.3333333333333333",
+              "iso": "6400",
+              "datetime_original": "2026:10:13 22:07:54"
+            },
+            "full_decode": "PASS"
+          }
+        ]
+      },
+      {
+        "number": 3,
+        "status": "PASS",
+        "capture_duration_s": 4.055,
+        "shot_start_s": 35.072957,
+        "shot_end_s": 39.128225,
+        "uvc_frames_during_capture": 122,
+        "uvc_unique_payloads_during_capture": 55,
+        "files": [
+          {
+            "file": "shot-03/ptp-original.arw",
+            "size_bytes": 24902400,
+            "sha256": "9946861cd1aadd3f024a4be9ed01d86d2870fc5810d02fb7d03f38fcddb1ece7",
+            "header_tiff": true,
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "shot-03/ptp-original.jpg",
+            "size_bytes": 15335942,
+            "sha256": "ee0782f0c4b51dc6670e38f9b7d6355d4bd711e7dd6cbed7b1e0c8ac66f5d3cc",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "focal_length_mm": "50.0",
+              "f_number": "5.6",
+              "exposure_s": "0.25",
+              "iso": "6400",
+              "datetime_original": "2026:10:13 22:08:09"
+            },
+            "full_decode": "PASS"
+          }
+        ]
+      }
+    ],
+    "uvc_frames_received": 2667,
+    "uvc_unique_payload_hashes": 1106,
+    "uvc_receive_span_s": 88.881968,
+    "uvc_max_receive_gap_s": 0.119192,
+    "uvc_longest_identical_payload_run_after_3s": {
+      "first_index": 613,
+      "last_index": 632,
+      "count": 20,
+      "start_s": 20.678317,
+      "end_s": 21.313026,
+      "span_s": 0.634709
+    },
+    "uvc_top_identical_payload_runs_after_3s": [
+      {
+        "first_index": 613,
+        "last_index": 632,
+        "count": 20,
+        "start_s": 20.678317,
+        "end_s": 21.313026,
+        "span_s": 0.634709
+      },
+      {
+        "first_index": 1075,
+        "last_index": 1092,
+        "count": 18,
+        "start_s": 36.074007,
+        "end_s": 36.642333,
+        "span_s": 0.568326
+      },
+      {
+        "first_index": 157,
+        "last_index": 174,
+        "count": 18,
+        "start_s": 5.482582,
+        "end_s": 6.050781,
+        "span_s": 0.568199
+      },
+      {
+        "first_index": 118,
+        "last_index": 120,
+        "count": 3,
+        "start_s": 4.151703,
+        "end_s": 4.302916,
+        "span_s": 0.151213
+      },
+      {
+        "first_index": 1177,
+        "last_index": 1179,
+        "count": 3,
+        "start_s": 39.474629,
+        "end_s": 39.550616,
+        "span_s": 0.075987
+      },
+      {
+        "first_index": 537,
+        "last_index": 539,
+        "count": 3,
+        "start_s": 18.145257,
+        "end_s": 18.215616,
+        "span_s": 0.070359
+      },
+      {
+        "first_index": 1225,
+        "last_index": 1227,
+        "count": 3,
+        "start_s": 41.074485,
+        "end_s": 41.144279,
+        "span_s": 0.069794
+      },
+      {
+        "first_index": 249,
+        "last_index": 251,
+        "count": 3,
+        "start_s": 8.545898,
+        "end_s": 8.615497,
+        "span_s": 0.069599
+      },
+      {
+        "first_index": 230,
+        "last_index": 232,
+        "count": 3,
+        "start_s": 7.913238,
+        "end_s": 7.982678,
+        "span_s": 0.06944
+      },
+      {
+        "first_index": 1165,
+        "last_index": 1167,
+        "count": 3,
+        "start_s": 39.074345,
+        "end_s": 39.143723,
+        "span_s": 0.069378
+      },
+      {
+        "first_index": 650,
+        "last_index": 652,
+        "count": 3,
+        "start_s": 21.910358,
+        "end_s": 21.979727,
+        "span_s": 0.069369
+      },
+      {
+        "first_index": 2641,
+        "last_index": 2643,
+        "count": 3,
+        "start_s": 88.267237,
+        "end_s": 88.336583,
+        "span_s": 0.069346
+      },
+      {
+        "first_index": 2262,
+        "last_index": 2264,
+        "count": 3,
+        "start_s": 75.634785,
+        "end_s": 75.704073,
+        "span_s": 0.069288
+      },
+      {
+        "first_index": 2293,
+        "last_index": 2295,
+        "count": 3,
+        "start_s": 76.666937,
+        "end_s": 76.736206,
+        "span_s": 0.069269
+      },
+      {
+        "first_index": 2418,
+        "last_index": 2420,
+        "count": 3,
+        "start_s": 80.834963,
+        "end_s": 80.904205,
+        "span_s": 0.069242
+      }
+    ],
+    "samples": [
+      {
+        "role": "before",
+        "index": 119,
+        "dimensions": [
+          1920,
+          1080
+        ]
+      }
+    ],
+    "sd_hash_comparison": "UNKNOWN_PENDING_MASS_STORAGE",
+    "limits": [
+      "Host pipe receipt timestamps are not sensor timestamps.",
+      "Identical payload runs do not independently prove camera or grabber cause.",
+      "Full RAW decode and SD persistence remain unverified for this series.",
+      "Limited lighting is accepted for transport testing; no optical quality conclusion."
+    ]
+  },
+  "fourth_capture": {
+    "command": "capture-image-and-download",
+    "error_lines": [
+      "ERROR: Could not capture image.",
+      "ERROR: Could not capture."
+    ],
+    "downloaded_raw_jpeg_files": 0,
+    "exposure_on_sd": "UNKNOWN",
+    "automatic_retry": false,
+    "subsequent_capture_requests": 0
+  },
+  "post_failure_readonly": {
+    "ptp_config_rc": 0,
+    "focus_mode": "AF-A",
+    "capture_target": "card+sdram",
+    "image_quality": "RAW+JPEG (X.Fine)",
+    "battery_level": "2%",
+    "usb_power": "operator_reports_enabled",
+    "root_cause": "UNKNOWN; configuration reads alone do not distinguish focus, power, or PTP driver failure"
+  },
+  "limits": [
+    "No complete 10-shot PASS; only three verified pairs from four requests.",
+    "AF-A in limited lighting and low reported battery are observations, not established causes.",
+    "Auto Review previous value unknown; exposure changed, so no isolated causal comparison.",
+    "No full RAW decode, new direct SD comparison, concurrent BLE, or optical quality conclusion."
+  ]
+}
