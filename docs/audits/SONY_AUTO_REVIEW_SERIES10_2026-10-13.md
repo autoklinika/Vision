@@ -1,0 +1,64 @@
+# Sony ILCE-6100A — Auto podgląd WYŁ. i próba serii 10
+
+**Data:** 2026-10-13. **Zakres:** diagnostyka stanowiska VENTUNO Q; bez wdrożenia i merge.
+**Wynik:** pojedynczy RAW+JPEG PASS; seria 10 **FAIL / INCOMPLETE**, zatrzymana na czwartym żądaniu. Odebrano trzy kompletne pary.
+
+To kontynuacja [testów T1/T2](SONY_PTP_HDMI_SD_T1_T2_2026-10-13.md). Nazwy T3/T4 w lokalnym JSON oznaczają kolejne uruchomienia, nie bramki T3/T4 z głównego audytu.
+
+## Warunki i metoda
+
+Operator potwierdził wyłączenie **Auto podgląd** oraz powrót do USB PC Remote. Poprzednia wartość podglądu nie została podana. Oświetlenie jest ograniczone, zaakceptowane dla testów transportu; nie wykonano porównania jakości optycznej.
+
+Odczyt ustawień: card+sdram, RAW+JPEG (X.Fine), AF-A, tryb A; EXIF 50 mm, f/5,6, ISO 6400. Skrypty nie zmieniały parametrów aparatu. UVC: MJPEG 1920×1080, żądane 30 fps. Wszystkie logi, oryginały i próbki trafiały na NVMe po sprawdzeniu mountpoint, źródła NVMe, ext4, etykiety VISION_DATA i rw.
+
+Próba serii użyła jednego procesu gphoto2 --shell, jednej sesji UVC i serialnych poleceń capture-image-and-download. Przekazano --keep; retencja na SD wymaga bezpośredniej kontroli. Odstęp 10 s liczono po odebraniu i zweryfikowaniu kompletnej pary. Każdy JPEG dekodowano w pełni, ARW sprawdzano nagłówkiem TIFF i SHA-256. Pełny dekoder RAW nadal niedostępny. Nie ponawiano wyzwolenia po błędzie.
+
+## Pojedyncza próba po wyłączeniu podglądu
+
+Odbiór jednej pary trwał **5,249 s**. JPEG: 6000×4000, 15 381 590 B, pełne dekodowanie PASS. ARW: 24 918 784 B, nagłówek TIFF PASS, pełne dekodowanie UNKNOWN.
+
+UVC: 399 odebranych ramek, 156 podczas zdjęcia+odbioru, 69 różnych payloadów w tym przedziale. Największa przerwa między odbiorami: 0,132356 s. Najdłuższy ciąg identycznych payloadów po 3 s rozruchu: 20 ramek / **0,632085 s**. Wcześniejszy ciąg 2,134255 s z T1 nie powtórzył się.
+
+Nie jest to kontrolowany dowód wpływu Auto podgląd: poprzednia wartość jest nieznana, a ekspozycja zmieniła się z 1/6 s w T1 na 1/3 s. Próbki pokazują scenę; nie potwierdzają zawartości każdej ramki.
+
+## Seria — trzy udane ujęcia, błąd czwartego
+
+| Żądanie | Wynik | Zdjęcie + odbiór | Ekspozycja JPEG | UVC odebrane / różne podczas operacji |
+| --- | --- | --- | --- | --- |
+| 1 | RAW+JPEG PASS | 4,764 s | 1/4 s | 143 / 62 |
+| 2 | RAW+JPEG PASS | 4,832 s | 1/3 s | 145 / 62 |
+| 3 | RAW+JPEG PASS | 4,055 s | 1/4 s | 122 / 55 |
+| 4 | ERROR; brak odebranej pary | nie zaliczono do czasów sukcesu | UNKNOWN | nie oceniono osobno |
+
+Czwarte polecenie zwróciło:
+
+```text
+ERROR: Could not capture image.
+ERROR: Could not capture.
+```
+
+Katalog shot-04 zawierał jedynie capture.log; brak ARW/JPEG. Seria zatrzymana: **4 żądania, 3 zweryfikowane pary, 0 automatycznych ponowień**, żądania 5–10 nie wysłane. Kod zakończenia procesu diagnostycznego 0 nie jest PASS: wynik result.json jednoznacznie FAIL_OR_INCOMPLETE. Nie wiadomo, czy czwarte zdjęcie zostało zapisane na SD.
+
+Po zakończeniu PTP nadal odpowiadało na odczyty ustawień (rc=0): AF-A, card+sdram, RAW+JPEG (X.Fine). Odczyt baterii 2%; operator zgłasza aktywne zasilanie USB. Ani słabe światło/AF, ani zasilanie, ani błąd sterownika nie zostały wykazane jako przyczyna. Nie zmieniano ustawień i nie wykonywano zdjęcia recovery.
+
+UVC przez około 88,882 s: 2667 odebranych ramek, 1106 różnych payloadów, maksymalna przerwa odbioru 0,119192 s, brak błędów kolektora. Najdłuższe identyczne ciągi po rozruchu: 0,634709 s przy ujęciu 2 oraz około 0,568 s przy ujęciach 1 i 3. Są to znaczniki dostarczenia danych do hosta, nie pomiar sensor→ekran. Dopływ ramek nie oznacza stale aktualizowanego obrazu; przyczyny powtórzeń kamera/grabber nie rozdzielono.
+
+## Pozostałe kroki
+
+1. Przełączyć operatorowo na Mass Storage i zamontować kartę tylko do odczytu.
+2. Porównać pojedynczą próbę oraz trzy udane pary z SD; sprawdzić dodatkowe pliki po ostatnim udanym ujęciu, aby ustalić możliwy wynik czwartego żądania.
+3. Dopiero po rozstrzygnięciu plików ustalić kontrolowaną próbę przyczyny: np. AF-A versus MF przy tej samej scenie i stałej ekspozycji, bez ślepego ponawiania migawki.
+4. Pełne 10/50/100 i próba wielogodzinna pozostają otwarte; obecny wynik nie zamyka niezawodności.
+
+Integralność ARW bajtowo i JPEG do EOI potwierdzona w T2 dotyczy tamtej jednej ekspozycji; nie przeniesiono jej automatycznie na nowe zdjęcia. Nie testowano w tej serii BLE, MTP, pełnego dekodowania RAW, jakości PCB ani latencji.
+
+## Odtwarzalność
+
+Ograniczony zapis wyników i hashów: [SONY_AUTO_REVIEW_SERIES_EVIDENCE_2026-10-13.json](SONY_AUTO_REVIEW_SERIES_EVIDENCE_2026-10-13.json). Bez zdjęć, identyfikatorów sieci i numerów seryjnych.
+
+Lokalne dowody pod /srv/vision-data/vision/sessions/:
+
+- sony-uvc-ptp-autoreview-off-20261013T200129Z: result.json, repeat-analysis.json, ptp-one-shot.log, próbki i oryginały.
+- sony-uvc-ptp-series10-20261013T200614Z: result.json, checkpoint.json, ptp-shell.log, shot-01–04, uvc-frames.json, preflight-config.txt i post-failure-readonly-config.txt.
+
+Dokumentacja ustawienia: [Sony ILCE-6100A, polska instrukcja PDF — Auto podgląd](https://helpguide.sony.net/ilc/2460/v1/pl/print.pdf#page=276), MENU → Ustawienia fotograf.2 → Auto podgląd → WYŁ.
