@@ -4,6 +4,8 @@
 **Repo bazowe:** `autoklinika/Vision`, `main` = `22cc025dffaea85260b7356494c86984be375ecc`.
 **Zakres:** Sony ILCE-6100A ↔ Arduino VENTUNO Q, Ubuntu 24.04.4 ARM64, kernel `6.8.0-1084-qcom`. Nie zmieniono innych projektów.
 
+**Aktualizacja po testach T1/T2 około 19:39–19:48 UTC:** jedna ekspozycja RAW+JPEG przy ciągłym UVC PASS; ARW PTP = SD bajtowo, JPEG identyczny do końca obrazu, a na SD dodatkowo 9226 zer. Podczas operacji UVC powtarzało ten sam payload przez 2,13 s. Szczegóły i aktualne granice: [uzupełnienie T1/T2](SONY_PTP_HDMI_SD_T1_T2_2026-10-13.md). Początkowy stan urządzeń i wcześniejsze UNKNOWN poniżej opisują moment pierwszej fazy audytu.
+
 ## 1. Rekomendacja
 
 **Preferowany wariant B+: clean HDMI do szybkiego podglądu, USB PC Remote/PTP przez libgphoto2 do ustawień, wyzwalania i natychmiastowego odbioru oryginalnych ARW/JPEG na NVMe, opcjonalne BLE do Power Zoom.**
@@ -152,7 +154,7 @@ Docelowe serie automatyczne: oddzielne pojedyncze ekspozycje, Silent Shooting wy
 | Sposób | Utworzenie oryginału | Transfer | Stan dowodu |
 | --- | --- | --- | --- |
 | Lokalne naciśnięcie migawki | Plik według ustawień aparatu | SD / późniejszy import | Kontrolowane porównanie z wyzwoleniem zdalnym UNKNOWN |
-| USB migawka | PASS ARW + pełny JPEG RAW-02 | PTP→NVMe PASS | Nie ma testu SD↔PTP hash tego samego ujęcia |
+| USB migawka | PASS ARW + pełny JPEG RAW-02 | PTP→NVMe PASS | T2: ARW identyczny; JPEG identyczny do EOI, na SD dodatkowe zerowe dopełnienie |
 | Wi-Fi migawka | PASS RAW+JPEG na SD dla DSC00020 | Remote API tylko postview | Jakość utworzenia oddzielna od ograniczenia API |
 | Wi-Fi import „Original” | SUPPORTED JPEG | Osobny Send to Smartphone | RAW konwertowany do JPEG; oryginalny ARW tą funkcją UNSUPPORTED |
 | Mass Storage | Nie tworzy nowego zdjęcia | SD→NVMe bitowo, hash źródło/kopia PASS | Pełny pojedynczy cykl; automatyzacja/recovery niepotwierdzone |
@@ -161,7 +163,7 @@ W sesji Wi-Fi to samo ujęcie dało postview 463 984 B, 1616×1080, oraz SD JPEG
 
 USB RAW-02: ARW 24 894 208 B i JPEG 7 689 886 B. Nowy odczyt EXIF USB JPEG: 39 mm, f/5,6, 1/250, ISO4000; Wi-Fi SD JPEG: 20 mm, f/5,6, 1/200, ISO6400. **To różne sceny/ustawienia; nie można z wielkości plików ani hashy wnioskować o przewadze jakości któregoś wyzwalania.**
 
-Próba domykająca PTP: przed sesją PC Remote ustawić **PC+Camera** i **RAW & JPEG do PC**; Sony dokumentuje te opcje, konfiguracja musi nastąpić przed fotografowaniem. Po jednej ekspozycji odebrać oba obiekty PTP, zamknąć sesję i po bezpiecznej zmianie na Mass Storage porównać te same JPG/ARW z SD. Hash źródłowego JPG ma odpowiadać PTP JPG, ARW odpowiednio ARW. Jeśli hash różni się, zbadać EXIF/MakerNotes i pełne dane; nie zatuszować różnicy ani nie nazwać jej automatycznie rekompresją. **PC+Camera w gphoto2 na tym modelu pozostaje SUPPORTED, nie PASS.** [S6, S7]
+Próba domykająca PTP: przed sesją PC Remote ustawić **PC+Camera** i **RAW & JPEG do PC**; Sony dokumentuje te opcje, konfiguracja musi nastąpić przed fotografowaniem. Po jednej ekspozycji odebrać oba obiekty PTP, zamknąć sesję i po bezpiecznej zmianie na Mass Storage porównać te same JPG/ARW z SD. Hash źródłowego JPG ma odpowiadać PTP JPG, ARW odpowiednio ARW. Jeśli hash różni się, zbadać EXIF/MakerNotes i pełne dane; nie zatuszować różnicy ani nie nazwać jej automatycznie rekompresją. **PC+Camera: początkowo SUPPORTED; późniejsza próba T2 potwierdziła zapis tej samej pary na SD — PASS jednego ujęcia. ARW ma identyczny hash, a JPEG różni się wyłącznie zerowym dopełnieniem po EOI; patrz uzupełnienie T1/T2.** [S6, S7]
 
 Warunek wdrożenia: oryginały kopiowane jako bajty, bez rekompresji, zmiany EXIF, demosaicingu ani nadpisania; produkty QC, TIFF, mozaiki i stacki osobno. Przy zapisie tymczasowy plik na NVMe, walidacja, fsync, atomowa publikacja i manifest. Hash nowego pliku na NVMe zabezpiecza dalszą spójność; sam nie dowodzi zgodności ze źródłem PTP bez źródłowego hasha lub porównania.
 
