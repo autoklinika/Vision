@@ -50,6 +50,16 @@ Stanowisko laboratoryjne wykonuje zdjęcia PCB i pozyskuje *radiometryczne* dane
 
 **Kamera głębi i model AI nie są niezależnym systemem bezpieczeństwa.** Wymagamy mechanicznych/elektrycznych limitów, E-stop, odpowiednich interlocków, osobnego nadzoru napędów oraz procedury bezpiecznego odzyskania stanu. Bez tego system nie może wykonywać autonomicznych ruchów ramieniem.
 
+## Sony A6100A — proponowany podział kanałów (testy 2026-10-13)
+
+Próba sprzętowa potwierdziła funkcjonalny cykl: **czyste HDMI na monitorze + sterowanie Wi-Fi ScalarWebAPI → oryginalny RAW+JPEG na SD → po sesji USB Mass Storage i import na NVMe z walidacją SHA-256**. Nie jest to wdrożona architektura runtime ani dowód pełnej automatyzacji.
+
+Nierozwiązane: odzyskanie Wi-Fi bez obsługi operatora po odłączeniu USB, przechwytywanie HDMI przez grabber UVC, stabilność dużych serii zdjęć oraz odporność na błędy. Logiczne wyłączenie portu USB Linux nie spowodowało powrotu Sony do Wi-Fi.
+
+Dokumentacja:
+- [Sony — raport rzeczywistych testów](../hardware/SONY_A6100A_MULTITRANSPORT_VERIFICATION_2026-10-13.md)
+- [ADR-VISION-SONY-001 — projektowany automat stanów i bramki produkcyjne](ADR_SONY_STAGED_ACQUISITION_2026-10-13.md)
+
 ## Decyzje otwarte
 
 Model ramienia, kamera termiczna, kamera głębi, mechanizm triggera Sony A6100, dobór interfejsu oświetlenia, GUI, framework runtime, protokół eksportu i archiwizacja danych.
