@@ -53,13 +53,22 @@ def compare_jpeg_bytes(ptp, sd):
     pe, se = jpeg_end(ptp), jpeg_end(sd)
     encoded_equal = ptp[:pe] == sd[:se]
     tails_zero = not any(ptp[pe:]) and not any(sd[se:])
+    # Sony originals can contain a second JPEG AFTER the primary image's EOI.
+    # Preserve all those bytes. Only an SD suffix beyond the ENTIRE PTP file
+    # may be classified as additional zero padding.
+    prefix_equal = sd.startswith(ptp)
+    sd_extra = sd[len(ptp):] if prefix_equal else b""
+    padding_only = prefix_equal and len(sd) > len(ptp) and not any(sd_extra)
     return {"whole_file_equal": ptp == sd,
             "encoded_through_eoi_equal": encoded_equal,
             "ptp_eoi_end_bytes": pe, "sd_eoi_end_bytes": se,
             "ptp_tail_bytes": len(ptp) - pe, "sd_tail_bytes": len(sd) - se,
             "tails_all_zero": tails_zero,
+            "entire_ptp_prefix_equal": prefix_equal,
+            "sd_extra_bytes": len(sd_extra) if prefix_equal else None,
+            "sd_extra_all_zero": not any(sd_extra) if prefix_equal else None,
             "classification": ("EXACT" if ptp == sd else
-                               "ENCODED_IDENTICAL_ZERO_PADDING_ONLY" if encoded_equal and tails_zero
+                               "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY" if padding_only
                                else "DIFFERENT")}
 
 
@@ -198,7 +207,7 @@ def compare(manifest, sdroot, output):
     report["status"] = "PASS" if report["verified_pairs"] == 13 else "FAIL"
     report["raw_exact_files"] = sum(row.get("raw", {}).get("whole_file_equal", False) for row in report["shots"])
     report["jpeg_exact_files"] = sum(row.get("jpeg", {}).get("whole_file_equal", False) for row in report["shots"])
-    report["jpeg_zero_padding_only"] = sum(row.get("jpeg", {}).get("classification") == "ENCODED_IDENTICAL_ZERO_PADDING_ONLY" for row in report["shots"])
+    report["jpeg_zero_padding_only"] = sum(row.get("jpeg", {}).get("classification") == "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY" for row in report["shots"])
     sd_guard(sdroot)
     af.write_json(output, report)
     print("FINAL %s %d/13; OUTPUT %s" % (report["status"], report["verified_pairs"], output), flush=True)
