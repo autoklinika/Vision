@@ -1,6 +1,6 @@
 # Sony ILCE-6100A — test BLE zoom + AF + RAW/JPEG + UVC
 
-Status: **PROTOTYPE / TEST przygotowany; seria sprzętowa z zoomem NOT RUN**.
+Status: **PROTOTYPE / ograniczony test sprzętowy PASS: 3/3 i 10/10 z zoomem**.
 Odczyt usług BLE i pasywna obserwacja: **PASS**. Data: 2026-10-13.
 Rozszerzenie [prototypu AF, PR #11](https://github.com/autoklinika/Vision/pull/11).
 Kod `scripts/audit/sony_zoom_af_test.py` wykorzystuje jego niezmienione Shell,
@@ -110,8 +110,9 @@ na urządzeniu. Nie commitować MAC, seriali, fotografii ani surowych logów.
 - 17/17 wcześniejszych testów AF lokalnie i VENTUNO; kod AF niezmieniony.
 - `--inspect` na ARM64 PASS, 10,213074 s; 0 impulsów zoomu, 0 zdjęć,
   FF02 brak powiadomień w 10 s, BLE postflight PASS.
-- **Seria sprzętowa 3/10 z nowym skryptem: NOT RUN.** Kod jest przygotowany,
-  wyniku AF 10/10 z PR #11 nie przenosimy na nową kombinację kanałów.
+- **Seria sprzętowa z nowym skryptem: PASS 3/3 i PASS 10/10**, po jawnej
+  dyspozycji użytkownika „puść test”. Wynik opisany poniżej dotyczy wspólnego
+  działania BLE zoom, świeżego AF/PTP, oryginalnych RAW+JPEG i ciągłego UVC.
 
 PASS serii wymaga odpowiednio 3 lub 10 zweryfikowanych ujęć oraz 2 lub 9
 zmian EXIF we właściwym kierunku, bez retry, z UVC i poprawnym release.
@@ -125,6 +126,72 @@ Tylko draft PR, bez merge, autostartu, wdrożenia i zmian firmware/usług.
 Rollback: zatrzymać proces i potwierdzić release; zachować oryginały i wyniki.
 SIGINT/SIGTERM wyzwalają cleanup; SIGKILL, utrata radia i zasilania nie dają
 gwarancji wykonania programowego RELEASE.
+
+## Wyniki sprzętowe po uruchomieniu
+
+| Próba | RAW+JPEG | Ruch zoomu z EXIF | Czas całej próby |
+| --- | --- | --- | --- |
+| Krótka | PASS 3/3; 3 żądania, 0 retry | PASS 2/2; 50 → 39 → 50 mm | 44,515483 s |
+| Seria | PASS 10/10; 10 żądań, 0 retry | PASS 9/9; tabela poniżej | 167,505139 s |
+
+Sesje NVMe: `sony-zoom-af-20261013T212532372329Z` oraz
+`sony-zoom-af-20261013T212639036527Z`. Kod identyczny z przygotowanym
+prototypem (SHA-256 w JSON); nie zmieniano go pomiędzy przygotowaniem i testem.
+
+| Zdjęcie serii | Impuls | EXIF mm | Potwierdzenie AF, s |
+| --- | --- | --- | --- |
+| 1 | Bazowe | 50 | 1,445580 |
+| 2 | WIDE | 39 | 2,287075 |
+| 3 | TELE | 50 | 2,189096 |
+| 4 | WIDE | 40 | 1,656243 |
+| 5 | TELE | 50 | 2,224081 |
+| 6 | WIDE | 38 | 2,172942 |
+| 7 | TELE | 50 | 2,117133 |
+| 8 | WIDE | 39 | 2,043892 |
+| 9 | TELE | 50 | 2,210765 |
+| 10 | WIDE | 39 | 2,052476 |
+
+Wszystkie 13 JPEG w obu próbach w pełni zdekodowane 6000×4000; każda para
+zawiera ARW z poprawnym nagłówkiem TIFF. SHA-256 wszystkich 26 oryginałów
+w ograniczonym JSON. Pełne dekodowanie RAW i nowe porównanie z SD nadal
+UNKNOWN. Żadnych ponowień PRESS lub full-press; 11/11 par PRESS/RELEASE zoomu
+potwierdzone transportem bez zabezpieczających powtórzeń RELEASE. Ruch
+potwierdzono osobno EXIF, nie na podstawie ACK.
+
+W serii10 AF 1,445580–2,287075 s, mediana 2,1450375 s; każdy z 10 odczytów
+potwierdzenia był >1 s. Kompletna para po rozpoczęciu AF: 5,139965–6,001042 s,
+mediana 5,6669285 s. Te czasy zawierają komunikację i weryfikację protokołu;
+nie są czystą latencją pracy optycznego autofocusa.
+
+| UVC | Krótka próba | Seria10 |
+| --- | --- | --- |
+| Odebrane ramki | 1303 | 4998 |
+| Różne payloady JPEG | 542 | 2131 |
+| Największa przerwa odbioru | 0,111960 s | 0,109949 s |
+| Najdłuższy identyczny fragment po 3 s | 0,400068 s | 0,455600 s |
+| Kontrole treści / wykrycia wzorca | 83 / 0 | 330 / 1 |
+| Błędy kolektora | 0 | 0 |
+
+Jedno wykrycie pasów w serii10 przypadało przed gotowością UVC: to wniosek
+z próbki „before” na ramce105, algorytmu wymagającego trzech kolejnych
+poprawnych kontroli co15 ramek od ramki60 oraz sumy jednego wykrycia w całym
+teście. Zdjęcia uruchomiono dopiero po przejściu bramki. Nie zapisano
+oddzielnego czasu tego wykrycia; nie deklarujemy kontroli każdej klatki.
+Próbki przed/po obu prób obejrzano: rzeczywista scena w słabym oświetleniu,
+bez pasów w tych próbkach; w serii widać zmianę kadru. Czas UVC to odbiór
+hosta, nie timestamp sensora ani dowód płynnych 30 unikalnych klatek/s.
+
+Odebrano 12 powiadomień FF02 w krótkiej próbie i 40 w serii. Nie
+interpretowano ich jako pozycji zoomu. Po obu próbach zwolnienie spustu PTP
+potwierdzone; BLE postflight PASS. Dodatkowy read-only postflight serii:
+AF-A / Single Shot / card+sdram / RAW+JPEG (X.Fine), świeże D215=0,
+D213=1, BLE połączone/sparowane/ServicesResolved, ponowne otwarcie UVC do
+odczytu formatu RC=0. Bez dodatkowego zdjęcia i bez zapisu nastaw.
+**Obiektyw pozostaje po serii na EXIF 39 mm**; nie wysyłano ruchu powrotnego.
+
+Identyczne impulsy WIDE 650 ms z 50 mm dawały 38–40 mm. To nie jest pomiar
+powtarzalności w kontrolowanych warunkach ani dowód absolutnego ustawiania
+zoomu. Odczyt BLE pozycji nadal niedostępny w badanym protokole; używamy EXIF.
 
 ## Referencje pierwotne
 
