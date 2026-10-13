@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-13",
+  "status": "TEST_PREPARED_HARDWARE_SERIES_NOT_RUN",
+  "device": "Sony ILCE-6100A / VENTUNO Q ARM64",
+  "dependency_pr": 11,
+  "dependency_head": "f08d6292b2edd55c622c77e94276958f7fbdd69b",
+  "source_sha256": "4b04d24e36d04ab2e98a3f5f917ec7e1350c1d98f63d7f7d2899b6919153b182",
+  "unchanged_af_source_sha256": "8fc71b344ae4487ab2b84aa63453404c0474c8c732a457eb6066abc3adb94efb",
+  "ble_inspection": {
+    "status": "PASS",
+    "session": "sony-zoom-af-20261013T211946571934Z",
+    "elapsed_s": 10.213074,
+    "paired": true,
+    "connected": true,
+    "services_resolved": true,
+    "remote_service": "8000ff00-ff00-ffff-ffff-ffffffffffff",
+    "ff01_flags": ["write"],
+    "ff02_flags": ["notify"],
+    "readable_characteristics": ["0000dd21-0000-1000-8000-00805f9b34fb"],
+    "dd21_read_bytes": 7,
+    "dd21_interpretation": "LOCATION_FEATURE_FLAGS_NOT_LENS_POSITION",
+    "passive_notify_seconds": 10,
+    "passive_ff02_notifications": 0,
+    "position_readout": "NOT_AVAILABLE_IN_TESTED_REMOTE_PROTOCOL",
+    "unknown_undocumented_ble_commands": "NOT_PROBED",
+    "zoom_press_requests": 0,
+    "full_press_requests": 0,
+    "ble_postflight": "PASS"
+  },
+  "software_validation": {
+    "new_tests_local": {"passed": 14, "total": 14},
+    "new_tests_arm64": {"passed": 14, "total": 14},
+    "af_regressions_local": {"passed": 17, "total": 17},
+    "af_regressions_arm64": {"passed": 17, "total": 17}
+  },
+  "hardware_series": {
+    "status": "NOT_RUN",
+    "short_planned_shots": 3,
+    "full_planned_shots": 10,
+    "baseline_shots": 1,
+    "pulse_ms": 650,
+    "settle_after_release_s": 1,
+    "af_timeout_s": 8,
+    "interval_after_pair_s": 10,
+    "position_measurement": "JPEG_EXIF_AFTER_EACH_PHOTO",
+    "absolute_position_control": "UNKNOWN",
+    "focus_position_readout": "UNKNOWN",
+    "raw_full_decode": "UNKNOWN",
+    "new_ptp_sd_integrity": "UNKNOWN",
+    "long_series_stability": "UNKNOWN"
+  }
+}
