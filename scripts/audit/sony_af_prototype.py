@@ -60,6 +60,7 @@ class Shell:
     """Exactly one camera owner; shell commands never invoke generic capture."""
     def __init__(self, session, binary, library_dir, port):
         self.session, self.port, self.binary = session, port, binary
+        self.output_folder = session
         self.env = os.environ.copy()
         self.env["LD_LIBRARY_PATH"] = library_dir
         for key in ("TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME"):
@@ -111,18 +112,44 @@ class Shell:
         response = self._prompt(timeout)
         if re.search(r"ERROR:|Could not", response, re.I):
             raise GateError("PTP_COMMAND_ERROR:" + command.split()[0])
+        if command.startswith("lcd "):
+            self.output_folder = Path(command[4:])
         return response
 
+    def refresh(self):
+        # Sony wait_for_event explicitly calls GetAllDevicePropData, bypassing
+        # the two-second cache used by get-config. Never silently consume an
+        # unexpected image: preserve its cached bytes on NVMe and stop.
+        response = self.command("wait-event 1ms")
+        if re.search(r"^FILEADDED ", response, re.M):
+            self.preserve_unexpected(response)
+            raise GateError("UNEXPECTED_IMAGE_RECOVERED_NO_NEW_SHUTTER")
+
+    def preserve_unexpected(self, response):
+        matches = re.findall(r"^FILEADDED (capt[0-9]+\.(?:jpg|arw)) /$", response, re.M)
+        if not matches:
+            raise GateError("UNEXPECTED_IMAGE_PATH_RECOVERY_REQUIRED")
+        nvme_guard()
+        original_folder = self.output_folder
+        quarantine = self.session / ("recovered-object-" + str(time.monotonic_ns()))
+        quarantine.mkdir()
+        try:
+            self.command("lcd " + str(quarantine))
+            for name in matches:
+                nvme_guard()
+                self.command("get /" + name)
+        finally:
+            if self.usable:
+                self.command("lcd " + str(original_folder))
+
     def current(self, name, fresh=False):
-        # Two serial reads account for the one-response lag seen in this driver.
-        value = None
-        for _ in range(2 if fresh else 1):
-            response = self.command("get-config " + name)
-            matches = re.findall(r"^Current: (.*)$", response, re.M)
-            if len(matches) != 1:
-                raise GateError("CONFIG_VALUE_MISSING:" + name)
-            value = matches[0].strip()
-        return value
+        if fresh:
+            self.refresh()
+        response = self.command("get-config " + name)
+        matches = re.findall(r"^Current: (.*)$", response, re.M)
+        if len(matches) != 1:
+            raise GateError("CONFIG_VALUE_MISSING:" + name)
+        return matches[0].strip()
 
     def focus(self):
         return int(self.current("d213", fresh=True))
@@ -231,6 +258,30 @@ def af_then_shutter(camera, before_shutter, af_timeout=8.0,
     return result
 
 
+def wait_buffer_idle(camera, timeout=3, clock=time.monotonic, pause=time.sleep):
+    start = clock()
+    samples = []
+    while clock() - start < timeout:
+        value = camera.buffer()
+        samples.append({"elapsed_s": round(clock() - start, 6), "value": value})
+        if value == 0:
+            return samples
+        pause(.1)
+    raise GateError("BUFFER_NOT_IDLE_NO_NEXT_SHOT")
+
+
+def looks_like_test_pattern(image):
+    expected = [(255, 255, 255), (255, 255, 0), (0, 255, 255), (0, 255, 0),
+                (255, 0, 255), (255, 0, 0), (0, 0, 255), (0, 0, 0)]
+    width, height = image.size
+    matches = 0
+    for index, color in enumerate(expected):
+        for fraction in (.2, .5, .8):
+            pixel = image.getpixel((int(width * (index + .5) / 8), int(height * fraction)))
+            matches += max(abs(a - b) for a, b in zip(pixel, color)) < 75
+    return matches >= 22
+
+
 class UVC:
     def __init__(self, session, env):
         from PIL import Image
@@ -239,6 +290,11 @@ class UVC:
         self.ready, self.stop = threading.Event(), threading.Event()
         self.started = time.monotonic()
         self.last = None
+        self.last_content_check = None
+        self.last_was_pattern = True
+        self.valid_content_checks = 0
+        self.pattern_checks = 0
+        self.content_checks = 0
         self.log = (session / "uvc-stream.log").open("wb")
         self.process = subprocess.Popen(
             ["v4l2-ctl", "-d", "/dev/video0",
@@ -285,9 +341,20 @@ class UVC:
                                       "bytes": len(payload),
                                       "sha256": hashlib.sha256(payload).hexdigest()})
                     self.last = payload
-                    if index == 119:
-                        self.sample(payload, "before", index)
-                        self.ready.set()
+                    if index >= 60 and index % 15 == 0:
+                        with self.Image.open(io.BytesIO(payload)) as image:
+                            image.load()
+                            if image.size != (1920, 1080):
+                                raise GateError("UVC_DIMENSIONS")
+                            pattern = looks_like_test_pattern(image.convert("RGB"))
+                        self.last_content_check = received
+                        self.last_was_pattern = pattern
+                        self.content_checks += 1
+                        self.pattern_checks += bool(pattern)
+                        self.valid_content_checks = 0 if pattern else self.valid_content_checks + 1
+                        if self.valid_content_checks >= 3 and not self.ready.is_set():
+                            self.sample(payload, "before", index)
+                            self.ready.set()
                 if len(buffer) > 4 * 1024**2:
                     raise GateError("UVC_BUFFER_LIMIT")
         except Exception as error:
@@ -297,6 +364,9 @@ class UVC:
         if (self.errors or self.process.poll() is not None or not self.rows
                 or time.monotonic() - self.started - self.rows[-1]["receive_s"] > 1):
             raise GateError("UVC_UNAVAILABLE")
+        if (self.last_was_pattern or self.last_content_check is None
+                or time.monotonic() - self.last_content_check > 1):
+            raise GateError("UVC_TEST_PATTERN_OR_UNVERIFIED_CONTENT")
 
     def close(self):
         if self.last and not self.errors:
@@ -321,17 +391,20 @@ class UVC:
         runs, first = [], 0
         for index in range(1, len(self.rows) + 1):
             if index == len(self.rows) or self.rows[index]["sha256"] != self.rows[first]["sha256"]:
-                if index - first > 1 and self.rows[first]["receive_s"] >= 3:
+                if index - first > 1 and self.rows[index - 1]["receive_s"] >= 3:
+                    clipped_start = max(3, self.rows[first]["receive_s"])
                     runs.append({"count": index - first,
-                                 "start_s": self.rows[first]["receive_s"],
+                                 "start_s": clipped_start,
                                  "span_s": round(self.rows[index - 1]["receive_s"]
-                                                 - self.rows[first]["receive_s"], 6)})
+                                                 - clipped_start, 6)})
                 first = index
         return {"frames_received": len(self.rows),
                 "unique_payloads": len({row["sha256"] for row in self.rows}),
                 "max_receive_gap_s": round(max(gaps), 6) if gaps else None,
                 "longest_identical_run_after_3s": max(runs, key=lambda x: x["span_s"]) if runs else None,
                 "samples": self.samples, "collector_errors": self.errors,
+                "content_checks": self.content_checks,
+                "test_pattern_checks": self.pattern_checks,
                 "timing_method": "host_pipe_receipt_not_sensor_timestamp"}
 
 
@@ -423,7 +496,7 @@ def run(args):
         if camera.buffer() != 0:
             raise GateError("PENDING_IMAGE_RECOVERY_REQUIRED")
         uvc = UVC(session, camera.env)
-        if not uvc.ready.wait(14):
+        if not uvc.ready.wait(25):
             raise GateError("UVC_WARMUP_TIMEOUT")
         uvc.gate()
         for number in range(1, args.shots + 1):
@@ -458,8 +531,7 @@ def run(args):
                 if len(photo_paths(folder)) == 2:
                     break
             attempt["files"] = validate_pair(folder)
-            if camera.buffer() != 0:
-                raise GateError("UNEXPECTED_PENDING_OBJECT_NO_NEXT_SHOT")
+            attempt["buffer_settle_samples"] = wait_buffer_idle(camera)
             attempt["status"] = "PASS"
             attempt["complete_pair_s"] = round(time.monotonic() - shot_start, 6)
             write_json(session / "checkpoint.json", report)
