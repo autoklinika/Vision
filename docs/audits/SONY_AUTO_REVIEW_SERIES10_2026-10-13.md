@@ -62,3 +62,21 @@ Lokalne dowody pod /srv/vision-data/vision/sessions/:
 - sony-uvc-ptp-series10-20261013T200614Z: result.json, checkpoint.json, ptp-shell.log, shot-01–04, uvc-frames.json, preflight-config.txt i post-failure-readonly-config.txt.
 
 Dokumentacja ustawienia: [Sony ILCE-6100A, polska instrukcja PDF — Auto podgląd](https://helpguide.sony.net/ilc/2460/v1/pl/print.pdf#page=276), MENU → Ustawienia fotograf.2 → Auto podgląd → WYŁ.
+
+## Diagnostyka błędu — 20:16–20:20 UTC
+
+Nie wykonano nowej ekspozycji ani ponowienia niejednoznacznego zdjęcia.
+
+- W logu kernela z 20:07:20–20:10:00 UTC nie znaleziono zdarzeń USB/UVC świadczących o rozłączeniu lub resecie; odczyt journalctl zakończył się rc=0. Nie wyklucza to każdego błędu transportu.
+- Kolejny odczyt PTP: AF-A, Single Shot, D215 Objects in memory = 0. To stan późniejszy, nie dowód braku czwartej ekspozycji na SD.
+- Źródła używanej wersji [libgphoto2 v2.5.31, library.c](https://github.com/gphoto/libgphoto2/blob/v2.5.31/camlibs/ptp2/library.c): camera_sony_capture wysyła half-press i full-press, w AF czeka najwyżej 1000 ms na ostrość, zwalnia oba przyciski i czeka do 35000 ms na ObjectAdded lub ObjectInMemory >= 0x8000. Bez obiektu zwraca GP_ERROR. Komunikaty tego mechanizmu obecne w załadowanym systemowym ptp2.so; CLI i biblioteka raportują 2.5.28 / 2.5.31.
+- Różnica mtime logów końca ujęć 3 i 4 wynosiła 49,564931 s, obejmując 10 s przerwy i walidację pary 3. Przedział około 39 s dla nieudanego żądania jest zgodny z oczekiwaniem na obiekt; nie zastępuje brakującego szczegółowego trace tego żądania.
+- Wykonano jedną kontrolowaną próbę **wyłącznie half-press przez D2C1**, bez full-press D2C2 i bez aktywnego UVC. Komenda zaakceptowana; odczyty właściwości odświeżały dane z Sony GetAllDevicePropData. W świeżym trace przejście Focus status D213 **1 → 2** odnotowano przy 3,304151 s od startu logu, około **3,012 s po wysłaniu half-press** (0,292035 s). Sterownik traktuje 2/3 jako osiągnięcie ostrości. Odczyty były dyskretne, więc to czas obserwacji potwierdzenia, nie dokładna chwila uzyskania ostrości.
+- Tekstowe odpowiedzi shell get-config pozostawały Current: 1 również w ostatniej próbce; nowsze przejście 1→2 wynika ze szczegółowego trace odświeżenia. Nie ukryto tej różnicy; do wniosku użyto świeżego trace.
+- Half-press zwolniony poprawnie. Pełnych żądań migawki: 0. Nie zmieniano focus mode ani ekspozycji.
+
+**Wiodąca hipoteza:** AF w bieżących warunkach potwierdza ostrość później niż limit trzymania spustu w sterowniku. Aparat może więc nie wykonać zdjęcia przed zwolnieniem, a klient kończy oczekiwanie bez obiektu. Późniejsza próba wspiera ten mechanizm, lecz nie dowodzi stanu AF podczas pierwotnego czwartego wyzwolenia. To nie jest jeszcze zdiagnozowany błąd sterownika ani dowód uszkodzenia aparatu.
+
+Następny test rozróżniający: operator ustawia MF; oddzielna, oznaczona próba RAW+JPEG przy UVC i pełnym debug, bez automatycznych ponowień. Wynik poprzedniej ekspozycji na SD nadal wymaga kontroli; nowej próby nie liczyć jako odzyskania tamtego ujęcia.
+
+Dowody na NVMe: failure-state-readonly.txt, failure-readonly-debug.log, failure-state-get-debug.log, af-halfpress-only-shell.log, af-halfpress-only-debug.log, af-halfpress-only-result.json i failure-diagnosis-preliminary.json. Surowy debug nie jest publikowany — zawiera pełne dane urządzenia. Publiczny JSON uzupełniono wyłącznie o ograniczoną diagnozę i istotne znaczniki.
