@@ -116,8 +116,9 @@ na urządzeniu. Nie commitować MAC, seriali, fotografii ani surowych logów.
 
 PASS serii wymaga odpowiednio 3 lub 10 zweryfikowanych ujęć oraz 2 lub 9
 zmian EXIF we właściwym kierunku, bez retry, z UVC i poprawnym release.
-AF state nie zastępuje optycznej oceny ostrości PCB. Pełne dekodowanie ARW,
-integralność tych nowych plików PTP↔SD, absolutna pozycja zoom/focus,
+AF state nie zastępuje optycznej oceny ostrości PCB. Integralność nowych plików
+PTP↔SD zamknięta: PASS 13/13 par — szczegóły w [raporcie porównania](SONY_PTP_SD_13PAIRS_CLOSEOUT_2026-10-13.md).
+Pełne dekodowanie ARW, absolutna pozycja zoom/focus,
 długotrwała stabilność i metrologia po zmianie skali pozostają UNKNOWN.
 Zoom podczas skalibrowanej mozaiki nadal wymaga stałej ogniskowej; ta seria
 jest diagnostyką współpracy kanałów, nie kalibracją geometrii obrazu.
@@ -153,8 +154,9 @@ prototypem (SHA-256 w JSON); nie zmieniano go pomiędzy przygotowaniem i testem.
 
 Wszystkie 13 JPEG w obu próbach w pełni zdekodowane 6000×4000; każda para
 zawiera ARW z poprawnym nagłówkiem TIFF. SHA-256 wszystkich 26 oryginałów
-w ograniczonym JSON. Pełne dekodowanie RAW i nowe porównanie z SD nadal
-UNKNOWN. Żadnych ponowień PRESS lub full-press; 11/11 par PRESS/RELEASE zoomu
+w ograniczonym JSON. Porównanie tych samych 13 par PTP↔SD: PASS, RAW identyczne
+bajtowo, JPEG pełna zawartość i RGB identyczne, tylko dodatkowe zera na SD.
+Pełne dekodowanie RAW nadal UNKNOWN. Żadnych ponowień PRESS lub full-press; 11/11 par PRESS/RELEASE zoomu
 potwierdzone transportem bez zabezpieczających powtórzeń RELEASE. Ruch
 potwierdzono osobno EXIF, nie na podstawie ACK.
 
@@ -203,3 +205,8 @@ zoomu. Odczyt BLE pozycji nadal niedostępny w badanym protokole; używamy EXIF.
   względne przyciski, brak getterów nastaw i absolutnej pozycji.
 - [finfinack/alphaloc](https://github.com/finfinack/alphaloc), README blob
   `1a80d75a5a6eb21d6e36a210d076079fe258b770`: DD21 jako location feature flags.
+
+## Zamknięcie integralności SD
+
+[Raport końcowy PTP ↔ SD](SONY_PTP_SD_13PAIRS_CLOSEOUT_2026-10-13.md):
+PASS 13/13 par, dokładne kopie 26 plików SD na NVMe. Ten etap zakończony.
