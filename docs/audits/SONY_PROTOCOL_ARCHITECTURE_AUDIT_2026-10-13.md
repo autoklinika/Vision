@@ -10,6 +10,8 @@
 
 **Diagnoza odtworzonego błędu, do 20:28 UTC:** próba AF-A ponownie zatrzymana (drugie żądanie). Pełny trace potwierdził 35,006969 s oczekiwania bez obiektu zdjęcia, D215 stale 0; kontrola MF w tej samej formie trwałej sesji PTP + UVC zakończona 4/4 parami PASS. Silnie wsparty problem AF/obsługi spustu; nie zamyka pierwotnego zapisu SD ani serii 10/50/100. MF było tymczasowe, AF-A przywrócone i odczytane. [Diagnoza i ograniczenia](SONY_AUTO_REVIEW_SERIES10_2026-10-13.md).
 
+**Aktualizacja po prototypie AF, 20:57–21:01 UTC:** osobne AF → świeże potwierdzenie → migawka zaliczyło pojedyncze zdjęcie i 10/10 RAW+JPEG przy ciągłym UVC, bez MF i retry. 17 testów bez sprzętu PASS. Ujawniono także domyślny cache właściwości; wcześniejsze odczyty około 3 s nie są czystym pomiarem pracy AF. Pełne wyniki, kod i granice: [draft PR #11](https://github.com/autoklinika/Vision/pull/11). Integralność nowych zdjęć z SD, optyczne QC i długie próby pozostają otwarte.
+
 ## 1. Rekomendacja
 
 **Preferowany wariant B+: clean HDMI do szybkiego podglądu, USB PC Remote/PTP przez libgphoto2 do ustawień, wyzwalania i natychmiastowego odbioru oryginalnych ARW/JPEG na NVMe, opcjonalne BLE do Power Zoom.**
