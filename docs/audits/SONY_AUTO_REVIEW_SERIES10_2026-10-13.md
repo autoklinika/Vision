@@ -80,3 +80,44 @@ Nie wykonano nowej ekspozycji ani ponowienia niejednoznacznego zdjęcia.
 Następny test rozróżniający: operator ustawia MF; oddzielna, oznaczona próba RAW+JPEG przy UVC i pełnym debug, bez automatycznych ponowień. Wynik poprzedniej ekspozycji na SD nadal wymaga kontroli; nowej próby nie liczyć jako odzyskania tamtego ujęcia.
 
 Dowody na NVMe: failure-state-readonly.txt, failure-readonly-debug.log, failure-state-get-debug.log, af-halfpress-only-shell.log, af-halfpress-only-debug.log, af-halfpress-only-result.json i failure-diagnosis-preliminary.json. Surowy debug nie jest publikowany — zawiera pełne dane urządzenia. Publiczny JSON uzupełniono wyłącznie o ograniczoną diagnozę i istotne znaczniki.
+
+## Odtworzenie błędu i kontrola MF — 20:22–20:28 UTC
+
+**Potwierdzony mechanizm odtworzonego błędu:** camera_sony_capture kończy 35-sekundowe oczekiwanie bez obiektu zdjęcia i zwraca GP_ERROR. **Silnie wsparta przyczyna:** współdziałanie AF-A z krótkim trzymaniem spustu przez sterownik. Nie uznano pierwotnego błędu ani pełnej niezawodności za ostatecznie zamknięte.
+
+| Próba przy ciągłym UVC | Sesja PTP | Wynik | Przywrócenie ustawień |
+| --- | --- | --- | --- |
+| Jedno nowe zdjęcie MF | Osobny proces CLI, pełny debug | RAW+JPEG PASS, 5,919 s | AF-A odczytane po przywróceniu |
+| Do 4 nowych zdjęć AF-A | Jeden gphoto2 --shell, pełny debug | Zdjęcie 1 PASS, 6,413 s; zdjęcie 2 FAIL; 3–4 nie wysłano | AF-A pozostawione |
+| 4 nowe zdjęcia MF | Jeden gphoto2 --shell, pełny debug | 4/4 RAW+JPEG PASS; 5,379 / 5,119 / 4,937 / 4,883 s | AF-A odczytane po przywróceniu |
+
+Wszystkie nowe próby oznaczono odrębnymi katalogami; nie są ponowieniem ani odzyskaniem pierwotnego zdjęcia. Łącznie 7 nowych żądań migawki, 6 odebranych par, 0 automatycznych ponowień. Zmiany AF-A→MF→AF-A były tymczasowymi zmianami diagnostycznymi. Nie zmieniano innych parametrów, bibliotek, usług, firmware ani konfiguracji produkcyjnej.
+
+### Szczegółowy trace nieudanego zdjęcia AF-A nr 2
+
+- Trzymanie spustu: 17,364693–18,371763 s w zegarze logu; wszystkie 6 odczytów D213 = 1, bez potwierdzenia 2/3 w tym przedziale.
+- Oczekiwanie na dostępność zdjęcia: 18,379848–53,386817 s, **35,006969 s**.
+- **5168 odczytów D215**, stale 0; bez ObjectAdded i bez dostępnego obiektu w RAM.
+- Końcowy wpis: no object found during event polling. perhaps no focus...; ścieżka zwraca GP_ERROR. Brak odebranej pary; sekwencja zatrzymana.
+
+Linie timeoutu odczytu kolejki zdarzeń USB występowały również przy udanym pierwszym zdjęciu (109 w jego przedziale, 5163 w długim oczekiwaniu nieudanego drugiego). To polling kanału interrupt/event; same te wpisy nie dowodzą zerwania transportu. Właściwości aparatu były dalej odczytywane. [Źródło obsługi zdarzeń w libgphoto2 v2.5.31](https://github.com/gphoto/libgphoto2/blob/v2.5.31/camlibs/ptp2/usb.c).
+
+Również udane pierwsze zdjęcie AF-A miało D213 = 1 przed zwolnieniem spustu. Zatem sam brak wartości 2/3 nie jest wystarczającym dowodem przyczyny. Dopiero zestaw: opóźnione potwierdzenie w próbie half-press, powtórzenie błędu AF-A i 4/4 MF wspiera zależność od AF/obsługi spustu. Nie nazwano tego dowiedzionym uszkodzeniem USB, aparatu ani błędem bibliotek niezależnym od warunków fotografowania.
+
+### Kontrola MF i granice wniosku
+
+W obu próbach MF pełny trace pominął holding down shutterbutton; zdjęcia zostały udostępnione i obie składowe pobrane. Kontrola 4/4 działała w jednej sesji PTP z UVC i 10 s przerwy po walidacji pary. JPEG 6000×4000: pełne dekodowanie PASS; ARW: nagłówek TIFF i SHA-256, pełne dekodowanie UNKNOWN.
+
+Ekspozycja automatyczna: MF pojedyncze i udane AF-A 1/6 s; kontrola MF trzy pierwsze 1/6 s, czwarte 1/10 s. Oświetlenia/sceny nie zablokowano, więc to nie jest izolowane porównanie przyczynowe ani jakości optycznej. Cztery sukcesy MF nie zamykają 10/50/100 ani próby wielogodzinnej.
+
+**Wniosek praktyczny do kolejnego etapu:** po ustawieniu ostrości sprawdzić serię akwizycji w MF. Jeżeli potrzebny jest zdalny AF, adapter powinien rozdzielić ustawienie ostrości i wyzwolenie zdjęcia, zweryfikować stan i obsłużyć brak gotowości; samo wydłużenie 35-sekundowego oczekiwania na plik nie naprawia wcześniejszego zwolnienia spustu. To propozycja, bez implementacji teraz.
+
+Status SD obu nieudanych ekspozycji i integralność nowych par pozostają UNKNOWN. Aktualny końcowy focus mode: **AF-A**, przywrócenie potwierdzone; Auto podgląd pozostaje WYŁ. zgodnie z potwierdzeniem operatora.
+
+Dodatkowe lokalne sesje:
+
+- sony-capture-error-mf-20261013T202224Z: result.json, diagnostic-summary.json, tymczasowy MF i restore log.
+- sony-capture-error-af-debug-20261013T202630Z: result.json, diagnostic-summary.json, shot-02/capture.log i pełny trace.
+- sony-capture-error-mf-series4-20261013T202800Z: result.json, diagnostic-summary.json, 4 pary i potwierdzenie restore.
+
+Uwaga odtwarzalności: nazwy katalogów nowych prób zawierają zadane identyfikatory, nie wszystkie odpowiadają rzeczywistej chwili utworzenia. Czas wykonania wynika z result.json/EXIF/trace, nie samej nazwy. gphoto2 CLI pochodzi z katalogu diagnostycznego na NVMe; trace wskazuje załadowany systemowy driver /usr/lib/aarch64-linux-gnu/libgphoto2/2.5.31/ptp2.so. Niczego tam nie instalowano ani nie zmieniano. Surowe debug logi zawierają dane obrazów i identyfikację urządzenia, pozostają na NVMe; do publicznego JSON weszły tylko ograniczone wyniki i wybrane wpisy bez tych danych.
