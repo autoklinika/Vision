@@ -18,6 +18,16 @@ Sony ILCE-6100A jest podłączany przez USB w trybie PC Remote. Zweryfikowano st
 
 Raport: [SONY_A6100_VERIFICATION_2026-10-10.md](SONY_A6100_VERIFICATION_2026-10-10.md). Dowody zdjęciowe i logi przechowujemy poza Git.
 
+### Rozszerzenie 2026-10-13 — HDMI/UVC oraz bezpośrednie Wi-Fi Sony
+
+Rzeczywista weryfikacja przyniosła dwa dodatkowe kanały komunikacji, **bez wdrożenia Vision Core**:
+
+- **HDMI → MacroSilicon USB UVC:** 1920×1080 MJPEG przy około 30 FPS, prawdziwy obraz Sony po około 2,1 s rozruchu w jednym zmierzonym przebiegu; wcześniejsze krótkie sesje zwracały pasy testowe. Rekomendowany ciągły stream i niezależne sprawdzanie gotowości obrazu; źródło opóźnienia pozostaje nierozstrzygnięte.
+- **Druga karta Wi-Fi → Sony Camera Remote API:** połączenie WPA2, DHCP i bezpośredni ping **PASS**. `getAvailableApiList`, `getApplicationInfo` i `getShootMode` zwróciły HTTP 200. Główna sieć z Tailscale i trasa domyślna pozostały aktywne.
+- **NIEPRZETESTOWANE:** zoom, wyzwalanie migawki i Wi-Fi Live View metodami API, współbieżność z USB/PTP, opóźnienia końcowe i stabilność długoterminowa.
+
+**Dokument dowodowy:** [SONY_A6100_HDMI_WIFI_VERIFICATION_2026-10-13.md](SONY_A6100_HDMI_WIFI_VERIFICATION_2026-10-13.md). Wyniki te rozszerzają wcześniejszy raport USB/PTP, nie zastępują go. Szczegółowe adresy sieci, sekret WPA2 i pliki obrazu pozostają poza publicznym repo.
+
 ## Kamera radiometryczna (do wyboru)
 
 Wymagane surowe dane temperatur per piksel, parametry kalibracji i możliwość zapisania korekt. Ujęcie pseudokolorowe bez danych radiometrycznych nie spełnia celu. Test: format, jednostki, zakres, emisyjność i współrzędne RGB→IR. **UNVERIFIED.**
