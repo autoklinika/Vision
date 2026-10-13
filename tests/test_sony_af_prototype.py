@@ -152,5 +152,58 @@ class StorageGateTests(unittest.TestCase):
             mkdir.assert_not_called()
 
 
+class RefreshTests(unittest.TestCase):
+    def test_fresh_property_forces_event_refresh_before_read(self):
+        shell = prototype.Shell.__new__(prototype.Shell)
+        calls = []
+        def command(value):
+            calls.append(value)
+            return "Current: 2\n" if value.startswith("get-config") else ""
+        shell.command = command
+        self.assertEqual(shell.current("d213", fresh=True), "2")
+        self.assertEqual(calls, ["wait-event 1ms", "get-config d213"])
+
+    def test_unexpected_photo_during_refresh_is_preserved_and_blocks_read(self):
+        shell = prototype.Shell.__new__(prototype.Shell)
+        calls, preserved = [], []
+        def command(value):
+            calls.append(value)
+            return "FILEADDED capt0001.arw /\n"
+        shell.command = command
+        shell.preserve_unexpected = lambda value: preserved.append(value)
+        with self.assertRaises(prototype.GateError):
+            shell.current("d213", fresh=True)
+        self.assertEqual(calls, ["wait-event 1ms"])
+        self.assertEqual(len(preserved), 1)
+
+
+class BufferAndContentTests(unittest.TestCase):
+    def test_delayed_buffer_clear_can_settle_without_another_shutter(self):
+        clock = Clock()
+        camera = type("Buffer", (), {})()
+        values = iter([1, 1, 0])
+        camera.buffer = lambda: next(values)
+        result = prototype.wait_buffer_idle(camera, clock=clock, pause=clock.sleep)
+        self.assertEqual([r["value"] for r in result], [1, 1, 0])
+
+    def test_buffer_that_never_clears_blocks_next_shot(self):
+        clock = Clock()
+        camera = type("Buffer", (), {"buffer": lambda self: 1})()
+        with self.assertRaises(prototype.GateError):
+            prototype.wait_buffer_idle(camera, timeout=.2, clock=clock, pause=clock.sleep)
+
+    def test_known_eight_color_grabber_pattern_is_rejected(self):
+        colors = [(255,255,255),(255,255,0),(0,255,255),(0,255,0),
+                  (255,0,255),(255,0,0),(0,0,255),(0,0,0)]
+        image = type("Pixels", (), {"size": (1920,1080),
+            "getpixel": lambda self, xy: colors[int(xy[0] / 240)]})()
+        self.assertTrue(prototype.looks_like_test_pattern(image))
+
+    def test_neutral_scene_is_not_classified_as_color_bars(self):
+        image = type("Pixels", (), {"size": (1920,1080),
+            "getpixel": lambda self, xy: (80,80,80)})()
+        self.assertFalse(prototype.looks_like_test_pattern(image))
+
+
 if __name__ == "__main__":
     unittest.main()
