@@ -8,6 +8,8 @@
 
 **Aktualizacja po próbie Auto podgląd WYŁ. i serii, 20:02–20:09 UTC:** pojedyncza para PASS; seria 10 zatrzymana na czwartym żądaniu z błędem capture — odebrano 3 pary, wynik czwartej ekspozycji na SD UNKNOWN. PTP po błędzie nadal odpowiada; ciągi identycznego UVC po rozruchu do około 0,635 s. Nie ponawiano migawki i nie uznano serii za PASS. [Wyniki i granice](SONY_AUTO_REVIEW_SERIES10_2026-10-13.md).
 
+**Diagnoza odtworzonego błędu, do 20:28 UTC:** próba AF-A ponownie zatrzymana (drugie żądanie). Pełny trace potwierdził 35,006969 s oczekiwania bez obiektu zdjęcia, D215 stale 0; kontrola MF w tej samej formie trwałej sesji PTP + UVC zakończona 4/4 parami PASS. Silnie wsparty problem AF/obsługi spustu; nie zamyka pierwotnego zapisu SD ani serii 10/50/100. MF było tymczasowe, AF-A przywrócone i odczytane. [Diagnoza i ograniczenia](SONY_AUTO_REVIEW_SERIES10_2026-10-13.md).
+
 ## 1. Rekomendacja
 
 **Preferowany wariant B+: clean HDMI do szybkiego podglądu, USB PC Remote/PTP przez libgphoto2 do ustawień, wyzwalania i natychmiastowego odbioru oryginalnych ARW/JPEG na NVMe, opcjonalne BLE do Power Zoom.**
