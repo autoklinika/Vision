@@ -526,5 +526,784 @@
       "https://github.com/gphoto/libgphoto2/blob/v2.5.31/camlibs/ptp2/config.c"
     ],
     "new_exposures": 0
+  },
+  "failure_diagnosis_with_reproduction": {
+    "mf_single": {
+      "capture": {
+        "test": "CAPTURE_ERROR_DIAG_MF_ONE_DISTINCT_EXPOSURE",
+        "utc": "2026-10-13T20:23:10.870362+00:00",
+        "lighting": "limited_by_operator; not an optical quality comparison",
+        "settings_changed_by_script": true,
+        "temporary_focus_mode": "Manual",
+        "restore_focus_mode": "AF-A",
+        "restore_rc": 0,
+        "restore_verified": true,
+        "new_distinct_diagnostic_exposure": true,
+        "previous_failed_exposure_sd_status": "UNKNOWN",
+        "shutter_requests": 1,
+        "capture_rc": 0,
+        "capture_duration_s": 5.919,
+        "capture_error": null,
+        "capture_log_has_error": false,
+        "ptp_pair_status": "PASS",
+        "files": [
+          {
+            "file": "ptp-original.arw",
+            "size_bytes": 24890112,
+            "sha256": "df1e8c4fec5cbd6d2db7a8297bc3707dace6fcfa6d76500e6b536452e952fd7b",
+            "header_tiff": true,
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "ptp-original.jpg",
+            "size_bytes": 14550097,
+            "sha256": "77ec20bbf1ae0cd35cb39a0a3e05cb542b39a5efe4547697b7aadd8eae8a0545",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "focal_length_mm": "50.0",
+              "f_number": "5.6",
+              "exposure_s": "0.16666666666666666",
+              "iso": "6400",
+              "datetime_original": "2026:10:13 22:22:53"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "uvc_frames_received": 481,
+        "uvc_frames_during_capture": 178,
+        "uvc_unique_payload_hashes": 173,
+        "uvc_max_receive_gap_s": 0.131062,
+        "shot_start_s": 5.304694,
+        "shot_end_s": 11.224098,
+        "samples": [
+          {
+            "role": "before",
+            "index": 119,
+            "dimensions": [
+              1920,
+              1080
+            ],
+            "mean_luma": 88.13458333333334,
+            "near_black_fraction": 0.15,
+            "file": "uvc-before.jpg"
+          },
+          {
+            "role": "during",
+            "index": 151,
+            "dimensions": [
+              1920,
+              1080
+            ],
+            "mean_luma": 88.1751388888889,
+            "near_black_fraction": 0.15,
+            "file": "uvc-during.jpg"
+          },
+          {
+            "role": "after",
+            "index": 389,
+            "dimensions": [
+              1920,
+              1080
+            ],
+            "mean_luma": 87.08236111111111,
+            "near_black_fraction": 0.15,
+            "file": "uvc-after.jpg"
+          }
+        ],
+        "collector_errors": [],
+        "sd_hash_comparison": "UNKNOWN_PENDING_MASS_STORAGE",
+        "limits": [
+          "Receive timestamps are host pipe delivery timestamps, not sensor or V4L2 acquisition timestamps.",
+          "Uninterrupted valid content and scene freshness require inspection; incoming frames can be black, duplicates, or a held still.",
+          "RAW TIFF header does not establish full sensor decode or RAW bit depth.",
+          "Card persistence and byte identity remain pending direct SD comparison."
+        ]
+      },
+      "selected_driver_trace": [
+        "0.301902 camera_sony_capture         (2): releasing shutterbutton",
+        "0.306847 camera_sony_capture         (2): waiting for image availability",
+        "1.434748 camera_sony_capture         (2): SONY ObjectInMemory count change to 0x8001 seen, ending wait",
+        "1.434762 camera_sony_capture         (2): ending image availability",
+        "3.005751 camera_wait_for_event       (2): SONY ObjectInMemory count change seen, retrieving file"
+      ],
+      "debug_raw_size_bytes": 179225932,
+      "limits": [
+        "One MF success does not establish multi-shot reliability or original error root cause.",
+        "Exposure changed to 1/6 s; scene/lighting held constant was not independently established.",
+        "Raw debug includes image data and device identity; excluded from public evidence."
+      ]
+    },
+    "af_a_reproduction": {
+      "capture": {
+        "test": "CAPTURE_ERROR_AF_A_REPRO_MAX4_WITH_DEBUG",
+        "status": "FAIL_OR_INCOMPLETE",
+        "utc": "2026-10-13T20:25:43.643332+00:00",
+        "session": "sony-capture-error-af-debug-20261013T202630Z",
+        "shutter_requests": 2,
+        "validated_pairs": 1,
+        "planned_max_requests": 4,
+        "new_distinct_diagnostic_exposures": true,
+        "interval_after_validated_pair_s": 10,
+        "auto_review_off": "operator_confirmation",
+        "previous_auto_review_value": "UNKNOWN_NOT_REPORTED",
+        "settings_changed_by_script": false,
+        "persistent_ptp_shell": true,
+        "capture_keep_requested": true,
+        "failure": "AssertionError:PTP_CAPTURE_ERROR_OR_DELETE",
+        "collector_errors": [],
+        "shots": [
+          {
+            "number": 1,
+            "status": "PASS",
+            "capture_duration_s": 6.413,
+            "shot_start_s": 4.632349,
+            "shot_end_s": 11.045318,
+            "uvc_frames_during_capture": 193,
+            "uvc_unique_payloads_during_capture": 86,
+            "files": [
+              {
+                "file": "shot-01/ptp-original.arw",
+                "size_bytes": 24894208,
+                "sha256": "0ede1c66666245c95084f1b412a608fed88c5d5238da79317ee88336c5ddadc8",
+                "header_tiff": true,
+                "raw_full_decode": "UNKNOWN"
+              },
+              {
+                "file": "shot-01/ptp-original.jpg",
+                "size_bytes": 14626124,
+                "sha256": "7c093a913035a40b897f632b733bba33d9e77b30c4dcc47efdef48de977b5a45",
+                "dimensions": [
+                  6000,
+                  4000
+                ],
+                "exif": {
+                  "focal_length_mm": "50.0",
+                  "f_number": "5.6",
+                  "exposure_s": "0.16666666666666666",
+                  "iso": "6400",
+                  "datetime_original": "2026:10:13 22:24:41"
+                },
+                "full_decode": "PASS"
+              }
+            ]
+          }
+        ],
+        "uvc_frames_received": 1827,
+        "uvc_unique_payload_hashes": 753,
+        "uvc_receive_span_s": 60.85299,
+        "uvc_max_receive_gap_s": 0.044558,
+        "uvc_longest_identical_payload_run_after_3s": {
+          "first_index": 168,
+          "last_index": 183,
+          "count": 16,
+          "start_s": 5.841796,
+          "end_s": 6.339407,
+          "span_s": 0.497611
+        },
+        "uvc_top_identical_payload_runs_after_3s": [
+          {
+            "first_index": 168,
+            "last_index": 183,
+            "count": 16,
+            "start_s": 5.841796,
+            "end_s": 6.339407,
+            "span_s": 0.497611
+          },
+          {
+            "first_index": 676,
+            "last_index": 685,
+            "count": 10,
+            "start_s": 22.773712,
+            "end_s": 23.073077,
+            "span_s": 0.299365
+          },
+          {
+            "first_index": 1331,
+            "last_index": 1333,
+            "count": 3,
+            "start_s": 44.599672,
+            "end_s": 44.670197,
+            "span_s": 0.070525
+          },
+          {
+            "first_index": 822,
+            "last_index": 824,
+            "count": 3,
+            "start_s": 27.636012,
+            "end_s": 27.706043,
+            "span_s": 0.070031
+          },
+          {
+            "first_index": 563,
+            "last_index": 565,
+            "count": 3,
+            "start_s": 19.004312,
+            "end_s": 19.073996,
+            "span_s": 0.069684
+          },
+          {
+            "first_index": 1295,
+            "last_index": 1297,
+            "count": 3,
+            "start_s": 43.399569,
+            "end_s": 43.469128,
+            "span_s": 0.069559
+          },
+          {
+            "first_index": 1564,
+            "last_index": 1566,
+            "count": 3,
+            "start_s": 52.363745,
+            "end_s": 52.433302,
+            "span_s": 0.069557
+          },
+          {
+            "first_index": 1230,
+            "last_index": 1232,
+            "count": 3,
+            "start_s": 41.232827,
+            "end_s": 41.302327,
+            "span_s": 0.0695
+          },
+          {
+            "first_index": 282,
+            "last_index": 284,
+            "count": 3,
+            "start_s": 9.639475,
+            "end_s": 9.708726,
+            "span_s": 0.069251
+          },
+          {
+            "first_index": 834,
+            "last_index": 836,
+            "count": 3,
+            "start_s": 28.035448,
+            "end_s": 28.104648,
+            "span_s": 0.0692
+          },
+          {
+            "first_index": 1667,
+            "last_index": 1669,
+            "count": 3,
+            "start_s": 55.796497,
+            "end_s": 55.865677,
+            "span_s": 0.06918
+          },
+          {
+            "first_index": 858,
+            "last_index": 860,
+            "count": 3,
+            "start_s": 28.836258,
+            "end_s": 28.905435,
+            "span_s": 0.069177
+          },
+          {
+            "first_index": 132,
+            "last_index": 134,
+            "count": 3,
+            "start_s": 4.640607,
+            "end_s": 4.709725,
+            "span_s": 0.069118
+          },
+          {
+            "first_index": 1444,
+            "last_index": 1446,
+            "count": 3,
+            "start_s": 48.365419,
+            "end_s": 48.434528,
+            "span_s": 0.069109
+          },
+          {
+            "first_index": 258,
+            "last_index": 260,
+            "count": 3,
+            "start_s": 8.841001,
+            "end_s": 8.910016,
+            "span_s": 0.069015
+          }
+        ],
+        "samples": [
+          {
+            "role": "before",
+            "index": 119,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          }
+        ],
+        "sd_hash_comparison": "UNKNOWN_PENDING_MASS_STORAGE",
+        "limits": [
+          "Host pipe receipt timestamps are not sensor timestamps.",
+          "Identical payload runs do not independently prove camera or grabber cause.",
+          "Full RAW decode and SD persistence remain unverified for this series.",
+          "Limited lighting is accepted for transport testing; no optical quality conclusion."
+        ]
+      },
+      "reproduced_failure_shot": 2,
+      "failed_shot_capture_log": "capture-image-and-download\ncapture-image-and-download\nERROR: Could not capture image.\nERROR: Could not capture.\ngphoto2: {...261013T202630Z/shot-02} /> ",
+      "selected_driver_trace": [
+        "0.424734 camera_sony_capture         (2): holding down shutterbutton",
+        "0.428927 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "0.446204 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "0.752111 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "1.006191 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "1.313223 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "1.621024 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "1.621028 camera_sony_capture         (2): releasing shutterbutton",
+        "1.625200 camera_sony_capture         (2): waiting for image availability",
+        "2.544717 camera_sony_capture         (2): SONY ObjectInMemory count change to 0x8001 seen, ending wait",
+        "2.544720 camera_sony_capture         (2): ending image availability",
+        "4.005115 camera_wait_for_event       (2): SONY ObjectInMemory count change seen, retrieving file",
+        "17.364693 camera_sony_capture         (2): holding down shutterbutton",
+        "17.381731 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "17.387300 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "17.553307 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "17.859807 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "18.066120 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "18.371759 camera_sony_capture         (2): DEBUG== 0xd213 after shutter press = 1",
+        "18.371763 camera_sony_capture         (2): releasing shutterbutton",
+        "18.379848 camera_sony_capture         (2): waiting for image availability",
+        "53.386817 camera_sony_capture         (2): ending image availability",
+        "53.386834 camera_sony_capture [library.c:5013](0): no object found during event polling. perhaps no focus..."
+      ],
+      "failed_shot_focus_samples": [
+        {
+          "debug_s": 17.381731,
+          "value": 1
+        },
+        {
+          "debug_s": 17.3873,
+          "value": 1
+        },
+        {
+          "debug_s": 17.553307,
+          "value": 1
+        },
+        {
+          "debug_s": 17.859807,
+          "value": 1
+        },
+        {
+          "debug_s": 18.06612,
+          "value": 1
+        },
+        {
+          "debug_s": 18.371759,
+          "value": 1
+        }
+      ],
+      "failed_shot_object_poll_samples": 5168,
+      "failed_shot_object_poll_values": [
+        0
+      ],
+      "failed_shot_object_first_last": [
+        {
+          "debug_s": 18.3851,
+          "value": 0
+        },
+        {
+          "debug_s": 53.386803,
+          "value": 0
+        }
+      ],
+      "other_error_level_lines_during_failed_shot": [
+        "18.379880 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.385126 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.399681 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.418816 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.425524 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.439014 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.455933 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.463202 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.468580 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)",
+        "18.486407 ptp_usb_event [usb.c:589]   (0): Reading PTP event failed: Timeout reading from or writing to the port (-10)"
+      ],
+      "shutter_release_debug_s": 18.371763,
+      "image_wait_start_debug_s": 18.379848,
+      "image_wait_end_debug_s": 53.386817,
+      "image_wait_duration_s": 35.006969,
+      "driver_error_site": "camera_sony_capture no object found during event polling, return GP_ERROR",
+      "limits": [
+        "Missing object confirmed; lack of AF confirmation alone does not prove why no object appeared.",
+        "Successful first AF-A shot also lacked a focus value 2/3 before shutter release.",
+        "SD persistence of failed exposures remains unknown.",
+        "Raw debug excluded from public evidence.",
+        "Interrupt event queue timeout lines occur during successful capture too; they do not independently establish a broken USB transport."
+      ],
+      "event_poll_timeouts": {
+        "successful_first": 109,
+        "failed_second": 5163
+      }
+    },
+    "mf_four_shot_control": {
+      "capture": {
+        "test": "CAPTURE_ERROR_MF_CONTROL_MAX4_WITH_DEBUG",
+        "status": "PASS",
+        "utc": "2026-10-13T20:28:15.239405+00:00",
+        "session": "sony-capture-error-mf-series4-20261013T202800Z",
+        "shutter_requests": 4,
+        "validated_pairs": 4,
+        "planned_max_requests": 4,
+        "new_distinct_diagnostic_exposures": true,
+        "interval_after_validated_pair_s": 10,
+        "auto_review_off": "operator_confirmation",
+        "previous_auto_review_value": "UNKNOWN_NOT_REPORTED",
+        "settings_changed_by_script": true,
+        "temporary_focus_mode": "Manual",
+        "restore_focus_mode": "AF-A",
+        "restore_rc": 0,
+        "restore_verified": true,
+        "persistent_ptp_shell": true,
+        "capture_keep_requested": true,
+        "failure": null,
+        "collector_errors": [],
+        "shots": [
+          {
+            "number": 1,
+            "status": "PASS",
+            "capture_duration_s": 5.379,
+            "shot_start_s": 5.512197,
+            "shot_end_s": 10.890881,
+            "uvc_frames_during_capture": 162,
+            "uvc_unique_payloads_during_capture": 63,
+            "files": [
+              {
+                "file": "shot-01/ptp-original.arw",
+                "size_bytes": 24857344,
+                "sha256": "22b693ba5b6dc2dad59b156edb5de643d6c9b1bfc786c5d32eae0cc18d1c12c4",
+                "header_tiff": true,
+                "raw_full_decode": "UNKNOWN"
+              },
+              {
+                "file": "shot-01/ptp-original.jpg",
+                "size_bytes": 14254072,
+                "sha256": "b339eace23535657bad86aebcb60dacec06ac5c0b749ca722d6af0c975658177",
+                "dimensions": [
+                  6000,
+                  4000
+                ],
+                "exif": {
+                  "focal_length_mm": "50.0",
+                  "f_number": "5.6",
+                  "exposure_s": "0.16666666666666666",
+                  "iso": "6400",
+                  "datetime_original": "2026:10:13 22:27:11"
+                },
+                "full_decode": "PASS"
+              }
+            ]
+          },
+          {
+            "number": 2,
+            "status": "PASS",
+            "capture_duration_s": 5.119,
+            "shot_start_s": 21.451467,
+            "shot_end_s": 26.57047,
+            "uvc_frames_during_capture": 153,
+            "uvc_unique_payloads_during_capture": 59,
+            "files": [
+              {
+                "file": "shot-02/ptp-original.arw",
+                "size_bytes": 24857344,
+                "sha256": "a46a718b8cee107df76f6575e7bbf42465c66daf8088e2f0061172ec5f149497",
+                "header_tiff": true,
+                "raw_full_decode": "UNKNOWN"
+              },
+              {
+                "file": "shot-02/ptp-original.jpg",
+                "size_bytes": 14221507,
+                "sha256": "14eae6f4dbe21252886f183d92e5750a41a621742f5d95c7939d41154ccb96ec",
+                "dimensions": [
+                  6000,
+                  4000
+                ],
+                "exif": {
+                  "focal_length_mm": "50.0",
+                  "f_number": "5.6",
+                  "exposure_s": "0.16666666666666666",
+                  "iso": "6400",
+                  "datetime_original": "2026:10:13 22:27:27"
+                },
+                "full_decode": "PASS"
+              }
+            ]
+          },
+          {
+            "number": 3,
+            "status": "PASS",
+            "capture_duration_s": 4.937,
+            "shot_start_s": 37.100171,
+            "shot_end_s": 42.037628,
+            "uvc_frames_during_capture": 148,
+            "uvc_unique_payloads_during_capture": 59,
+            "files": [
+              {
+                "file": "shot-03/ptp-original.arw",
+                "size_bytes": 24857344,
+                "sha256": "a3657b4637f7023721e89c7be04b7452030df593e4808573bd9592fad6d13036",
+                "header_tiff": true,
+                "raw_full_decode": "UNKNOWN"
+              },
+              {
+                "file": "shot-03/ptp-original.jpg",
+                "size_bytes": 14243969,
+                "sha256": "7191805ff5f00324546d50e8cf84567113186360384f04e1a4ec17af5422e5cf",
+                "dimensions": [
+                  6000,
+                  4000
+                ],
+                "exif": {
+                  "focal_length_mm": "50.0",
+                  "f_number": "5.6",
+                  "exposure_s": "0.16666666666666666",
+                  "iso": "6400",
+                  "datetime_original": "2026:10:13 22:27:42"
+                },
+                "full_decode": "PASS"
+              }
+            ]
+          },
+          {
+            "number": 4,
+            "status": "PASS",
+            "capture_duration_s": 4.883,
+            "shot_start_s": 52.470418,
+            "shot_end_s": 57.353245,
+            "uvc_frames_during_capture": 147,
+            "uvc_unique_payloads_during_capture": 57,
+            "files": [
+              {
+                "file": "shot-04/ptp-original.arw",
+                "size_bytes": 24845056,
+                "sha256": "4c35a6bbc378e362c1bfeb277a10724307389071542a1a5cd9eabcb426568dec",
+                "header_tiff": true,
+                "raw_full_decode": "UNKNOWN"
+              },
+              {
+                "file": "shot-04/ptp-original.jpg",
+                "size_bytes": 13909380,
+                "sha256": "6a40d163e4d24b5136abfdba65f064a0128e4558284c749121deb810421406fc",
+                "dimensions": [
+                  6000,
+                  4000
+                ],
+                "exif": {
+                  "focal_length_mm": "50.0",
+                  "f_number": "5.6",
+                  "exposure_s": "0.1",
+                  "iso": "6400",
+                  "datetime_original": "2026:10:13 22:27:58"
+                },
+                "full_decode": "PASS"
+              }
+            ]
+          }
+        ],
+        "uvc_frames_received": 1880,
+        "uvc_unique_payload_hashes": 739,
+        "uvc_receive_span_s": 62.655673,
+        "uvc_max_receive_gap_s": 0.116962,
+        "uvc_longest_identical_payload_run_after_3s": {
+          "first_index": 1110,
+          "last_index": 1124,
+          "count": 15,
+          "start_s": 37.282608,
+          "end_s": 37.750425,
+          "span_s": 0.467817
+        },
+        "uvc_top_identical_payload_runs_after_3s": [
+          {
+            "first_index": 1110,
+            "last_index": 1124,
+            "count": 15,
+            "start_s": 37.282608,
+            "end_s": 37.750425,
+            "span_s": 0.467817
+          },
+          {
+            "first_index": 166,
+            "last_index": 180,
+            "count": 15,
+            "start_s": 5.822556,
+            "end_s": 6.289999,
+            "span_s": 0.467443
+          },
+          {
+            "first_index": 1572,
+            "last_index": 1585,
+            "count": 14,
+            "start_s": 52.677268,
+            "end_s": 53.114969,
+            "span_s": 0.437701
+          },
+          {
+            "first_index": 640,
+            "last_index": 653,
+            "count": 14,
+            "start_s": 21.619356,
+            "end_s": 22.051287,
+            "span_s": 0.431931
+          },
+          {
+            "first_index": 1295,
+            "last_index": 1297,
+            "count": 3,
+            "start_s": 43.445319,
+            "end_s": 43.515491,
+            "span_s": 0.070172
+          },
+          {
+            "first_index": 887,
+            "last_index": 889,
+            "count": 3,
+            "start_s": 29.849771,
+            "end_s": 29.919583,
+            "span_s": 0.069812
+          },
+          {
+            "first_index": 110,
+            "last_index": 112,
+            "count": 3,
+            "start_s": 3.92167,
+            "end_s": 3.991399,
+            "span_s": 0.069729
+          },
+          {
+            "first_index": 145,
+            "last_index": 147,
+            "count": 3,
+            "start_s": 5.120757,
+            "end_s": 5.190472,
+            "span_s": 0.069715
+          },
+          {
+            "first_index": 522,
+            "last_index": 524,
+            "count": 3,
+            "start_s": 17.685838,
+            "end_s": 17.755373,
+            "span_s": 0.069535
+          },
+          {
+            "first_index": 1535,
+            "last_index": 1537,
+            "count": 3,
+            "start_s": 51.446522,
+            "end_s": 51.515968,
+            "span_s": 0.069446
+          },
+          {
+            "first_index": 222,
+            "last_index": 224,
+            "count": 3,
+            "start_s": 7.686061,
+            "end_s": 7.755441,
+            "span_s": 0.06938
+          },
+          {
+            "first_index": 1379,
+            "last_index": 1381,
+            "count": 3,
+            "start_s": 46.246223,
+            "end_s": 46.315568,
+            "span_s": 0.069345
+          },
+          {
+            "first_index": 354,
+            "last_index": 356,
+            "count": 3,
+            "start_s": 12.086574,
+            "end_s": 12.155862,
+            "span_s": 0.069288
+          },
+          {
+            "first_index": 402,
+            "last_index": 404,
+            "count": 3,
+            "start_s": 13.686272,
+            "end_s": 13.755501,
+            "span_s": 0.069229
+          },
+          {
+            "first_index": 1487,
+            "last_index": 1489,
+            "count": 3,
+            "start_s": 49.846358,
+            "end_s": 49.915544,
+            "span_s": 0.069186
+          }
+        ],
+        "samples": [
+          {
+            "role": "before",
+            "index": 119,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          },
+          {
+            "role": "after",
+            "index": 1845,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          }
+        ],
+        "sd_hash_comparison": "UNKNOWN_PENDING_MASS_STORAGE",
+        "limits": [
+          "Host pipe receipt timestamps are not sensor timestamps.",
+          "Identical payload runs do not independently prove camera or grabber cause.",
+          "Full RAW decode and SD persistence remain unverified for this series.",
+          "Limited lighting is accepted for transport testing; no optical quality conclusion."
+        ]
+      },
+      "selected_driver_trace": [
+        "0.291295 camera_sony_capture         (2): releasing shutterbutton",
+        "0.301492 camera_sony_capture         (2): waiting for image availability",
+        "1.481815 camera_sony_capture         (2): SONY ObjectAdded received, ending wait",
+        "1.481934 camera_sony_capture         (2): ending image availability",
+        "2.996598 camera_wait_for_event       (2): SONY ObjectInMemory count change seen, retrieving file",
+        "16.164199 camera_sony_capture         (2): releasing shutterbutton",
+        "16.196092 camera_sony_capture         (2): waiting for image availability",
+        "17.282279 camera_sony_capture         (2): SONY ObjectAdded received, ending wait",
+        "17.282283 camera_sony_capture         (2): ending image availability",
+        "18.726228 camera_wait_for_event       (2): SONY ObjectInMemory count change seen, retrieving file",
+        "31.838470 camera_sony_capture         (2): releasing shutterbutton",
+        "31.857263 camera_sony_capture         (2): waiting for image availability",
+        "32.938236 camera_sony_capture         (2): SONY ObjectInMemory count change to 0x8001 seen, ending wait",
+        "32.938251 camera_sony_capture         (2): ending image availability",
+        "34.339647 camera_wait_for_event       (2): SONY ObjectInMemory count change seen, retrieving file",
+        "47.190087 camera_sony_capture         (2): releasing shutterbutton",
+        "47.204418 camera_sony_capture         (2): waiting for image availability",
+        "48.253129 camera_sony_capture         (2): SONY ObjectInMemory count change to 0x8001 seen, ending wait",
+        "48.253144 camera_sony_capture         (2): ending image availability",
+        "49.633281 camera_wait_for_event       (2): SONY ObjectInMemory count change seen, retrieving file"
+      ],
+      "af_wait_log_count": 0,
+      "limits": [
+        "Four-shot MF control supports focus-dependent mechanism; not a full 10-shot or long-duration reliability gate.",
+        "Exposure was automatic; three images 1/6 s, final image 1/10 s.",
+        "This test does not establish whether either failed AF-A exposure was stored on SD.",
+        "Raw debug contains image data and device identity and is excluded from public evidence."
+      ]
+    },
+    "confirmed_error_mechanism": "In reproduced AF-A shot 2, camera_sony_capture waited 35.006969 s; 5168 ObjectInMemory polls stayed 0 and no ObjectAdded was observed; it returned GP_ERROR at its no-object guard.",
+    "leading_cause": "AF timing/handling mismatch strongly supported by delayed AF-only confirmation and MF control 4/4; original failed exposure causal proof and SD persistence remain UNKNOWN.",
+    "state_after_tests": "Focus mode restored and verified AF-A; Auto Review OFF by operator confirmation; no new production implementation.",
+    "new_diagnostic_full_shutter_requests": 7,
+    "new_diagnostic_verified_pairs": 6,
+    "automatic_retries": 0,
+    "scope_limits": [
+      "Not a 10-shot PASS or long-duration gate.",
+      "AF-A successful shot 1 also reported FocusFound 1 before release; AF status alone does not prove causal failure.",
+      "Automatic exposure and scene/lighting were not locked; quality not compared.",
+      "Full RAW decode and direct SD comparison of new diagnostics pending."
+    ]
   }
 }
