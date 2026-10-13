@@ -241,10 +241,11 @@ class UVC:
         self.last = None
         self.log = (session / "uvc-stream.log").open("wb")
         self.process = subprocess.Popen(
-            ["timeout", "420s", "v4l2-ctl", "-d", "/dev/video0",
+            ["v4l2-ctl", "-d", "/dev/video0",
              "--set-fmt-video=width=1920,height=1080,pixelformat=MJPG",
              "--set-parm=30", "--stream-mmap", "--stream-count=12600", "--stream-to=-"],
-            cwd=session, env=env, stdout=subprocess.PIPE, stderr=self.log, bufsize=0)
+            cwd=session, env=env, stdout=subprocess.PIPE, stderr=self.log,
+            bufsize=0, start_new_session=True)
         self.thread = threading.Thread(target=self._collect, daemon=True)
         self.thread.start()
 
