@@ -121,3 +121,11 @@ Dodatkowe lokalne sesje:
 - sony-capture-error-mf-series4-20261013T202800Z: result.json, diagnostic-summary.json, 4 pary i potwierdzenie restore.
 
 Uwaga odtwarzalności: nazwy katalogów nowych prób zawierają zadane identyfikatory, nie wszystkie odpowiadają rzeczywistej chwili utworzenia. Czas wykonania wynika z result.json/EXIF/trace, nie samej nazwy. gphoto2 CLI pochodzi z katalogu diagnostycznego na NVMe; trace wskazuje załadowany systemowy driver /usr/lib/aarch64-linux-gnu/libgphoto2/2.5.31/ptp2.so. Niczego tam nie instalowano ani nie zmieniano. Surowe debug logi zawierają dane obrazów i identyfikację urządzenia, pozostają na NVMe; do publicznego JSON weszły tylko ograniczone wyniki i wybrane wpisy bez tych danych.
+
+## Aktualizacja — działający prototyp AF przed migawką
+
+Na osobnej gałęzi przygotowano [prototyp i wyniki w PR #11](https://github.com/autoklinika/Vision/pull/11). Aktualny kod, z osobnym AF i świeżym odświeżeniem właściwości, zaliczył pojedynczą próbę oraz 10/10 RAW+JPEG w jednej sesji PTP przy ciągłym UVC, bez przełączania na MF i bez retry. AF 0,861–3,034 s; kompletna para 4,643–6,912 s. 17/17 testów bez sprzętu PASS. To potwierdzenie krótkiego prototypu, nie wdrożenia ani prób 50/100/wielogodzinnych.
+
+Źródła ujawniły domyślny dwusekundowy cache get-config: wcześniejsze czasy obserwacji z tego interfejsu mogą zawierać opóźnienie cache i nie są czystą latencją optycznego AF. Szczegółowy trace wcześniejszej próby half-press pozostaje dowodem chwili obserwacji zmiany; nie rozdziela chwili fizycznego uzyskania ostrości od interwału odczytu. Nowy prototyp wymusza GetAllDevicePropData przez ścieżkę wait-event. Potwierdzenie AF dalej nie zastępuje oceny ostrości PCB.
+
+Nowe zdjęcia PTP↔SD i pełny RAW decode nadal wymagają kontroli. Kod oraz ograniczone dowody są w osobnym draft PR, bez merge.
