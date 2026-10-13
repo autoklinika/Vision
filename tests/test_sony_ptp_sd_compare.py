@@ -22,7 +22,21 @@ class IntegrityTests(unittest.TestCase):
         self.assertFalse(r["whole_file_equal"])
         self.assertTrue(r["encoded_through_eoi_equal"])
         self.assertEqual(r["sd_tail_bytes"], 9226)
-        self.assertEqual(r["classification"], "ENCODED_IDENTICAL_ZERO_PADDING_ONLY")
+        self.assertEqual(r["classification"], "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY")
+
+    def test_additional_jpeg_after_primary_eoi_is_preserved_in_full(self):
+        data = jpeg() + bytes(16) + jpeg(entropy=b"secondary")
+        r = check.compare_jpeg_bytes(data, data + bytes(128))
+        self.assertFalse(r["tails_all_zero"])
+        self.assertTrue(r["entire_ptp_prefix_equal"])
+        self.assertEqual(r["sd_extra_bytes"], 128)
+        self.assertEqual(r["classification"], "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY")
+
+    def test_different_secondary_jpeg_fails_even_if_primary_equal(self):
+        primary = jpeg()
+        r = check.compare_jpeg_bytes(primary + jpeg(entropy=b"one"), primary + jpeg(entropy=b"two"))
+        self.assertTrue(r["encoded_through_eoi_equal"])
+        self.assertEqual(r["classification"], "DIFFERENT")
 
     def test_nonzero_trailing_data_is_not_accepted_as_padding(self):
         data = jpeg()
