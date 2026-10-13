@@ -462,5 +462,69 @@
     "AF-A in limited lighting and low reported battery are observations, not established causes.",
     "Auto Review previous value unknown; exposure changed, so no isolated causal comparison.",
     "No full RAW decode, new direct SD comparison, concurrent BLE, or optical quality conclusion."
-  ]
+  ],
+  "failure_diagnosis_preliminary": {
+    "utc": "2026-10-13T20:20:18.992958+00:00",
+    "original_failure_debug_available": false,
+    "original_capture_log_end_delta_3_to_4_s": 49.56493139266968,
+    "original_kernel_usb_error_lines": 0,
+    "current_readonly_object_in_memory": 0,
+    "current_focus_mode": "AF-A",
+    "current_capture_mode": "Single Shot",
+    "af_probe": {
+      "test": "AF_HALF_PRESS_ONLY_NO_EXPOSURE",
+      "utc": "2026-10-13T20:18:58.188476+00:00",
+      "shutter_full_press_requests": 0,
+      "focus_mode": "AF-A",
+      "halfpress_requests": 1,
+      "halfpress_release_confirmed": true,
+      "samples": [
+        {
+          "since_halfpress_s": 0.160403,
+          "focus_status": "1"
+        },
+        {
+          "since_halfpress_s": 0.51728,
+          "focus_status": "1"
+        },
+        {
+          "since_halfpress_s": 1.022492,
+          "focus_status": "1"
+        },
+        {
+          "since_halfpress_s": 2.025428,
+          "focus_status": "1"
+        },
+        {
+          "since_halfpress_s": 3.021683,
+          "focus_status": "1"
+        }
+      ],
+      "failure": null,
+      "limits": [
+        "Later controlled probe cannot establish the focus state during the original failed fourth exposure.",
+        "No UVC stream was active during this focus probe."
+      ]
+    },
+    "af_probe_selected_debug_lines": [
+      "0.292028 _set_config                 (2): Setting property 'Auto-Focus' / 0xd2c1",
+      "0.292035 ptp_usb_sendreq             (2): Sending PTP_OC 0x9207 (SetControlDeviceB) (0xd2c1) request...",
+      "0.293108 ptp_usb_senddata            (2): Sending PTP_OC 0x9207 (SetControlDeviceB) data...",
+      "0.293783 ptp_usb_getresp             (2): Reading PTP_OC 0x9207 (SetControlDeviceB) response...",
+      "3.304151 ptp                         (2): ptp_sony_getalldevicepropdesc: Focus status(d213): value 1 -> 2",
+      "3.327376 _set_config                 (2): Setting property 'Auto-Focus' / 0xd2c1",
+      "3.327408 ptp_usb_sendreq             (2): Sending PTP_OC 0x9207 (SetControlDeviceB) (0xd2c1) request...",
+      "3.328579 ptp_usb_senddata            (2): Sending PTP_OC 0x9207 (SetControlDeviceB) data...",
+      "3.329747 ptp_usb_getresp             (2): Reading PTP_OC 0x9207 (SetControlDeviceB) response..."
+    ],
+    "driver_source_version": "libgphoto2 v2.5.31",
+    "driver_focus_hold_limit_ms": 1000,
+    "driver_object_wait_limit_ms": 35000,
+    "inference": "Delayed focus confirmation during later probe supports AF timing mismatch as leading hypothesis; original fourth failure not definitively diagnosed.",
+    "source_paths": [
+      "https://github.com/gphoto/libgphoto2/blob/v2.5.31/camlibs/ptp2/library.c",
+      "https://github.com/gphoto/libgphoto2/blob/v2.5.31/camlibs/ptp2/config.c"
+    ],
+    "new_exposures": 0
+  }
 }
