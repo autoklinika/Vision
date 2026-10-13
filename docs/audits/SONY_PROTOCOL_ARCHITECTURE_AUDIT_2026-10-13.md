@@ -6,6 +6,8 @@
 
 **Aktualizacja po testach T1/T2 około 19:39–19:48 UTC:** jedna ekspozycja RAW+JPEG przy ciągłym UVC PASS; ARW PTP = SD bajtowo, JPEG identyczny do końca obrazu, a na SD dodatkowo 9226 zer. Podczas operacji UVC powtarzało ten sam payload przez 2,13 s. Szczegóły i aktualne granice: [uzupełnienie T1/T2](SONY_PTP_HDMI_SD_T1_T2_2026-10-13.md). Początkowy stan urządzeń i wcześniejsze UNKNOWN poniżej opisują moment pierwszej fazy audytu.
 
+**Aktualizacja po próbie Auto podgląd WYŁ. i serii, 20:02–20:09 UTC:** pojedyncza para PASS; seria 10 zatrzymana na czwartym żądaniu z błędem capture — odebrano 3 pary, wynik czwartej ekspozycji na SD UNKNOWN. PTP po błędzie nadal odpowiada; ciągi identycznego UVC po rozruchu do około 0,635 s. Nie ponawiano migawki i nie uznano serii za PASS. [Wyniki i granice](SONY_AUTO_REVIEW_SERIES10_2026-10-13.md).
+
 ## 1. Rekomendacja
 
 **Preferowany wariant B+: clean HDMI do szybkiego podglądu, USB PC Remote/PTP przez libgphoto2 do ustawień, wyzwalania i natychmiastowego odbioru oryginalnych ARW/JPEG na NVMe, opcjonalne BLE do Power Zoom.**
