@@ -18,6 +18,20 @@ Sony ILCE-6100A jest podłączany przez USB w trybie PC Remote. Zweryfikowano st
 
 Raport: [SONY_A6100_VERIFICATION_2026-10-10.md](SONY_A6100_VERIFICATION_2026-10-10.md). Dowody zdjęciowe i logi przechowujemy poza Git.
 
+## Sony A6100A — nowy wariant toru HDMI + Wi-Fi + USB (2026-10-13)
+
+**Preferowany kierunek do dalszej walidacji, nie wdrożony produkcyjnie:** clean HDMI do kadrowania; Wi-Fi ScalarWebAPI do zoomu, ekspozycji i migawki; RAW+JPEG zapisywane na karcie SD; **po sesji** USB Mass Storage do importu oryginałów na NVMe.
+
+**Rzeczywisty PASS pojedynczego cyklu:** użytkownik widział czysty obraz HDMI podczas aktywnego Wi-Fi; VENTUNO wykonał zdjęcie przez Wi-Fi; Sony zapisał na SD parę `DSC00020.JPG` (**6000×4000**) + `DSC00020.ARW`; po fizycznym podłączeniu USB aparat sam zgłosił Mass Storage; źródłowe pliki skopiowano z zamontowanej read-only karty na NVMe i zweryfikowano zgodność SHA-256.
+
+**BLOKER automatyzacji:** programowe `usb1-port2/disable` odłącza urządzenie od Linux, lecz Sony nadal wyświetlało „Tryb USB” i nie uruchamiało sieci Wi-Fi. Po fizycznym odłączeniu USB wraca obraz HDMI, ale sieć Wi-Fi nie pojawiła się automatycznie. Wpływ opcji `Zawsze połączony` pozostaje **NOT TESTED do końca** (rozładowanie akumulatora). Grabber HDMI/UVC i niezawodność długiej serii nadal **NOT TESTED**.
+
+Wariant **USB PC Remote + Bluetooth** ma odrębne potwierdzenie działania USB Preview wraz z BLE zoom (EXIF 16→20 mm), ale nie jest aktualnie preferowanym docelowym przepływem.
+
+- [Wyniki testów Sony — 13 października](SONY_A6100A_MULTITRANSPORT_VERIFICATION_2026-10-13.md)
+- [ADR — etapowy transfer i bramki bezpieczeństwa](../architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md)
+- [Rejestr lokalnych dowodów na NVMe](EVIDENCE_REGISTER_SONY_2026-10-13.md)
+
 ## Kamera radiometryczna (do wyboru)
 
 Wymagane surowe dane temperatur per piksel, parametry kalibracji i możliwość zapisania korekt. Ujęcie pseudokolorowe bez danych radiometrycznych nie spełnia celu. Test: format, jednostki, zakres, emisyjność i współrzędne RGB→IR. **UNVERIFIED.**

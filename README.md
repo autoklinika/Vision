@@ -10,6 +10,11 @@ Stanowisko akwizycji obrazu i inspekcji fotograficznej płytek PCB / sterownikó
 - [Sony A6100 — wszystkie testy USB/PTP, Live View, RAW, focus, STAB-01–06](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md)
 - [Lokalne dowody i katalogi sesji na NVMe](docs/hardware/EVIDENCE_REGISTER_2026-10-10.md)
 - [Skrócony stan bazowy VENTUNO](docs/hardware/VENTUNO_Q_BASELINE.md)
+- [Sony A6100A — HDMI, ScalarWebAPI Wi-Fi, BLE, USB/PTP i pełny cykl RAW+JPEG na SD (13.10.2026)](docs/hardware/SONY_A6100A_MULTITRANSPORT_VERIFICATION_2026-10-13.md)
+- [Decyzja robocza: etapowa akwizycja HDMI + Wi-Fi + import USB, bramki przed produkcją](docs/architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md)
+- [Rejestr dowodów Sony z 12–13.10.2026 (wyłącznie indeks lokalnych sesji NVMe)](docs/hardware/EVIDENCE_REGISTER_SONY_2026-10-13.md)
+
+**Stan dodatkowy 2026-10-13:** pojedynczy cykl HDMI (obserwacja operatora) + sterowanie Wi-Fi → RAW+JPEG na karcie SD → późniejszy import przez USB Mass Storage na NVMe przeszedł **PASS**. Automatyczne wznowienie Wi-Fi po USB, trwała stabilność serii i przechwytywanie cyfrowe HDMI pozostają **NOT TESTED / BLOCKED**; nie ma wdrożonej aplikacji Vision Core.
 
 **Interpretacja:** status `PASS` dotyczy określonego testu; nie jest równoznaczny z gotowością produkcyjną. Zdjęcia i niezredagowane logi pozostają na NVMe, nie w publicznym repo.
 
