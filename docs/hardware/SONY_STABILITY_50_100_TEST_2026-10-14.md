@@ -1,5 +1,7 @@
 # Sony A6100A — test stabilności 50/100 zdjęć w każdym trybie
 
+> **Aktualizacja po rzeczywistym teście (2026-10-14):** poniższy status dokumentuje wyłącznie stan przygotowania sprzed próby. Ukończono później test 100 zdjęć: akwizycja PASS, porównanie PTP↔SD 100/100 PASS i import SD 200/200 PASS. Automatyczny assessment daje FAIL z powodu defektu metadanych `phase=RELEASE`. Pełne wyniki: [SONY_STABILITY_100_REAL_RUN_RESULTS_2026-10-14.md](SONY_STABILITY_100_REAL_RUN_RESULTS_2026-10-14.md).
+
 Status: **PREPARED / SOFTWARE VERIFIED / HARDWARE RUN NOT STARTED**.
 Data przygotowania: 2026-10-14 (Europe/Warsaw).
 **Nie uruchamiać serii bez kolejnej, jednoznacznej zgody właściciela.**
