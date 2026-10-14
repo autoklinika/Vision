@@ -58,7 +58,7 @@ def write_json(path, value):
 
 class Shell:
     """Exactly one camera owner; shell commands never invoke generic capture."""
-    def __init__(self, session, binary, library_dir, port):
+    def __init__(self, session, binary, library_dir, port, debug=True):
         self.session, self.port, self.binary = session, port, binary
         self.output_folder = session
         self.env = os.environ.copy()
@@ -67,10 +67,12 @@ class Shell:
             self.env[key] = str(session)
         self.log = (session / "ptp-shell-private.log").open("wb")
         self.usable = True
+        debug_args = (["--debug", "--debug-loglevel=debug",
+                       "--debug-logfile=" + str(session / "ptp-debug-private.log")]
+                      if debug else [])
         self.process = subprocess.Popen(
             [binary, "--port=" + port, "--camera=USB PTP Class Camera", "--keep",
-             "--filename=original.%C", "--debug", "--debug-loglevel=debug",
-             "--debug-logfile=" + str(session / "ptp-debug-private.log"), "--shell"],
+             "--filename=original.%C", *debug_args, "--shell"],
             cwd=session, env=self.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, bufsize=0)
         try:
@@ -107,9 +109,15 @@ class Shell:
     def command(self, command, timeout=20):
         if not self.usable:
             raise GateError("PTP_SESSION_UNUSABLE")
-        self.process.stdin.write((command + "\n").encode())
-        self.process.stdin.flush()
-        response = self._prompt(timeout)
+        try:
+            self.process.stdin.write((command + "\n").encode())
+            self.process.stdin.flush()
+            response = self._prompt(timeout)
+        except BaseException:
+            # An interrupted command leaves an ambiguous prompt/USB outcome.
+            # Cleanup must terminate this owner before emergency release.
+            self.usable = False
+            raise
         if re.search(r"ERROR:|Could not", response, re.I):
             raise GateError("PTP_COMMAND_ERROR:" + command.split()[0])
         if command.startswith("lcd "):
@@ -283,7 +291,7 @@ def looks_like_test_pattern(image):
 
 
 class UVC:
-    def __init__(self, session, env):
+    def __init__(self, session, env, frame_count=12600):
         from PIL import Image
         self.Image, self.session = Image, session
         self.rows, self.samples, self.errors = [], [], []
@@ -299,7 +307,7 @@ class UVC:
         self.process = subprocess.Popen(
             ["v4l2-ctl", "-d", "/dev/video0",
              "--set-fmt-video=width=1920,height=1080,pixelformat=MJPG",
-             "--set-parm=30", "--stream-mmap", "--stream-count=12600", "--stream-to=-"],
+             "--set-parm=30", "--stream-mmap", "--stream-count=" + str(frame_count), "--stream-to=-"],
             cwd=session, env=env, stdout=subprocess.PIPE, stderr=self.log,
             bufsize=0, start_new_session=True)
         self.thread = threading.Thread(target=self._collect, daemon=True)
