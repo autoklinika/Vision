@@ -2,7 +2,7 @@
 """Controlled IR dot/flood + stereo + optional on-camera YOLOv6 Nano benchmark.
 
 Modes tested in one USB3 session. No robot commands, saved images, flash, EEPROM changes.
-Always resets emitters to OFF, even if the test fails.
+Attempts to reset emitters to OFF in finally; if USB disconnects this call cannot reach device. Device reboots to default IR OFF.
 """
 import argparse
 import json
