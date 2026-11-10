@@ -1,0 +1,791 @@
+{
+  "date": "2026-10-13",
+  "status": "PASS_LIMITED_HARDWARE_DIAGNOSTIC",
+  "device": "Sony ILCE-6100A / VENTUNO Q ARM64",
+  "dependency_pr": 11,
+  "dependency_head": "f08d6292b2edd55c622c77e94276958f7fbdd69b",
+  "source_sha256": "4b04d24e36d04ab2e98a3f5f917ec7e1350c1d98f63d7f7d2899b6919153b182",
+  "unchanged_af_source_sha256": "8fc71b344ae4487ab2b84aa63453404c0474c8c732a457eb6066abc3adb94efb",
+  "ble_inspection": {
+    "status": "PASS",
+    "session": "sony-zoom-af-20261013T211946571934Z",
+    "elapsed_s": 10.213074,
+    "paired": true,
+    "connected": true,
+    "services_resolved": true,
+    "remote_service": "8000ff00-ff00-ffff-ffff-ffffffffffff",
+    "ff01_flags": [
+      "write"
+    ],
+    "ff02_flags": [
+      "notify"
+    ],
+    "readable_characteristics": [
+      "0000dd21-0000-1000-8000-00805f9b34fb"
+    ],
+    "dd21_read_bytes": 7,
+    "dd21_interpretation": "LOCATION_FEATURE_FLAGS_NOT_LENS_POSITION",
+    "passive_notify_seconds": 10,
+    "passive_ff02_notifications": 0,
+    "position_readout": "NOT_AVAILABLE_IN_TESTED_REMOTE_PROTOCOL",
+    "unknown_undocumented_ble_commands": "NOT_PROBED",
+    "zoom_press_requests": 0,
+    "full_press_requests": 0,
+    "ble_postflight": "PASS"
+  },
+  "software_validation": {
+    "new_tests_local": {
+      "passed": 14,
+      "total": 14
+    },
+    "new_tests_arm64": {
+      "passed": 14,
+      "total": 14
+    },
+    "af_regressions_local": {
+      "passed": 17,
+      "total": 17
+    },
+    "af_regressions_arm64": {
+      "passed": 17,
+      "total": 17
+    }
+  },
+  "hardware_series": {
+    "status": "PASS",
+    "short_planned_shots": 3,
+    "full_planned_shots": 10,
+    "baseline_shots": 1,
+    "pulse_ms": 650,
+    "settle_after_release_s": 1,
+    "af_timeout_s": 8,
+    "interval_after_pair_s": 10,
+    "position_measurement": "JPEG_EXIF_AFTER_EACH_PHOTO",
+    "absolute_position_control": "UNKNOWN",
+    "focus_position_readout": "UNKNOWN",
+    "raw_full_decode": "UNKNOWN",
+    "new_ptp_sd_integrity": "UNKNOWN",
+    "long_series_stability": "UNKNOWN",
+    "short_verified_shots": 3,
+    "full_verified_shots": 10,
+    "validated_optical_zoom_changes": 11
+  },
+  "hardware_results": {
+    "pilot": {
+      "session": "sony-zoom-af-20261013T212532372329Z",
+      "status": "PASS",
+      "planned_shots": 3,
+      "verified_shots": 3,
+      "full_press_requests": 3,
+      "automatic_shutter_retries": 0,
+      "elapsed_s": 44.515483,
+      "ptp_release_ack": true,
+      "ble_postflight": "PASS",
+      "ble_notifications_received": 12,
+      "zoom_pulses": [
+        {
+          "direction": "WIDE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.745773
+        },
+        {
+          "direction": "TELE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.783548
+        }
+      ],
+      "focal_sequence_mm": [
+        50,
+        39,
+        50
+      ],
+      "af_confirmation_s": {
+        "min": 0.932372,
+        "median": 2.076346,
+        "max": 2.150828
+      },
+      "pair_completion_s": {
+        "min": 4.621883,
+        "median": 5.862487,
+        "max": 6.052082
+      },
+      "uvc": {
+        "frames_received": 1303,
+        "unique_payloads": 542,
+        "max_receive_gap_s": 0.11196,
+        "longest_identical_run_after_3s": {
+          "count": 13,
+          "start_s": 40.088627,
+          "span_s": 0.400068
+        },
+        "samples": [
+          {
+            "role": "before",
+            "index": 90,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          },
+          {
+            "role": "after",
+            "index": 1301,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          }
+        ],
+        "collector_errors": [],
+        "content_checks": 83,
+        "test_pattern_checks": 0,
+        "timing_method": "host_pipe_receipt_not_sensor_timestamp"
+      },
+      "shots": [
+        {
+          "number": 1,
+          "status": "PASS",
+          "direction": null,
+          "focal_mm": 50,
+          "af_confirmation_s": 0.932372,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.005492,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24869632,
+              "sha256": "847adceac51712ed5d978f2b1ec903de86886a3e7add7f1fab7f27cb82968781",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14148743,
+              "sha256": "a7ea4db1eade9b347322a2e6f2c1e764c12d7088b60c0e92a1567d015d324933",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "status": "PASS",
+          "direction": "WIDE",
+          "focal_mm": 39,
+          "focal_delta_mm": -11,
+          "af_confirmation_s": 2.150828,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.005911,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24865536,
+              "sha256": "4d4c5bb6e973efc16d84286cd41d3e6bca1a9fbb0dde68c3827cfb7fa79a9373",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14392962,
+              "sha256": "7763aa5cc3b833777c67ee059d1f4183f7043547bc852d2ddb6111367598711b",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "39.0"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "status": "PASS",
+          "direction": "TELE",
+          "focal_mm": 50,
+          "focal_delta_mm": 11,
+          "af_confirmation_s": 2.076346,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.011718,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24890112,
+              "sha256": "93ab5e77a3dfaf0dd76f2e036e0829cebb4717f59f88405d92846b28c3e6cf9b",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14570489,
+              "sha256": "81d7ece4b5e75a321e933a3a109c35eec1faabe230a95191b696af1b9ae71aee",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        }
+      ]
+    },
+    "series10": {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "status": "PASS",
+      "planned_shots": 10,
+      "verified_shots": 10,
+      "full_press_requests": 10,
+      "automatic_shutter_retries": 0,
+      "elapsed_s": 167.505139,
+      "ptp_release_ack": true,
+      "ble_postflight": "PASS",
+      "ble_notifications_received": 40,
+      "zoom_pulses": [
+        {
+          "direction": "WIDE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.779614
+        },
+        {
+          "direction": "TELE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.75937
+        },
+        {
+          "direction": "WIDE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.742452
+        },
+        {
+          "direction": "TELE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.761398
+        },
+        {
+          "direction": "WIDE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.791417
+        },
+        {
+          "direction": "TELE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.753427
+        },
+        {
+          "direction": "WIDE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.766569
+        },
+        {
+          "direction": "TELE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.757203
+        },
+        {
+          "direction": "WIDE",
+          "hold_after_ack_s": 0.65,
+          "press_requests": 1,
+          "release_ack": true,
+          "status": "PASS",
+          "press_ack": true,
+          "elapsed_s": 0.750617
+        }
+      ],
+      "focal_sequence_mm": [
+        50,
+        39,
+        50,
+        40,
+        50,
+        38,
+        50,
+        39,
+        50,
+        39
+      ],
+      "af_confirmation_s": {
+        "min": 1.44558,
+        "median": 2.1450375,
+        "max": 2.287075
+      },
+      "pair_completion_s": {
+        "min": 5.139965,
+        "median": 5.6669285,
+        "max": 6.001042
+      },
+      "uvc": {
+        "frames_received": 4998,
+        "unique_payloads": 2131,
+        "max_receive_gap_s": 0.109949,
+        "longest_identical_run_after_3s": {
+          "count": 14,
+          "start_s": 23.373298,
+          "span_s": 0.4556
+        },
+        "samples": [
+          {
+            "role": "before",
+            "index": 105,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          },
+          {
+            "role": "after",
+            "index": 4995,
+            "dimensions": [
+              1920,
+              1080
+            ]
+          }
+        ],
+        "collector_errors": [],
+        "content_checks": 330,
+        "test_pattern_checks": 1,
+        "timing_method": "host_pipe_receipt_not_sensor_timestamp"
+      },
+      "shots": [
+        {
+          "number": 1,
+          "status": "PASS",
+          "direction": null,
+          "focal_mm": 50,
+          "af_confirmation_s": 1.44558,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.0072,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24873728,
+              "sha256": "397782a0ceb87a658ee4eecaf331481dd83df8a9a36b400cb758cc969e4193af",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14410255,
+              "sha256": "065b451aa79d6697f74e636218a2c83f848247a5aad90ffbe58d9367f1013e0a",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "status": "PASS",
+          "direction": "WIDE",
+          "focal_mm": 39,
+          "focal_delta_mm": -11,
+          "af_confirmation_s": 2.287075,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.007296,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24861440,
+              "sha256": "0ec3522631ce372fe358ffbf37d1675afe75f49a2fc800d0689870e9702f3c05",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14318540,
+              "sha256": "90286540d5c8c5fedc80632cbf6c6f3a26e4921668397a0e6252be02ef8d906f",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "39.0"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "status": "PASS",
+          "direction": "TELE",
+          "focal_mm": 50,
+          "focal_delta_mm": 11,
+          "af_confirmation_s": 2.189096,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.010679,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24881920,
+              "sha256": "f5990326945eec4c66a6b8c1d40489065eb7a31205a5404e4f8806cfc7bfb6ef",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14178363,
+              "sha256": "9c1659a380df23aa658b5a0e524f0717e79e82aede9a4d16035044216b3e0193",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "status": "PASS",
+          "direction": "WIDE",
+          "focal_mm": 40,
+          "focal_delta_mm": -10,
+          "af_confirmation_s": 1.656243,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.010137,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24865536,
+              "sha256": "5ef68c2823aff347aabab7d46e3907882115ba79a17a435382e49bcdd5855c85",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14342045,
+              "sha256": "f9e49a756c4e49ef0f2fe094cf5b29e84e84ec5969fecbd1a68937d7834ca0db",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "40.0"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "status": "PASS",
+          "direction": "TELE",
+          "focal_mm": 50,
+          "focal_delta_mm": 10,
+          "af_confirmation_s": 2.224081,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.011942,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24886016,
+              "sha256": "1f816b4a45c95e12fb349eed559e6506c93dbebc0a646a3610e8c8be04568b93",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14403913,
+              "sha256": "601a2fd8b153cb4e85d58b9f005a2d800e5a3f1e96336ad9206a978712c86775",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "status": "PASS",
+          "direction": "WIDE",
+          "focal_mm": 38,
+          "focal_delta_mm": -12,
+          "af_confirmation_s": 2.172942,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.014629,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24865536,
+              "sha256": "89fb87a77cfda4452b7b4d21fbb6cebf027915f3c222c4d377b47f2b656cd603",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14359447,
+              "sha256": "a13a991217b5d49ef6c847036a70ea15b76191047a7d838aa36d9457e2395d54",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "38.0"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "status": "PASS",
+          "direction": "TELE",
+          "focal_mm": 50,
+          "focal_delta_mm": 12,
+          "af_confirmation_s": 2.117133,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.012312,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24873728,
+              "sha256": "b9eaac62c1b0cc7d97ed4f8d82516ff9fb815c2403086c229fffdb73ad978309",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14370876,
+              "sha256": "86e58cb70eb6cfe17f1a0ca5f64916aac82dab38081f9ed62cf4a4aefd019a52",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "status": "PASS",
+          "direction": "WIDE",
+          "focal_mm": 39,
+          "focal_delta_mm": -11,
+          "af_confirmation_s": 2.043892,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.013156,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24865536,
+              "sha256": "13f5409e55f9f50377e84efa8d52af787940ff24e65b3458aece515a15bc4792",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14358059,
+              "sha256": "2a1a6caf5b512c32338bfcb20197ef41821c106ff5da6e56864bc513ea8eb1d6",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "39.0"
+            }
+          ]
+        },
+        {
+          "number": 9,
+          "status": "PASS",
+          "direction": "TELE",
+          "focal_mm": 50,
+          "focal_delta_mm": 11,
+          "af_confirmation_s": 2.210765,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.011145,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24873728,
+              "sha256": "91133dd1f10f7c12e21e93ea8e223819bbfee8e9a72cbabdd8ab1e48b9e94d0a",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14413652,
+              "sha256": "d5bfdb6c332cd6eee8e3bea325280f515110d6e4fa8e0f88b8c54f110b3611ac",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "50.0"
+            }
+          ]
+        },
+        {
+          "number": 10,
+          "status": "PASS",
+          "direction": "WIDE",
+          "focal_mm": 39,
+          "focal_delta_mm": -11,
+          "af_confirmation_s": 2.052476,
+          "full_press_requests": 1,
+          "release_errors": [],
+          "buffer_settle_samples": [
+            {
+              "elapsed_s": 0.008358,
+              "value": 0
+            }
+          ],
+          "files": [
+            {
+              "file": "original.arw",
+              "size_bytes": 24865536,
+              "sha256": "592ad957e0b8f19799c944e7ecc601ae9da0bb2c18c3f66c565d90b08de89985",
+              "tiff_header": "PASS",
+              "raw_full_decode": "UNKNOWN"
+            },
+            {
+              "file": "original.jpg",
+              "size_bytes": 14396750,
+              "sha256": "74bded1e6564b66578fa0b87974dc962673d287e596307f78463f3d26f8a6671",
+              "dimensions": [
+                6000,
+                4000
+              ],
+              "full_decode": "PASS",
+              "focal_length_mm": "39.0"
+            }
+          ]
+        }
+      ]
+    },
+    "postflight": {
+      "config": {
+        "focusmode": "AF-A",
+        "capturemode": "Single Shot",
+        "capturetarget": "card+sdram",
+        "imagequality": "RAW+JPEG (X.Fine)"
+      },
+      "buffer": 0,
+      "focus": 1,
+      "ble": {
+        "Paired": true,
+        "Connected": true,
+        "ServicesResolved": true
+      },
+      "uvc_reopen_readonly_rc": 0,
+      "status": "PASS"
+    }
+  },
+  "uvc_pattern_note": "Series10: one pattern check before readiness at frame105; inferred from gate algorithm and total count1. No guarantee about unchecked frames."
+}

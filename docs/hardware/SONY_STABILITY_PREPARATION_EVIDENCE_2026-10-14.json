@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "status": "SOFTWARE_VERIFIED_HARDWARE_RUN_NOT_STARTED",
+  "date_local": "2026-10-14",
+  "source_base_commit": "0b7685908973c11979822722647d8be684bacbc3",
+  "local": {
+    "tests_passed": 81,
+    "tests_failed": 0,
+    "hardware": "MOCKS_ONLY"
+  },
+  "ventuno": {
+    "os": "Ubuntu ARM64",
+    "python": "3.12.3",
+    "tests_passed": 81,
+    "tests_failed": 0,
+    "test_runtime_s": 16.502,
+    "help_exit_code": 0,
+    "pillow_dbus_pygobject_available": true
+  },
+  "source_sha256": {
+    "scripts/audit/sony_af_prototype.py": "73cc86479b7d519fe7b12fd37756c412aa581186dbfe493f21526146a9a385f3",
+    "scripts/audit/sony_ptp_sd_compare.py": "655a14bd50646682de97eada386cd3bae0992762161d708b9866dbc9def687b9",
+    "scripts/audit/sony_stability_test.py": "68c7de45a377a8644f90841a05bafe65d8f1986058c935ddeb2f7a46703bee12",
+    "scripts/audit/sony_zoom_af_test.py": "4b04d24e36d04ab2e98a3f5f917ec7e1350c1d98f63d7f7d2899b6919153b182",
+    "tests/test_sony_af_prototype.py": "6adcb37bafdb6ec48400bf83869738899257db86442ca4ba0fa8a54d9a4e77fe",
+    "tests/test_sony_ptp_sd_compare.py": "42c0ee1967b35e9c095a38c1bc35e74a2398df7413be60ab6c382a39fea960a5",
+    "tests/test_sony_stability_test.py": "bc641eb62ea7b7c61bb45a77898355e10d0a7db3af100af5b327f73f79884f5c",
+    "tests/test_sony_zoom_af_test.py": "f0005f23c71dfcc08edf13ba878d27363eedaa56652322c2e362e0c94e5a933b"
+  },
+  "hardware_exposures_during_validation": 0,
+  "hardware_zoom_presses_during_validation": 0,
+  "real_50_100_series": "NOT_STARTED_WAITING_FOR_OWNER_AUTHORIZATION"
+}

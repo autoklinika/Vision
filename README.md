@@ -1,55 +1,53 @@
-# Vision
+# Vision — stanowisko inspekcji PCB / ECU
 
-Stanowisko akwizycji obrazu i inspekcji fotograficznej płytek PCB / sterowników ECU, rozwijane na Arduino VENTUNO Q (Qualcomm QCS8275).
+**Aktualizacja stanu faktycznego: 2026-11-10.** Projekt działa na Arduino VENTUNO Q (Qualcomm QCS8275, Ubuntu 24.04 ARM64) z NVMe `/srv/vision-data`. To **integracyjne repozytorium kodu, dokumentacji i testów**; nie oznacza jeszcze istnienia jednego ukończonego Vision Core ani dopuszczenia autonomicznych ruchów robota.
 
-> **Status na 2026-10-10:** projekt bez wdrożonej aplikacji Vision Core. Zakończono część weryfikacji rzeczywistego hardware: GPU, NPU i funkcje USB/PTP Sony A6100, w tym Live View, JPEG 24 MP oraz RAW+JPEG. Stabilność fotografowania pozostaje warunkowa; pełny Hardware Baseline v1 jest nadal otwarty.
+> **Najważniejsze:** sprawdzone moduły nie są równoznaczne z gotowością całego stanowiska. Każda funkcja ma własny stan TEST / PASS / FROZEN / BLOCKED. Faktyczne wyniki dotyczą konkretnych sesji opisanych w raportach. `main` nie aktualizuje automatycznie usług na VENTUNO.
 
-## Raporty z testów sprzętu
+## Ostatni audyt rzeczywistego urządzenia
 
-- [VENTUNO Q — matryca wyników GPU, NPU, PCIe/NVMe, USB, roadmapa](docs/hardware/VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md)
-- [Sony A6100 — wszystkie testy USB/PTP, Live View, RAW, focus, STAB-01–06](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md)
-- [Lokalne dowody i katalogi sesji na NVMe](docs/hardware/EVIDENCE_REGISTER_2026-10-10.md)
-- [Skrócony stan bazowy VENTUNO](docs/hardware/VENTUNO_Q_BASELINE.md)
+- [Stan aktualny / AS-BUILT 2026-11-10](docs/operations/VISION_AS_BUILT_2026-11-10.md) — fakty, testy, stan usług oraz rozbieżności.
+- [Problemy otwarte i bramki integracji](docs/operations/OPEN_ITEMS_2026-11-10.md) — priorytety i warunki dalszych testów.
+- [Zakres konsolidacji i manifest źródeł](docs/operations/SYNC_MANIFEST_2026-11-10.md) — pochodzenie plików, wyłączenia i bezpieczeństwo publikacji.
 
-**Interpretacja:** status `PASS` dotyczy określonego testu; nie jest równoznaczny z gotowością produkcyjną. Zdjęcia i niezredagowane logi pozostają na NVMe, nie w publicznym repo.
+| Moduł | Potwierdzone osiągnięcie | Stan na dzień audytu |
+|---|---|---|
+| VENTUNO Q + NVMe | Ubuntu 24.04.4; NVMe ext4; GPU/NPU ocenione w wyodrębnionych testach | platforma czynna; Hardware Baseline v1 wciąż otwarty |
+| Sony A6100 | HDMI, Wi-Fi, USB PTP/RAW+JPEG i BLE ocenione w testach; różne tryby mają ograniczenia | eksperymenty udokumentowane; brak zintegrowanej produkcyjnej akwizycji |
+| Vision Thermal InfiRay T2S+ | aplikacja webowa DEV v0.6, 3 ROI, historia, obrót, radiometria surowa | **DEV FROZEN**, źródła prywatne; temperatura w °C **NOT VALIDATED** |
+| AgileX NERO 7-DOF | SDK pyAgxArm 1.0.0, CAN 1 Mb/s, firmware 1.22, odczyt 7 przegubów | komunikacja przetestowana; ruch robota niezatwierdzony |
+| Stream Deck Plus | OpenDeck 2.14.1 i prawy dolny STOP SW; sterownik NERO potwierdził `EMERGENCY_STOP(0x1)` | **po restarcie USB Stream Deck niewykryte**; usługa w pętli restartów |
+| STOP / UPS | ADR dwustopniowego zatrzymania i odrębnego scenariusza zaniku zasilania | **etap 1 częściowo wdrożony**, brak globalnego interlocka i niezależnego E-STOP |
+| Vision Core / autonomiczna inspekcja | architektura modułowa, prototypy i raporty | **brak finalnej aplikacji produkcyjnej** |
 
-## Cel i podział odpowiedzialności
+## Architektura i najważniejsze decyzje
 
-**VENTUNO (Vision)** jest lokalnym kontrolerem stanowiska: ma obsługiwać wykonywanie zdjęć, pozyskiwanie termowizji radiometrycznej, ocenę ostrości/ekspozycji/pokrycia, rejestrację przestrzenną, mozaiki i focus stacking, kalibrację oraz wspomaganie ustawiania kamery i planowania ruchu ramienia. OpenCV i lekki model detekcyjny pozostają kandydatami do przyszłego etapu — po weryfikacji kompatybilności.
+- [Architektura logiczna Vision](docs/architecture/OVERVIEW.md): akwizycja, jakość, termowizja, robot i eksport do oddzielnej AI Platform.
+- [ADR-VISION-ROBOT-001 — NERO STOP](docs/architecture/ADR_VISION_NERO_TWO_STAGE_STOP_2026-11-10.md): etap 1 STOP programowy na Stream Deck, etap 2 przycisk GPIO; jasno określone ograniczenia bezpieczeństwa.
+- [ADR Sony — HDMI + Wi-Fi + import z SD](docs/architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md): **PROPOSED**, nie wdrożenie.
+- [Polityka NVMe](docs/architecture/STORAGE_POLICY.md), [fail-closed write guard](docs/architecture/NVME_ENFORCEMENT.md).
+- [Proces zmian i zgody na aktywowanie urządzeń](docs/process/DEVELOPMENT.md).
 
-**AI Platform** ma wykonywać wnikliwą analizę zdjęć PCB, wnioskowanie i raporty **poza VENTUNO**. Sposób przekazywania wyników nie jest wdrożony. Projekty i repozytoria pozostają odrębne.
+## Fotografia, BLE, kamera głębi, robot
 
-## Sprzęt
+- [Sony HDMI/Wi-Fi](docs/hardware/SONY_A6100_HDMI_WIFI_VERIFICATION_2026-10-13.md), [Sony multitransport / SD](docs/hardware/SONY_A6100A_MULTITRANSPORT_VERIFICATION_2026-10-13.md), [audyt protokołów](docs/audits/SONY_PROTOCOL_ARCHITECTURE_AUDIT_2026-10-13.md).
+- [AF przed migawką](docs/hardware/SONY_AF_BEFORE_SHUTTER_PROTOTYPE_2026-10-13.md), [BLE i zoom](docs/hardware/SONY_BLE_ZOOM_AF_TEST_2026-10-13.md), [stabilność 100 zdjęć](docs/hardware/SONY_STABILITY_100_REAL_RUN_RESULTS_2026-10-14.md).
+- [Stream Deck + Sony — testy HID/GUI](docs/hardware/STREAM_DECK_SONY_BLE_TESTS_2026-10-12.md).
+- [STM32, CSI i wbudowany CAN VENTUNO](docs/hardware/VENTUNO_Q_STM32_CSI_CAN_READONLY_2026-10-11.md).
+- [Eksperymentalny skrypt diagnostyczny NERO](scripts/robot/nero_sdk_readonly_probe.py), [odwzorowanie STOP SW](ops/nero/nero_stop.py), [OpenDeck — konfiguracja referencyjna](ops/streamdeck/README.md).
+- [Archiwum autorskich narzędzi eksperymentalnych](scripts/experiments/README.md): Sony/PTP, Stream Deck/GUI/BLE, GPU i NPU — kod zanonimizowany, nieuruchamiany automatycznie.
 
-- Arduino VENTUNO Q — lokalny komputer/sterownik stanowiska, Ubuntu 24.04.4 ARM64, kernel `6.8.0-1084-qcom`; GPU Adreno i NPU Hexagon przeszły testy funkcjonalne w opisanym zakresie.
-- Sony A6100 — **fizycznie przetestowany** po USB: PTP, żywy Preview, JPEG i RAW+JPEG. STAB-01/STAB-03 wykazały błędy szybkiego ponawiania zdjęć; STAB-05 (10/10 w jednej sesji) i STAB-06 (4/4 w oddzielnych sesjach przy 10 s odstępu) przeszły.
-- Kamera termowizyjna **radiometryczna** — model/interfejs niezatwierdzone; wymagane dane temperatury per piksel.
-- Ramię robota — model niezatwierdzony; wymagana ocena zasięgu, udźwigu, sztywności i niezależnego bezpieczeństwa.
-- Nieruchoma kamera głębi/3D — rozważana do mapowania przeszkód, nie jako czujnik bezpieczeństwa funkcjonalnego.
-- Sterowane oświetlenie (ring + boczne), uchwyty i kalibratory — do wyboru i weryfikacji.
+## Termowizja i granica publikacji
 
-Test aparatu i GPU/NPU nie oznacza automatycznej kompatybilności pozostałego sprzętu.
+- [Raport zamrożenia Vision Thermal v0.6](docs/audits/VISION_THERMAL_V06_FREEZE_2026-10-15_PL.md).
+- [Przekazanie źródeł prywatnych](docs/audits/VISION_THERMAL_V06_PRIVATE_SOURCE_HANDOFF_2026-10-15_PL.md).
 
-## Zasady inżynierskie
+Pełny kod, archiwa, zależności licencyjne i pomiary laboratoryjne Thermal pozostają **wyłącznie lokalnie na NVMe**. Publiczne repo przechowuje tylko udokumentowane wyniki, nie prywatne archiwa.
 
-1. Rozdzielamy akwizycję, jakość/kalibrację, przetwarzanie obrazu, termowizję, sterowanie robotem i integracje przez wymienne adaptery.
-2. AI/kamera głębi nie gwarantują bezpieczeństwa; limity ruchu, E-stop i interlocki muszą działać niezależnie.
-3. Zachowujemy oryginalne zdjęcia i radiometrię wraz z metadanymi i hashami; produkty pochodne mają być odtwarzalne.
-4. Nie zmieniamy środowiska Qualcomm/Arduino bez audytu i decyzji właściciela.
-5. Nie wykonujemy na razie sterowania mechaniką, grzaniem ani zasilaniem DUT.
-6. Prace prowadzimy na gałęziach i przez PR; merge do `main` wymaga wyraźnej zgody właściciela.
-7. Nie publikujemy kluczy, tokenów, numerów seryjnych, IP, surowych sesji i innych wrażliwych dowodów.
+## Zasady repozytorium
 
-## Plan kolejnych prac
-
-1. Dokończyć weryfikację hardware: STM32H5, Qualcomm ↔ STM32, MIPI CSI/ISP, Ethernet 2.5 Gb/s, USB-C/DP Alt Mode, temperatury/SMART, stabilność.
-2. Zamknąć odpowiedni zakres i zatwierdzić **Vision Hardware Baseline v1**.
-3. Dopiero potem budować Vision Core, adaptery akwizycji, QC/OpenCV i modele lokalne.
-4. Następnie realizować oświetlenie, kalibrację, mozaiki/focus stacking, radiometrię i integrację robota z osobnymi zabezpieczeniami.
-5. Przygotować jawny, wersjonowany kontrakt eksportu do odrębnej AI Platform.
-
-Szczegóły: `docs/architecture/`, `docs/hardware/`, `docs/process/`, `scripts/audit/`.
-
-## Połączenia administracyjne
-
-Potwierdzono SSH/Tailscale, wcześniejszą sesję przez USB-C/ADB i Desktop Commander MCP na urządzeniu `vision`. Adresy, identyfikatory urządzeń i dane dostępu nie są częścią repozytorium.
+1. `main` stanowi referencję zaakceptowaną przez właściciela. Nowe zmiany przechodzą przez osobne gałęzie i PR. **Brak automatycznego merge.**
+2. Nie commitujemy numerów seryjnych, sekretów, adresów sieci prywatnej, surowych logów, zdjęć, plików RAW, baz, kontenerów ani binarnych SDK.
+3. Testy hardware i każde rzeczywiste uruchomienie aktuatorów wymagają osobnej zgody i spełnienia wymagań bezpieczeństwa.
+4. Skrypty i profile w `ops/` opisują stan wdrożenia w sposób **zanonimizowany i przenośny**. Nie są automatycznie uruchamiane po checkout.
+5. SDK firm trzecich i środowiska runtime są instalowane niezależnie. Ten Git nie jest kopią kompletnego dysku NVMe.

@@ -1,5 +1,7 @@
 # Integracja urządzeń — plan weryfikacji i stan
 
+> **Dokument historyczny (2026-10-10).** Aktualne informacje o NERO, Sony, Thermal i Stream Deck pochodzą z [audytu AS-BUILT 2026-11-10](../operations/VISION_AS_BUILT_2026-11-10.md). Nowsze testy nie zmieniają automatycznie statusu zatwierdzenia produkcyjnego.
+
 **Aktualizacja:** 2026-10-10. Statusy dotyczą wyłącznie przeprowadzonych prób, nie ogólnej kompatybilności wszystkich akcesoriów.
 
 ## Sony A6100 — fizycznie przetestowany, PASS warunkowy

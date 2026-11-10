@@ -1,0 +1,628 @@
+{
+  "test": "PTP_SD_13_RAW_JPEG_PAIRS",
+  "status": "PASS",
+  "sd_mount": {
+    "filesystem": "exfat",
+    "readonly": true,
+    "usb_identity": "054c:0f0b"
+  },
+  "shots": [
+    {
+      "session": "sony-zoom-af-20261013T212532372329Z",
+      "shot": 1,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00045",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "847adceac51712ed5d978f2b1ec903de86886a3e7add7f1fab7f27cb82968781",
+        "sd_sha256": "847adceac51712ed5d978f2b1ec903de86886a3e7add7f1fab7f27cb82968781",
+        "ptp_size_bytes": 24869632,
+        "sd_size_bytes": 24869632
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13732322,
+        "sd_eoi_end_bytes": 13732322,
+        "ptp_tail_bytes": 416421,
+        "sd_tail_bytes": 423454,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 7033,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "a7ea4db1eade9b347322a2e6f2c1e764c12d7088b60c0e92a1567d015d324933",
+        "sd_sha256": "78c53f96dd2078cadb9bc6ae0972b15bb8ef3a0bd78ad1dfd26f3334738fde5a",
+        "ptp_size_bytes": 14148743,
+        "sd_size_bytes": 14155776,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "5558f8eaa54f37073b8e1f0954960ece98990d8ebdbfdc609e3784af58eedf60"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "5558f8eaa54f37073b8e1f0954960ece98990d8ebdbfdc609e3784af58eedf60"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212532372329Z",
+      "shot": 2,
+      "focal_mm": 39,
+      "status": "PASS",
+      "sd_stem": "DSC00046",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "4d4c5bb6e973efc16d84286cd41d3e6bca1a9fbb0dde68c3827cfb7fa79a9373",
+        "sd_sha256": "4d4c5bb6e973efc16d84286cd41d3e6bca1a9fbb0dde68c3827cfb7fa79a9373",
+        "ptp_size_bytes": 24865536,
+        "sd_size_bytes": 24865536
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13976504,
+        "sd_eoi_end_bytes": 13976504,
+        "ptp_tail_bytes": 416458,
+        "sd_tail_bytes": 441416,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 24958,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "7763aa5cc3b833777c67ee059d1f4183f7043547bc852d2ddb6111367598711b",
+        "sd_sha256": "e13b86951908a51566817d6cae355f9f7979059b05c2227692ab70f37029edf4",
+        "ptp_size_bytes": 14392962,
+        "sd_size_bytes": 14417920,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "bb36b9bbd4811636d448f46e8825fc9848d83de33d118e617061924f3bf10337"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "bb36b9bbd4811636d448f46e8825fc9848d83de33d118e617061924f3bf10337"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212532372329Z",
+      "shot": 3,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00047",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "93ab5e77a3dfaf0dd76f2e036e0829cebb4717f59f88405d92846b28c3e6cf9b",
+        "sd_sha256": "93ab5e77a3dfaf0dd76f2e036e0829cebb4717f59f88405d92846b28c3e6cf9b",
+        "ptp_size_bytes": 24890112,
+        "sd_size_bytes": 24890112
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 14131094,
+        "sd_eoi_end_bytes": 14131094,
+        "ptp_tail_bytes": 439395,
+        "sd_tail_bytes": 450666,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 11271,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "81d7ece4b5e75a321e933a3a109c35eec1faabe230a95191b696af1b9ae71aee",
+        "sd_sha256": "e1704aa512ba861e19423b575a87f10d7801e4a0dd88d99b98900435cd733f54",
+        "ptp_size_bytes": 14570489,
+        "sd_size_bytes": 14581760,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "9824e7289855007c89f6fc2380b030fe45bc87021f04ef9887f783e7bcc960b0"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "9824e7289855007c89f6fc2380b030fe45bc87021f04ef9887f783e7bcc960b0"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 1,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00048",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "397782a0ceb87a658ee4eecaf331481dd83df8a9a36b400cb758cc969e4193af",
+        "sd_sha256": "397782a0ceb87a658ee4eecaf331481dd83df8a9a36b400cb758cc969e4193af",
+        "ptp_size_bytes": 24873728,
+        "sd_size_bytes": 24873728
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13986031,
+        "sd_eoi_end_bytes": 13986031,
+        "ptp_tail_bytes": 424224,
+        "sd_tail_bytes": 431889,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 7665,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "065b451aa79d6697f74e636218a2c83f848247a5aad90ffbe58d9367f1013e0a",
+        "sd_sha256": "dc12f11631ce030e726cdbda8ea432c44afe1c4ad47eed97e4d0cd9c79bd593d",
+        "ptp_size_bytes": 14410255,
+        "sd_size_bytes": 14417920,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "245407b297797234f5eb5fa917f5f5e178e23d10441286007b5300e0d6108c47"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "245407b297797234f5eb5fa917f5f5e178e23d10441286007b5300e0d6108c47"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 2,
+      "focal_mm": 39,
+      "status": "PASS",
+      "sd_stem": "DSC00049",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "0ec3522631ce372fe358ffbf37d1675afe75f49a2fc800d0689870e9702f3c05",
+        "sd_sha256": "0ec3522631ce372fe358ffbf37d1675afe75f49a2fc800d0689870e9702f3c05",
+        "ptp_size_bytes": 24861440,
+        "sd_size_bytes": 24861440
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13907216,
+        "sd_eoi_end_bytes": 13907216,
+        "ptp_tail_bytes": 411324,
+        "sd_tail_bytes": 412400,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 1076,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "90286540d5c8c5fedc80632cbf6c6f3a26e4921668397a0e6252be02ef8d906f",
+        "sd_sha256": "a3cf89c5420a384d70bc24be40db18a85120489dedf615748f17e4ebe06d0f37",
+        "ptp_size_bytes": 14318540,
+        "sd_size_bytes": 14319616,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "2f1f9aecd528042e579e5614bade980c391e9662c7c8499d033e92ed68c63baa"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "2f1f9aecd528042e579e5614bade980c391e9662c7c8499d033e92ed68c63baa"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 3,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00050",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "f5990326945eec4c66a6b8c1d40489065eb7a31205a5404e4f8806cfc7bfb6ef",
+        "sd_sha256": "f5990326945eec4c66a6b8c1d40489065eb7a31205a5404e4f8806cfc7bfb6ef",
+        "ptp_size_bytes": 24881920,
+        "sd_size_bytes": 24881920
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13749322,
+        "sd_eoi_end_bytes": 13749322,
+        "ptp_tail_bytes": 429041,
+        "sd_tail_bytes": 439222,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 10181,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "9c1659a380df23aa658b5a0e524f0717e79e82aede9a4d16035044216b3e0193",
+        "sd_sha256": "16343382ad7df528b8cfcebc4acf7e5f9bf5f9b2add063a022cca663f069985a",
+        "ptp_size_bytes": 14178363,
+        "sd_size_bytes": 14188544,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "bdf14cd7f08fd9d5027ab04f413f316511b3cc504c48f810efcd8901ac94fcd0"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "bdf14cd7f08fd9d5027ab04f413f316511b3cc504c48f810efcd8901ac94fcd0"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 4,
+      "focal_mm": 40,
+      "status": "PASS",
+      "sd_stem": "DSC00051",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "5ef68c2823aff347aabab7d46e3907882115ba79a17a435382e49bcdd5855c85",
+        "sd_sha256": "5ef68c2823aff347aabab7d46e3907882115ba79a17a435382e49bcdd5855c85",
+        "ptp_size_bytes": 24865536,
+        "sd_size_bytes": 24865536
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13927142,
+        "sd_eoi_end_bytes": 13927142,
+        "ptp_tail_bytes": 414903,
+        "sd_tail_bytes": 425242,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 10339,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "f9e49a756c4e49ef0f2fe094cf5b29e84e84ec5969fecbd1a68937d7834ca0db",
+        "sd_sha256": "0edee9232533a927be4b15e586882953767dec9f3083befca444d7d34e298059",
+        "ptp_size_bytes": 14342045,
+        "sd_size_bytes": 14352384,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "7e32f9be1847fe5854f3328831072248c8599df674a7884af5f2b86ab373160d"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "7e32f9be1847fe5854f3328831072248c8599df674a7884af5f2b86ab373160d"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 5,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00052",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "1f816b4a45c95e12fb349eed559e6506c93dbebc0a646a3610e8c8be04568b93",
+        "sd_sha256": "1f816b4a45c95e12fb349eed559e6506c93dbebc0a646a3610e8c8be04568b93",
+        "ptp_size_bytes": 24886016,
+        "sd_size_bytes": 24886016
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13972464,
+        "sd_eoi_end_bytes": 13972464,
+        "ptp_tail_bytes": 431449,
+        "sd_tail_bytes": 445456,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 14007,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "601a2fd8b153cb4e85d58b9f005a2d800e5a3f1e96336ad9206a978712c86775",
+        "sd_sha256": "5e3a21652616509c3732f406373547dd38c01efe93f21067bfb8eef28cdb215a",
+        "ptp_size_bytes": 14403913,
+        "sd_size_bytes": 14417920,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "38586762d941e7fc343825100a1d6b7b0cab1a28524db00c7acd59579dcda05c"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "38586762d941e7fc343825100a1d6b7b0cab1a28524db00c7acd59579dcda05c"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 6,
+      "focal_mm": 38,
+      "status": "PASS",
+      "sd_stem": "DSC00053",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "89fb87a77cfda4452b7b4d21fbb6cebf027915f3c222c4d377b47f2b656cd603",
+        "sd_sha256": "89fb87a77cfda4452b7b4d21fbb6cebf027915f3c222c4d377b47f2b656cd603",
+        "ptp_size_bytes": 24865536,
+        "sd_size_bytes": 24865536
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13946757,
+        "sd_eoi_end_bytes": 13946757,
+        "ptp_tail_bytes": 412690,
+        "sd_tail_bytes": 438395,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 25705,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "a13a991217b5d49ef6c847036a70ea15b76191047a7d838aa36d9457e2395d54",
+        "sd_sha256": "e282ba9e31b7002ab484e32f7ca71cfb5f6eec4ad6187642e5c69dd303962311",
+        "ptp_size_bytes": 14359447,
+        "sd_size_bytes": 14385152,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "8d56ef4a4f18e82c7dd228e4b5f3b650c28026116edab0f395d9f71af37330ba"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "8d56ef4a4f18e82c7dd228e4b5f3b650c28026116edab0f395d9f71af37330ba"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 7,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00054",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "b9eaac62c1b0cc7d97ed4f8d82516ff9fb815c2403086c229fffdb73ad978309",
+        "sd_sha256": "b9eaac62c1b0cc7d97ed4f8d82516ff9fb815c2403086c229fffdb73ad978309",
+        "ptp_size_bytes": 24873728,
+        "sd_size_bytes": 24873728
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13947908,
+        "sd_eoi_end_bytes": 13947908,
+        "ptp_tail_bytes": 422968,
+        "sd_tail_bytes": 437244,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 14276,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "86e58cb70eb6cfe17f1a0ca5f64916aac82dab38081f9ed62cf4a4aefd019a52",
+        "sd_sha256": "9efc6e7d2656b22f58ec5fc5fcdf376a72b38691ac513f6847a04ebe567169e0",
+        "ptp_size_bytes": 14370876,
+        "sd_size_bytes": 14385152,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "ab3febdf482fc800ad68f621a75867062fbd51e6449470e9417791834b12234d"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "ab3febdf482fc800ad68f621a75867062fbd51e6449470e9417791834b12234d"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 8,
+      "focal_mm": 39,
+      "status": "PASS",
+      "sd_stem": "DSC00055",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "13f5409e55f9f50377e84efa8d52af787940ff24e65b3458aece515a15bc4792",
+        "sd_sha256": "13f5409e55f9f50377e84efa8d52af787940ff24e65b3458aece515a15bc4792",
+        "ptp_size_bytes": 24865536,
+        "sd_size_bytes": 24865536
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13943983,
+        "sd_eoi_end_bytes": 13943983,
+        "ptp_tail_bytes": 414076,
+        "sd_tail_bytes": 441169,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 27093,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "2a1a6caf5b512c32338bfcb20197ef41821c106ff5da6e56864bc513ea8eb1d6",
+        "sd_sha256": "64793f9c11ebf4e800dc93e45b416aa5a99e47d149c188aefd0805b5a7b7f103",
+        "ptp_size_bytes": 14358059,
+        "sd_size_bytes": 14385152,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "ac2c1046097ae1b89dc79063a239dca15aab9a65fd5bdcfd912594c710ac34d8"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "ac2c1046097ae1b89dc79063a239dca15aab9a65fd5bdcfd912594c710ac34d8"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 9,
+      "focal_mm": 50,
+      "status": "PASS",
+      "sd_stem": "DSC00056",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "91133dd1f10f7c12e21e93ea8e223819bbfee8e9a72cbabdd8ab1e48b9e94d0a",
+        "sd_sha256": "91133dd1f10f7c12e21e93ea8e223819bbfee8e9a72cbabdd8ab1e48b9e94d0a",
+        "ptp_size_bytes": 24873728,
+        "sd_size_bytes": 24873728
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13992621,
+        "sd_eoi_end_bytes": 13992621,
+        "ptp_tail_bytes": 421031,
+        "sd_tail_bytes": 425299,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 4268,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "d5bfdb6c332cd6eee8e3bea325280f515110d6e4fa8e0f88b8c54f110b3611ac",
+        "sd_sha256": "37721b639dcb4b5fb0cc60f8a4b7e5df2761429a7d110550dfe14cbd0166fb0d",
+        "ptp_size_bytes": 14413652,
+        "sd_size_bytes": 14417920,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "ba59b122cdb1142abed0ad3ed69801e41063a189e92bd403238108aa2ae39689"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "ba59b122cdb1142abed0ad3ed69801e41063a189e92bd403238108aa2ae39689"
+        }
+      }
+    },
+    {
+      "session": "sony-zoom-af-20261013T212639036527Z",
+      "shot": 10,
+      "focal_mm": 39,
+      "status": "PASS",
+      "sd_stem": "DSC00057",
+      "raw": {
+        "whole_file_equal": true,
+        "ptp_sha256": "592ad957e0b8f19799c944e7ecc601ae9da0bb2c18c3f66c565d90b08de89985",
+        "sd_sha256": "592ad957e0b8f19799c944e7ecc601ae9da0bb2c18c3f66c565d90b08de89985",
+        "ptp_size_bytes": 24865536,
+        "sd_size_bytes": 24865536
+      },
+      "jpeg": {
+        "whole_file_equal": false,
+        "encoded_through_eoi_equal": true,
+        "ptp_eoi_end_bytes": 13983785,
+        "sd_eoi_end_bytes": 13983785,
+        "ptp_tail_bytes": 412965,
+        "sd_tail_bytes": 434135,
+        "tails_all_zero": false,
+        "entire_ptp_prefix_equal": true,
+        "sd_extra_bytes": 21170,
+        "sd_extra_all_zero": true,
+        "classification": "PTP_PAYLOAD_IDENTICAL_SD_ZERO_PADDING_ONLY",
+        "ptp_sha256": "74bded1e6564b66578fa0b87974dc962673d287e596307f78463f3d26f8a6671",
+        "sd_sha256": "b80e5728cf759ac7d687536e73efe7193a34a200ad9a3a05b1b67170f5371aa1",
+        "ptp_size_bytes": 14396750,
+        "sd_size_bytes": 14417920,
+        "decoded_rgb_equal": true,
+        "ptp_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "dc144d1d92ac74935be3cc3eb1f51cc4795c0977a792555d2e91b46f3c4e784f"
+        },
+        "sd_decoded": {
+          "dimensions": [
+            6000,
+            4000
+          ],
+          "decoded_rgb_sha256": "dc144d1d92ac74935be3cc3eb1f51cc4795c0977a792555d2e91b46f3c4e784f"
+        }
+      }
+    }
+  ],
+  "raw_full_decode": "UNKNOWN",
+  "matching_method": "unique_EXIF_DateTimeOriginal_and_FocalLength_then_bytes",
+  "scope": "13_zoom_AF_test_pairs_only; no_shutter_no_SD_writes",
+  "verified_pairs": 13,
+  "raw_exact_files": 13,
+  "jpeg_exact_files": 0,
+  "jpeg_zero_padding_only": 13,
+  "completed_utc": "2026-10-13T21:57:09.875736+00:00",
+  "sd_import": {
+    "verified_files": 26,
+    "total_bytes": 510181120,
+    "exact_sd_originals_preserved": true
+  },
+  "execution": {
+    "script_sha256": "b9f8abedd92806f7533feabc24f1eadc291edcc15336f91995fd71aa8a592d61",
+    "comparison_tests_passed": 11,
+    "canonical_result_sha256": "72deb37341ab722eb0002c0193cee5c44158c862b60df3861d47e1681bf9855c",
+    "independent_result_sha256": "b0c01d30f660d7318acba918499a9cdee36319564b5f7b2da05c7bdb7a323053"
+  }
+}

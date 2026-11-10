@@ -1,0 +1,18 @@
+[Unit]
+Description=Vision Stream Deck Plus OpenDeck (NERO software STOP)
+After=default.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/srv/vision-data/tools/streamdeck-prod/bin/start-opendeck.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=5
+Environment=HOME=/home/arduino
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=GDK_BACKEND=x11
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

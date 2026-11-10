@@ -1,0 +1,38 @@
+[Unit]
+Description=Vision Remote Desktop Commander MCP (NVMe-only)
+Documentation=https://mcp.desktopcommander.app/
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/srv/vision-data
+ConditionPathIsMountPoint=/srv/vision-data
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=arduino
+Group=arduino
+WorkingDirectory=/srv/vision-data/tools/remote-agent
+Environment=PATH=/srv/vision-data/tools/node/bin:/srv/vision-data/tools/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/srv/vision-data/tools/remote-agent/home
+Environment=XDG_CACHE_HOME=/srv/vision-data/tools/remote-agent/cache
+Environment=XDG_CONFIG_HOME=/srv/vision-data/tools/remote-agent/config
+Environment=XDG_DATA_HOME=/srv/vision-data/tools/remote-agent/data
+Environment=XDG_STATE_HOME=/srv/vision-data/tools/remote-agent/state
+Environment=TMPDIR=/srv/vision-data/tools/remote-agent/tmp
+Environment=npm_config_cache=/srv/vision-data/tools/remote-agent/cache
+Environment=NODE_ENV=production
+Environment=GH_CONFIG_DIR=/home/arduino/.config/gh
+Environment=GIT_CONFIG_GLOBAL=/home/arduino/.gitconfig
+Environment="GIT_SSH_COMMAND=/usr/bin/ssh -i /home/arduino/.ssh/id_ed25519 -o IdentitiesOnly=yes -o UserKnownHostsFile=/home/arduino/.ssh/known_hosts"
+UMask=0077
+ExecStartPre=/bin/bash /srv/vision-data/tools/remote-agent/service/verify-nvme.sh
+ExecStart=/srv/vision-data/tools/node/bin/node /srv/vision-data/tools/remote-agent/runtime/lib/node_modules/@wonderwhy-er/desktop-commander/dist/index.js remote
+Restart=always
+RestartSec=20s
+TimeoutStopSec=20s
+KillMode=control-group
+StandardOutput=append:/srv/vision-data/tools/remote-agent/logs/remote-mcp.log
+StandardError=append:/srv/vision-data/tools/remote-agent/logs/remote-mcp.log
+
+[Install]
+WantedBy=multi-user.target
