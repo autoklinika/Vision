@@ -1,5 +1,7 @@
 # Integracja urządzeń — plan weryfikacji i stan
 
+> **Uwaga historyczna:** dokument odzwierciedla stan z 10.10.2026, a nie obecny wybór ramienia i aparatów. Aktualny audyt 10.11.2026: [AS-BUILT](../operations/VISION_AS_BUILT_2026-11-10.md). Nie traktować historycznego `Ramię (do wyboru)` jako wciąż otwartej decyzji o modelu.
+
 **Aktualizacja:** 2026-10-10. Statusy dotyczą wyłącznie przeprowadzonych prób, nie ogólnej kompatybilności wszystkich akcesoriów.
 
 ## Sony A6100 — fizycznie przetestowany, PASS warunkowy

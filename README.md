@@ -1,55 +1,46 @@
-# Vision
+# Vision — stanowisko inspekcji PCB / ECU
 
-Stanowisko akwizycji obrazu i inspekcji fotograficznej płytek PCB / sterowników ECU, rozwijane na Arduino VENTUNO Q (Qualcomm QCS8275).
+Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q** (Ubuntu ARM64), aparacie Sony A6100, kamerze termowizyjnej i ramieniu **AgileX NERO**.
 
-> **Status na 2026-10-10:** projekt bez wdrożonej aplikacji Vision Core. Zakończono część weryfikacji rzeczywistego hardware: GPU, NPU i funkcje USB/PTP Sony A6100, w tym Live View, JPEG 24 MP oraz RAW+JPEG. Stabilność fotografowania pozostaje warunkowa; pełny Hardware Baseline v1 jest nadal otwarty.
+**Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
 
-## Raporty z testów sprzętu
+## Bieżąca dokumentacja projektu
 
-- [VENTUNO Q — matryca wyników GPU, NPU, PCIe/NVMe, USB, roadmapa](docs/hardware/VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md)
-- [Sony A6100 — wszystkie testy USB/PTP, Live View, RAW, focus, STAB-01–06](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md)
-- [Lokalne dowody i katalogi sesji na NVMe](docs/hardware/EVIDENCE_REGISTER_2026-10-10.md)
-- [Skrócony stan bazowy VENTUNO](docs/hardware/VENTUNO_Q_BASELINE.md)
+- [Stan faktyczny VENTUNO Q i modułów (AS-BUILT, 10.11.2026)](docs/operations/VISION_AS_BUILT_2026-11-10.md).
+- [Otwarte problemy, ryzyka i bramki techniczne](docs/operations/OPEN_ITEMS_2026-11-10.md).
+- [Polityka `main`, eksperymentów i dopuszczenia Vision Core](docs/operations/RELEASE_GATES_2026-11-10.md).
+- [Architektura logiczna Vision](docs/architecture/OVERVIEW.md).
+- [ADR-VISION-ROBOT-001 — dwustopniowy STOP AgileX NERO](docs/architecture/ADR_VISION_NERO_TWO_STAGE_STOP_2026-11-10.md), **ACCEPTED** jako architektura; wdrożenie etapu 1 **częściowe**.
+- [ADR Sony — kanały HDMI/Wi-Fi/SD/USB](docs/architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md), **PROPOSED** — brak wdrożenia produkcyjnego.
 
-**Interpretacja:** status `PASS` dotyczy określonego testu; nie jest równoznaczny z gotowością produkcyjną. Zdjęcia i niezredagowane logi pozostają na NVMe, nie w publicznym repo.
+## Status potwierdzonych prac
 
-## Cel i podział odpowiedzialności
+| Moduł | Najważniejsze potwierdzone wyniki | Stan integracji |
+|---|---|---|
+| VENTUNO Q | Ubuntu 24.04.4 ARM64, NVMe ext4, próby GPU/NPU, STM32/CAN | platforma laboratoryjna; pełny hardware baseline nadal otwarty |
+| Sony A6100 | PTP, HDMI, Wi-Fi, BLE, RAW/JPEG, testy AF i stabilności | osobne próby udokumentowane; docelowy pipeline jeszcze nie wdrożony |
+| Vision Thermal / InfiRay T2S+ | Web DEV v0.6: podgląd, 3 ROI, historia, obrót | **DEV FROZEN**, temperatury **NOT VALIDATED** metrologicznie; źródła prywatne |
+| AgileX NERO 7 DOF | pyAgxArm, firmware 1.22, odczyt wszystkich przegubów i potwierdzenie komendy STOP | pierwsze ruchy / hamowanie pod obciążeniem jeszcze niewalidowane |
+| Stream Deck Plus | OpenDeck 2.14.1 i klawisz STOP SW z wcześniejszym potwierdzeniem sterownika | podczas audytu po restarcie **brak panelu w USB, usługa restartowała się** |
+| Vision Core, ruch autonomiczny, Eye-in-Hand, UPS / automatyczne parkowanie | architektura i plany etapów | **niezatwierdzone jako produkcyjny system** |
 
-**VENTUNO (Vision)** jest lokalnym kontrolerem stanowiska: ma obsługiwać wykonywanie zdjęć, pozyskiwanie termowizji radiometrycznej, ocenę ostrości/ekspozycji/pokrycia, rejestrację przestrzenną, mozaiki i focus stacking, kalibrację oraz wspomaganie ustawiania kamery i planowania ruchu ramienia. OpenCV i lekki model detekcyjny pozostają kandydatami do przyszłego etapu — po weryfikacji kompatybilności.
+Powyższa tabela przedstawia datowany audyt, a nie bieżącą telemetrię online. W szczególności **STOP programowy nie zastępuje niezależnego zabezpieczenia operatora**, a odcięcie zasilania NERO może spowodować opadnięcie ramienia.
 
-**AI Platform** ma wykonywać wnikliwą analizę zdjęć PCB, wnioskowanie i raporty **poza VENTUNO**. Sposób przekazywania wyników nie jest wdrożony. Projekty i repozytoria pozostają odrębne.
+## Gdzie znajdują się testy i kod roboczy?
 
-## Sprzęt
+Pełna konsolidacja prac z października i listopada, łącznie z testami Sony, STM32, skryptami GPU/NPU, referencyjnym kodem NERO/OpenDeck, raportami Thermal i dowodami, pozostaje na osobnej gałęzi:
 
-- Arduino VENTUNO Q — lokalny komputer/sterownik stanowiska, Ubuntu 24.04.4 ARM64, kernel `6.8.0-1084-qcom`; GPU Adreno i NPU Hexagon przeszły testy funkcjonalne w opisanym zakresie.
-- Sony A6100 — **fizycznie przetestowany** po USB: PTP, żywy Preview, JPEG i RAW+JPEG. STAB-01/STAB-03 wykazały błędy szybkiego ponawiania zdjęć; STAB-05 (10/10 w jednej sesji) i STAB-06 (4/4 w oddzielnych sesjach przy 10 s odstępu) przeszły.
-- Kamera termowizyjna **radiometryczna** — model/interfejs niezatwierdzone; wymagane dane temperatury per piksel.
-- Ramię robota — model niezatwierdzony; wymagana ocena zasięgu, udźwigu, sztywności i niezależnego bezpieczeństwa.
-- Nieruchoma kamera głębi/3D — rozważana do mapowania przeszkód, nie jako czujnik bezpieczeństwa funkcjonalnego.
-- Sterowane oświetlenie (ring + boczne), uchwyty i kalibratory — do wyboru i weryfikacji.
+- [PR #15 — integracyjny punkt odniesienia całego projektu](https://github.com/autoklinika/Vision/pull/15).
+- [Zamrożony commit pełnego snapshotu](https://github.com/autoklinika/Vision/tree/34181a6206918dce91021dce3286a221f6e32058).
 
-Test aparatu i GPU/NPU nie oznacza automatycznej kompatybilności pozostałego sprzętu.
+Kod eksperymentalny, testy urządzeń i niezatwierdzone konfiguracje **nie są scalane do `main`** tylko dlatego, że działały w laboratorium. Zostają w swoich gałęziach i w archiwum na NVMe. Zamrożone źródła Thermal, zewnętrzne SDK, duże obrazy, prywatne sesje i sekrety nie trafiają do publicznego GitHuba.
 
-## Zasady inżynierskie
+## Zasady bezpieczeństwa i procesu
 
-1. Rozdzielamy akwizycję, jakość/kalibrację, przetwarzanie obrazu, termowizję, sterowanie robotem i integracje przez wymienne adaptery.
-2. AI/kamera głębi nie gwarantują bezpieczeństwa; limity ruchu, E-stop i interlocki muszą działać niezależnie.
-3. Zachowujemy oryginalne zdjęcia i radiometrię wraz z metadanymi i hashami; produkty pochodne mają być odtwarzalne.
-4. Nie zmieniamy środowiska Qualcomm/Arduino bez audytu i decyzji właściciela.
-5. Nie wykonujemy na razie sterowania mechaniką, grzaniem ani zasilaniem DUT.
-6. Prace prowadzimy na gałęziach i przez PR; merge do `main` wymaga wyraźnej zgody właściciela.
-7. Nie publikujemy kluczy, tokenów, numerów seryjnych, IP, surowych sesji i innych wrażliwych dowodów.
+1. **`main` to wiarygodna, zatwierdzona baza**, a nie automatyczny obraz aktualnego systemu lub kompletna dystrybucja oprogramowania.
+2. Moduły wprowadzamy do `main` po przeglądzie, testach i jawnej zgodzie właściciela. Każda zmiana przez osobną gałąź i PR.
+3. Autonomiczny ruch ramienia wymaga odrębnej oceny ryzyka i niezależnych zabezpieczeń; kamera głębi i algorytmy AI ich nie zastępują.
+4. Nie uruchamiamy aktuatorów, migawki, zasilania ani testów na żywym sprzęcie w trakcie zwykłego tworzenia PR.
+5. Nie publikujemy kluczy, tokenów, numerów seryjnych, prywatnej adresacji, surowych zdjęć, archiwów i logów laboratoryjnych.
 
-## Plan kolejnych prac
-
-1. Dokończyć weryfikację hardware: STM32H5, Qualcomm ↔ STM32, MIPI CSI/ISP, Ethernet 2.5 Gb/s, USB-C/DP Alt Mode, temperatury/SMART, stabilność.
-2. Zamknąć odpowiedni zakres i zatwierdzić **Vision Hardware Baseline v1**.
-3. Dopiero potem budować Vision Core, adaptery akwizycji, QC/OpenCV i modele lokalne.
-4. Następnie realizować oświetlenie, kalibrację, mozaiki/focus stacking, radiometrię i integrację robota z osobnymi zabezpieczeniami.
-5. Przygotować jawny, wersjonowany kontrakt eksportu do odrębnej AI Platform.
-
-Szczegóły: `docs/architecture/`, `docs/hardware/`, `docs/process/`, `scripts/audit/`.
-
-## Połączenia administracyjne
-
-Potwierdzono SSH/Tailscale, wcześniejszą sesję przez USB-C/ADB i Desktop Commander MCP na urządzeniu `vision`. Adresy, identyfikatory urządzeń i dane dostępu nie są częścią repozytorium.
+Historia wcześniejszych testów: [weryfikacja VENTUNO Q](docs/hardware/VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md), [weryfikacja Sony A6100](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md), [proces rozwoju](docs/process/DEVELOPMENT.md).
