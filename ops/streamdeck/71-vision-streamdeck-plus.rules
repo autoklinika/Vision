@@ -1,0 +1,2 @@
+# Stream Deck Plus only; allow non-root arduino user in input group to operate HID.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0fd9", ATTRS{idProduct}=="0084", GROUP="input", MODE="0660"

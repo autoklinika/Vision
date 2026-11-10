@@ -31,6 +31,28 @@
 *credentials*.json
 *token*.json
 
+# Dodatkowe dane prywatne, obrazy surowe i paczki środowisk — nigdy nie publikować
+*.arw
+*.npy
+*.yuyv
+*.mjpeg
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.bundle
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+*.dmp
+*.elf
+*.bin
+*.so
+*.deb
+
 # Python/C++/IDE
 __pycache__/
 *.py[cod]

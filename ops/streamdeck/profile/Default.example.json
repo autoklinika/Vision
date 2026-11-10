@@ -1,0 +1,82 @@
+{
+  "infobars": [],
+  "keys": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+      "action": {
+        "controllers": [
+          "Keypad",
+          "Encoder"
+        ],
+        "disable_automatic_states": false,
+        "encoder": null,
+        "icon": "plugins/com.amansprojects.starterpack.sdPlugin/icons/nero-stop-sw.png",
+        "name": "NERO STOP SW",
+        "plugin": "com.amansprojects.starterpack.sdPlugin",
+        "property_inspector": "plugins/com.amansprojects.starterpack.sdPlugin/propertyInspector/runCommand.html",
+        "states": [
+          {
+            "alignment": "middle",
+            "background_colour": "#A0161C",
+            "colour": "#FFFFFF",
+            "family": "Liberation Sans",
+            "image": "plugins/com.amansprojects.starterpack.sdPlugin/icons/nero-stop-sw.png",
+            "image_scale": 100,
+            "name": "",
+            "show": true,
+            "size": 24,
+            "stroke_colour": "#000000",
+            "stroke_size": 3,
+            "style": "Bold",
+            "text": "",
+            "underline": false
+          }
+        ],
+        "supported_in_multi_actions": true,
+        "tooltip": "Software stop (NOT a safety-rated E-STOP)",
+        "uuid": "com.amansprojects.starterpack.runcommand",
+        "visible_in_action_list": true
+      },
+      "children": [],
+      "context": "Keypad.7.0",
+      "current_state": 0,
+      "settings": {
+        "down": "/usr/bin/python3 /srv/vision-data/tools/streamdeck-prod/bin/nero_stop.py --send",
+        "file": "",
+        "rotate": "",
+        "show": false,
+        "up": ""
+      },
+      "states": [
+        {
+          "alignment": "middle",
+          "background_colour": "#A0161C",
+          "colour": "#FFFFFF",
+          "family": "Liberation Sans",
+          "image": "plugins/com.amansprojects.starterpack.sdPlugin/icons/nero-stop-sw.png",
+          "image_scale": 100,
+          "name": "",
+          "show": true,
+          "size": 24,
+          "stroke_colour": "#000000",
+          "stroke_size": 3,
+          "style": "Bold",
+          "text": "",
+          "underline": false
+        }
+      ]
+    }
+  ],
+  "sliders": [
+    null,
+    null,
+    null,
+    null
+  ]
+}

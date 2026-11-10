@@ -1,0 +1,116 @@
+{
+  "audit_utc": "2026-10-13T19:13:40.975927+00:00",
+  "scope": "existing_files_and_readonly_device_descriptors",
+  "nvme_preflight": "PASS",
+  "camera_usb_present": false,
+  "capture_card_present": true,
+  "files": [
+    {
+      "file": "sony-raw-RAW02-HLbWO7NB/sony_raw02.arw",
+      "size_bytes": 24894208,
+      "sha256": "d1fc49b47f4aaafda38aa4dd9fdbabe47d41571a34faf48dc8089cd52616afa0",
+      "matches_recorded_hash": true,
+      "raw_full_decode": "UNKNOWN_DECODER_UNAVAILABLE"
+    },
+    {
+      "file": "sony-raw-RAW02-HLbWO7NB/sony_raw02.jpg",
+      "size_bytes": 7689886,
+      "sha256": "e79da7664d90f59364133aa99cff80580a37638d15814930575d2498d29ea118",
+      "matches_recorded_hash": true,
+      "dimensions": [
+        6000,
+        4000
+      ],
+      "jpeg_full_decode": "PASS",
+      "exif": {
+        "focal_length_mm": "39.0",
+        "f_number": "5.6",
+        "exposure_s": "0.004",
+        "iso": "4000",
+        "datetime_original": "2026:10:10 23:04:10"
+      }
+    },
+    {
+      "file": "sony-wifi-hdmi-usb-staged-20261013/imported_originals/DSC00020.JPG",
+      "size_bytes": 12877824,
+      "sha256": "51fc6cd21a51e19c410dff73128b9e8a04ebb5f33666f49096ab032e6acc3d65",
+      "matches_recorded_hash": true,
+      "dimensions": [
+        6000,
+        4000
+      ],
+      "jpeg_full_decode": "PASS",
+      "exif": {
+        "focal_length_mm": "20.0",
+        "f_number": "5.6",
+        "exposure_s": "0.005",
+        "iso": "6400",
+        "datetime_original": "2026:10:13 14:04:15"
+      }
+    },
+    {
+      "file": "sony-wifi-hdmi-usb-staged-20261013/imported_originals/DSC00020.ARW",
+      "size_bytes": 24816384,
+      "sha256": "70d5c22b945dc3a22d62f5ed653355785a45f8b4ffd47f2a21c59eecf0c26278",
+      "matches_recorded_hash": true,
+      "raw_full_decode": "UNKNOWN_DECODER_UNAVAILABLE"
+    }
+  ],
+  "series": {
+    "sony-stability-STAB05-*": {
+      "files": 10,
+      "dimensions": {
+        "6000x4000": 10
+      },
+      "decode_errors": []
+    },
+    "liveview-motion-LV05-*": {
+      "files": 85,
+      "dimensions": {
+        "1024x680": 85
+      },
+      "decode_errors": []
+    }
+  },
+  "notes": [
+    "Hashes are compared with prior records of the same files; no SD source is currently connected.",
+    "No new exposure, no network/service/firmware changes.",
+    "No optical comparative quality or latency measurement performed."
+  ],
+  "ble_zoom_exif_recheck": [
+    {
+      "file": "hdmi_monitor_test.jpg",
+      "dimensions": [
+        6000,
+        4000
+      ],
+      "focal_length_mm": "16.0",
+      "sha256": "47e894d3f56400880b6f1767af4b88c3179549e6e48cd932856b8c5994d62615"
+    },
+    {
+      "file": "hdmi_monitor_after_ble.jpg",
+      "dimensions": [
+        6000,
+        4000
+      ],
+      "focal_length_mm": "20.0",
+      "sha256": "517b26732b0689c068479b6907708bcc428650e44f30361e39c9f0542a51de53"
+    }
+  ],
+  "uvc_advertised_formats": {
+    "usb_link_mbps": 480,
+    "mjpeg_1920x1080_fps": [
+      60,
+      30,
+      25,
+      20,
+      10
+    ],
+    "yuyv_1920x1080_fps": [
+      5
+    ],
+    "status": "READONLY_DESCRIPTOR_CHECK_PASS",
+    "actual_scene_fps_this_audit": "UNKNOWN_NOT_MEASURED"
+  },
+  "publication_scope": "No images, private network addresses, serial numbers, credentials or device account IDs."
+}

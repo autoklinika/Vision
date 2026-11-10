@@ -1,0 +1,40 @@
+name: Vision offline integration checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'README.md'
+      - 'docs/**'
+      - 'ops/**'
+      - 'scripts/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-unit-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check syntax without importing or operating hardware
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          for prefix in ('ops', 'scripts', 'tests'):
+              for path in Path(prefix).rglob('*.py'):
+                  ast.parse(path.read_text(), filename=str(path))
+          print('AST_CHECK_PASS')
+          PY
+      - name: Install offline image-test dependency
+        run: python3 -m pip install --disable-pip-version-check 'Pillow==11.3.0'
+      - name: Offline unittest suite (mocked hardware)
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Check shell script syntax
+        run: |
+          find ops scripts -type f -name '*.sh' -print0 |
+          while IFS= read -r -d '' file; do bash -n "$file" || exit 1; done

@@ -1,5 +1,7 @@
 # Vision — architektura logiczna v0.1
 
+> **Historyczny projekt architektury (2026-10-10).** Dobór AgileX NERO i decyzje STOP są zapisane w [ADR-VISION-ROBOT-001](ADR_VISION_NERO_TWO_STAGE_STOP_2026-11-10.md). Stan prac 2026-11-10: [AS-BUILT](../operations/VISION_AS_BUILT_2026-11-10.md).
+
 **Status:** projekt architektury, bez implementacji runtime. Dokument opisuje granice odpowiedzialności, a nie gotowe funkcjonalności.
 
 ## Kontekst
