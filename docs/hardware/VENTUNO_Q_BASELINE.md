@@ -25,8 +25,10 @@
 | Sony A6100 — PTP/zdjęcia | **PASS warunkowo** | JPEG 24 MP, RAW+JPEG, żywy Preview 1024×680, udane serie z odstępami |
 | Sony A6100 — szybkie sekwencje | **FAIL niektórych prób** | STAB-01/STAB-03: `Could not capture` przy szybkich osobnych sesjach |
 | Sony focus stepping | **UNVERIFIED optycznie** | Polecenia Near/Far działały; zmienność ekspozycji uniemożliwiła rozstrzygnięcie |
-| CAN `can0`/`can1`/`can2`, `docker0` | **UNVERIFIED funkcjonalnie** | Wcześniejsze wykrycie interfejsów nie stanowi testu ruchu |
-| STM32H5, CSI/ISP, Ethernet 2.5 Gb/s, pomiary temperatur | **UNVERIFIED** | Odpowiednie testy jeszcze nie wykonane |
+| CAN `can0`/`can1`/`can2` | **PASS wykrycia / ruch UNVERIFIED** | SocketCAN `gs_usb` przez USB STM32; wszystkie DOWN, STOPPED, 0 RX/TX, CAN-FD niesprawdzony |
+| STM32H5 / Arduino Router | **PASS wykrycia/RPC Router / MCU RPC UNVERIFIED** | STM32H5F5xx USB CDC ACM, `/dev/ttySTM0`; odpowiedź `$/version` 0.10.0 pochodzi z Routera |
+| MIPI CSI/ISP | **PASS wpisów DT / capture UNVERIFIED** | CSI PHY/CSID/IFE i CCI w DT; `qcom-camss` dostępny, niezaładowany; brak subdev |
+| Ethernet 2.5 Gb/s i temperatury | **UNVERIFIED** | Bez testu funkcjonalnego |
 
 ### Uwaga o stwierdzeniu PASS
 
@@ -42,6 +44,7 @@
 - [Sony A6100 — USB/PTP, Live View, RAW, STAB](SONY_A6100_VERIFICATION_2026-10-10.md)
 - [Rejestr dowodów i ścieżek NVMe](EVIDENCE_REGISTER_2026-10-10.md)
 - [Plan integracji](INTEGRATION_PLAN.md)
+- [STM32-01/02, CSI-01, CAN-01 — weryfikacja read-only 2026-10-11](VENTUNO_Q_STM32_CSI_CAN_READONLY_2026-10-11.md)
 
 ## Zasady ochrony środowiska
 
@@ -49,9 +52,9 @@ Nie wykonujemy `do-release-upgrade`, `apt full-upgrade`, zmiany pakietów Qualco
 
 ## Dalsze bramki hardware
 
-1. STM32H5 i komunikacja Qualcomm ↔ STM32 (start od odczytu, bez flashowania).
-2. MIPI CSI/ISP, wykrywanie i funkcjonalna próba kamery.
-3. Ethernet 2.5 Gb/s, rzeczywisty transfer.
+1. STM32H5: wykrywanie i Router zakończone; test funkcji MCU pozostaje do uzgodnienia.
+2. MIPI CSI/ISP: Device Tree odczytane; niezweryfikowany działający capture.
+3. CAN: trzy kanały wykryte, RX/TX i CAN-FD do testów po zgodzie. Ethernet 2.5 Gb/s: rzeczywisty transfer.
 4. USB-C/DisplayPort Alt Mode na fizycznym monitorze z dotykiem.
 5. Temperatury, SMART NVMe, stabilność sprzętu pod obciążeniem.
 6. Po zatwierdzeniu zakresu: finalny **Vision Hardware Baseline v1**.

@@ -79,7 +79,18 @@ Przy kontroli plików potwierdzono m.in.:
 
 To **punkty odniesienia** do późniejszego ponownego obliczenia hashy, nie kopie dowodów. Weryfikacja pełnej retencji i automatycznego katalogu manifestów pozostaje pracą przyszłej aplikacji.
 
-## 6. Ograniczenia rejestru i bezpieczeństwo
+## 6. Diagnostyka read-only STM32, CSI i CAN (2026-10-11)
+
+| Etap | Źródło dowodu (odczyt MCP) | Granica potwierdzenia |
+|---|---|---|
+| STM32-01 | `udevadm`, `lsusb -t`, `/dev/ttySTM0`, `systemctl`, `journalctl`, Zephyr Core | Enumeracja USB i Router; nie firmware faktycznie działającego MCU |
+| STM32-02 | `arduino-router-cli '$/version'` | Odpowiedź 0.10.0 jest z Routera, nie z MCU |
+| CSI-01 | Device Tree, platform sysfs, `/dev/video*`, `lsmod`, `modinfo` | Konfiguracja kontrolerów; brak potwierdzonego capture |
+| CAN-01 | `ip -details -statistics link show`, sysfs `can0`–`can2`, `udevadm`, `journalctl -k` | 3 kanały `gs_usb` DOWN/STOPPED, 0 TX/RX; brak aktywnej próby |
+
+Pomiar wykonany bez zmian urządzenia. Dowody terminalowe pozostają w historii sesji MCP; nie zapisano nowych lokalnych plików dowodowych ani surowych logów w Git. Szczegóły w [raporcie 2026-10-11](VENTUNO_Q_STM32_CSI_CAN_READONLY_2026-10-11.md).
+
+## 7. Ograniczenia rejestru i bezpieczeństwo
 
 - Ścieżki są przypisane do konkretnego urządzenia i mogą stać się nieaktualne po reorganizacji NVMe.
 - Surowe zdjęcia oraz dane, na których widać człowieka, pozostają lokalne. Nie dodawać do publicznego repo.

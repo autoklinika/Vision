@@ -29,8 +29,8 @@
 | USB-01 | Kontroler USB 3.0 | TI TUSB73x0, 5 Gb/s, wykryty | PASS — enumeracja | Transfer 5 Gb/s na rzeczywistym urządzeniu: UNVERIFIED |
 | USBC-01 | USB-C Power Delivery / DP Alt Mode | Rozpoznane deklaracje PD i DP Alt Mode | PASS — deklaracja/odczyt | Zasilanie i obraz+dotyk jednym kablem: UNVERIFIED |
 | SONY-01 | Sony A6100 | USB/PTP, JPEG/ARW, podgląd, serie zdjęć | PASS z ograniczeniami | Szczegóły i błędy STAB-01/STAB-03 w osobnym raporcie |
-| STM32-01 | STM32H5 / komunikacja Qualcomm–STM32 | Nie wykonano testu | UNVERIFIED | Nie modyfikować firmware bez zgody |
-| CSI-01 | MIPI CSI / ISP / V4L2 | Nie wykonano funkcjonalnego testu kamery | UNVERIFIED | Wybór modułu kamery później |
+| STM32-01 | STM32H5 / USB CDC ACM / Router | MCP: `/dev/ttySTM0` -> `ttyACM0`; Router aktywny | PASS — wykrycie | Firmware działający na MCU i odpowiedź funkcji STM32: UNVERIFIED |
+| STM32-02 | RPC `$/version` do Routera 0.10.0 | MCP: odpowiedź Routera, exit 0 | PASS — Router | Dwukierunkowe RPC z firmware MCU: BLOCKED / UNVERIFIED |\n| CSI-01 | MIPI CSI / ISP / V4L2 | DT: 3 CSIPHY, 2 CSID + 5 Lite, 2 IFE + 5 Lite; `camss` niezaładowany | PASS — enumeracja DT | Brak aktywnego sterownika toru capture i modułu kamery; stream: UNVERIFIED |\n| CAN-01 | 3 kanały SocketCAN przez USB STM32 | `can0`/`can1`/`can2`, `gs_usb`, status DOWN, STOPPED, 0 TX/RX | PASS — enumeracja | Rzeczywisty RX/TX, transceivery i CAN-FD: UNVERIFIED |
 | NET-01 | Ethernet 2.5 Gb/s | Nie wykonano pomiaru transferu | UNVERIFIED | Sama obecność portu/sterownika nie wystarcza |
 | THERM-01 | Temperatury/throttling pod obciążeniem | Nie wykonano pełnego testu | UNVERIFIED | Objęte dalszą roadmapą |
 
@@ -87,9 +87,9 @@ Wymóg zapisu wyłącznie na NVMe wynika z zasad projektu; jego szczegółowa po
 
 ## 8. Kryteria dalszego etapu sprzętowego
 
-1. **STM32H5:** wykrycie obecności, opis kanału Qualcomm ↔ STM32, potwierdzenie dwukierunkowej wymiany testowej bez zmiany firmware (najpierw odczyt).
-2. **MIPI CSI/ISP:** spis fizycznych portów i sterowników, potem realny capture na wspieranym module.
-3. **Ethernet:** link i pomiar rzeczywistego transferu 2.5 Gb/s.
+1. **STM32H5:** wykrycie i diagnostyka Routera zakończone 2026-10-11; test dwukierunkowej wymiany z MCU pozostaje zablokowany do potwierdzenia bezskutkowej funkcji firmware.
+2. **MIPI CSI/ISP:** inwentaryzacja DT zakończona 2026-10-11; aktywna ścieżka capture i zgodny sensor do dalszej weryfikacji.
+3. **CAN:** trzy kanały wykryte 2026-10-11; fizyczny test RX/TX i CAN-FD wyłącznie po osobnym zatwierdzeniu. **Ethernet:** link i pomiar transferu 2.5 Gb/s.
 4. **USB-C / DP Alt Mode:** obraz + dotyk na właściwym monitorze i przewodzie, osobno od deklaracji firmware.
 5. **System/temperatury:** SMART NVMe, monitorowanie CPU/GPU/NPU, throttling i powtarzalny test pod obciążeniem.
 6. **Termowizja/depth/robot:** dopiero po wyborze urządzeń i osobnej zgodzie; danych radiometrycznych oraz funkcji bezpieczeństwa nie można zastępować pseudokolorem lub samym AI.
@@ -99,7 +99,7 @@ Wymóg zapisu wyłącznie na NVMe wynika z zasad projektu; jego szczegółowa po
 
 - [Sony A6100 — szczegółowy raport testów](SONY_A6100_VERIFICATION_2026-10-10.md)
 - [Rejestr dowodów i ścieżek](EVIDENCE_REGISTER_2026-10-10.md)
-- [Stan bazowy VENTUNO](VENTUNO_Q_BASELINE.md)
+- [Stan bazowy VENTUNO](VENTUNO_Q_BASELINE.md)\n- [STM32-01/02, CSI-01, CAN-01 — diagnostyka read-only 2026-10-11](VENTUNO_Q_STM32_CSI_CAN_READONLY_2026-10-11.md)
 - [Plan integracji](INTEGRATION_PLAN.md)
 
 **Zakres publikacji:** wyłącznie przeglądowe dane techniczne i lokalne ścieżki do dowodów. Bez zdjęć, surowych logów USB/PTP, tokenów, adresów sieci i numerów seryjnych.
