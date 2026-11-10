@@ -15,8 +15,11 @@ ap=argparse.ArgumentParser()
 ap.add_argument("--ai",action="store_true")
 ap.add_argument("--off-only",action="store_true",help="Only passive stereo baseline, never turn on IR")
 ap.add_argument("--enable-ir",action="store_true",help="Explicit opt-in to IR emitter testing after power review")
+ap.add_argument("--external-power-confirmed",action="store_true",help="Operator has connected an independent camera power source; electrical ratings still unverified")
 ap.add_argument("--duration",type=float,default=7.0)
 ap.add_argument("--warmup",type=float,default=1.5)
+ap.add_argument("--only-phase",choices=["off_initial","dot_15pct","dot_30pct","flood_20pct","combined_20pct","off_final"],help="Restrict to one phase for sustained soak")
+ap.add_argument("--max-chip-temp",type=float,default=65.0,help="Fail closed when average chip temperature exceeds this threshold")
 args=ap.parse_args()
 
 PHASES=[("off_initial",0.0,0.0),
@@ -27,8 +30,10 @@ PHASES=[("off_initial",0.0,0.0),
         ("off_final",0.0,0.0)]
 if args.off_only or not args.enable_ir:
     PHASES=[PHASES[0]]
-if args.ai and args.enable_ir:
-    raise SystemExit("SAFETY_GATE: IR+AI test suspended until external camera power is verified")
+elif args.only_phase:
+    PHASES=[ph for ph in PHASES if ph[0]==args.only_phase]
+if args.ai and args.enable_ir and not args.external_power_confirmed:
+    raise SystemExit("SAFETY_GATE: IR+AI test requires explicit operator external power confirmation")
 
 with dai.Pipeline() as pipeline:
     device=pipeline.getDefaultDevice()
@@ -73,6 +78,7 @@ with dai.Pipeline() as pipeline:
                 if nnq: nnq.tryGet()
                 time.sleep(0.03)
             t0=time.monotonic()
+            last_monitor=t0
             depth_frames=0
             nn_frames=0
             det_count=0
@@ -98,8 +104,13 @@ with dai.Pipeline() as pipeline:
                 if nf is not None:
                     nn_frames+=1
                     det_count+=len(nf.detections)
-                if (depth_frames+nn_frames)%150==1:
-                    pass
+                if time.monotonic()-last_monitor>=15:
+                    last_monitor=time.monotonic()
+                    chip=device.getChipTemperature()
+                    chip_avg=float(chip.average)
+                    print("SOAK_MONITOR",json.dumps({"phase":label,"elapsed_s":round(last_monitor-t0,1),"depth_frames":depth_frames,"nn_frames":nn_frames,"chip_temp_C":round(chip_avg,1)},ensure_ascii=False),flush=True)
+                    if chip_avg>args.max_chip_temp:
+                        raise RuntimeError(f"THERMAL_ABORT: chip={chip_avg} exceeds limit={args.max_chip_temp}")
                 if not df and not nf:
                     time.sleep(0.002)
             elapsed=time.monotonic()-t0
