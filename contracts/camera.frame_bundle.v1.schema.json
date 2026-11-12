@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/autoklinika/Vision/blob/feature/oak-rgbd-sync-perception-v1-20261112/contracts/camera.frame_bundle.v1.schema.json",
+  "title": "camera.frame_bundle.v1",
+  "description": "Atomic lossless RGB JPEG plus RAW16 depth pair. JSON is metadata; raw pixels are carried in the corresponding binary NPZ replay archive or future bounded IPC, never embedded as base64 in JSON.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "camera_id",
+    "session_id",
+    "bundle_id",
+    "sequence",
+    "sync_state",
+    "pairing_delta_ms",
+    "device_timestamp",
+    "host_timestamp",
+    "capture_age_ms",
+    "age_basis",
+    "rgb",
+    "depth",
+    "calibration",
+    "transform_status",
+    "quality"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "camera.frame_bundle.v1"
+    },
+    "camera_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sync_state": {
+      "const": "SYNCED"
+    },
+    "pairing_delta_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "device_timestamp": {
+      "type": "object",
+      "required": [
+        "clock_domain",
+        "rgb_ns",
+        "depth_ns"
+      ],
+      "properties": {
+        "clock_domain": {
+          "const": "depthai_device_monotonic_unsynced_to_host"
+        },
+        "rgb_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "depth_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "host_timestamp": {
+      "type": "object",
+      "required": [
+        "clock_domain",
+        "rgb_received_ns",
+        "depth_received_ns",
+        "assembled_ns"
+      ],
+      "properties": {
+        "clock_domain": {
+          "const": "host_monotonic"
+        },
+        "rgb_received_ns": {
+          "type": "integer"
+        },
+        "depth_received_ns": {
+          "type": "integer"
+        },
+        "assembled_ns": {
+          "type": "integer"
+        }
+      }
+    },
+    "capture_age_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "age_basis": {
+      "const": "host_receive_proxy_not_sensor_exposure"
+    },
+    "assembly_latency_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "host_arrival_spread_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "rgb": {
+      "type": "object",
+      "required": [
+        "stream_id",
+        "frame_id",
+        "sequence",
+        "resolution",
+        "encoding",
+        "coordinate_frame",
+        "aligned_to"
+      ],
+      "properties": {
+        "frame_id": {
+          "type": "integer"
+        },
+        "sequence": {
+          "type": "integer"
+        },
+        "encoding": {
+          "const": "jpeg"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolution"
+        },
+        "coordinate_frame": {
+          "const": "rgb_optical"
+        }
+      }
+    },
+    "depth": {
+      "type": "object",
+      "required": [
+        "stream_id",
+        "frame_id",
+        "sequence",
+        "resolution",
+        "encoding",
+        "depth_unit",
+        "invalid_depth_mask",
+        "aligned_to",
+        "coordinate_frame"
+      ],
+      "properties": {
+        "frame_id": {
+          "type": "integer"
+        },
+        "sequence": {
+          "type": "integer"
+        },
+        "encoding": {
+          "const": "uint16"
+        },
+        "depth_unit": {
+          "const": "mm"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolution"
+        },
+        "aligned_to": {
+          "const": "stereo_left_rectified"
+        },
+        "coordinate_frame": {
+          "const": "stereo_left_rectified_optical"
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "required": [
+        "state"
+      ]
+    },
+    "intrinsics_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "extrinsics_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "calibration_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "transform_status": {
+      "type": "object",
+      "required": [
+        "table",
+        "robot_base"
+      ],
+      "properties": {
+        "table": {
+          "const": "UNAVAILABLE"
+        },
+        "robot_base": {
+          "const": "UNAVAILABLE"
+        }
+      }
+    },
+    "quality": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "resolution": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}
