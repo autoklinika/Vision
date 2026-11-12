@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/autoklinika/Vision/blob/feature/oak-rgbd-sync-perception-v1-20261112/contracts/perception.scene_observation.v1.schema.json",
+  "title": "perception.scene_observation.v1",
+  "description": "Non-safety camera-frame geometry only; must not be treated as robot-ready without independent transform calibration and interlocks.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "source_bundle_id",
+    "source_frame_ids",
+    "frame_of_reference",
+    "units",
+    "table_frame",
+    "robot_base_frame",
+    "objects",
+    "plane",
+    "change",
+    "validity",
+    "reasons",
+    "safety_function"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "perception.scene_observation.v1"
+    },
+    "source_bundle_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_frame_ids": {
+      "type": "object"
+    },
+    "frame_of_reference": {
+      "const": "stereo_left_rectified_optical"
+    },
+    "units": {
+      "type": "object",
+      "required": [
+        "position",
+        "angle"
+      ],
+      "properties": {
+        "position": {
+          "const": "m"
+        },
+        "angle": {
+          "const": "rad"
+        }
+      }
+    },
+    "table_frame": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "const": "UNAVAILABLE"
+        }
+      }
+    },
+    "robot_base_frame": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "const": "UNAVAILABLE"
+        }
+      }
+    },
+    "safety_function": {
+      "const": false
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "object_id",
+          "class",
+          "position_camera_m",
+          "frame_of_reference",
+          "uncertainty"
+        ],
+        "properties": {
+          "object_id": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "position_camera_m": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "plane": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "change": {
+      "type": "object"
+    },
+    "validity": {
+      "enum": [
+        "NOT_READY",
+        "CAMERA_FRAME_ONLY",
+        "EXPLORATORY_UNVERIFIED_PROJECTION"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

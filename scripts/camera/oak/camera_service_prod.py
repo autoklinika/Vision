@@ -19,6 +19,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from camera_sync import (FramePacket, RgbdSynchronizer, bundle_metadata,
+                         encode_replay_npz, read_optics_readonly)
+
 LOG = logging.getLogger("vision.camera")
 PAGE = Path(__file__).with_name("camera_service_prod.html")
 LOCK_PATH = "/tmp/vision-oak-browser-preview.lock"
@@ -54,10 +57,13 @@ class State:
         self.running = False
         self.error = None
         self.started = time.monotonic()
+        self.sync = RgbdSynchronizer()
+        self.calibration = {"state": "UNAVAILABLE", "depth_projection_status": "UNAVAILABLE"}
         self.client_semaphore = threading.BoundedSemaphore(10)
 
     def start(self, usb: str):
         with self.cv:
+            self.sync.reset()
             self.usb = usb
             self.running = True
             self.error = None
@@ -123,6 +129,34 @@ class State:
         with self.cv:
             return self.depth.copy() if self.depth is not None else None
 
+    def ingest_packet(self, kind, payload, sequence, device_timestamp_ns,
+                      width, height, host_received_ns=None):
+        host_received_ns = (time.monotonic_ns() if host_received_ns is None
+                            else host_received_ns)
+        with self.cv:
+            if not self.running or self.error is not None:
+                return None
+            packet = FramePacket(kind, int(sequence), int(device_timestamp_ns),
+                                 host_received_ns, width, height, payload)
+            return self.sync.ingest(packet, now_ns=time.monotonic_ns())
+
+    def frame_bundle(self):
+        with self.cv:
+            if not self.running or self.error is not None:
+                return None
+            now_ns = time.monotonic_ns()
+            pair = self.sync.current(now_ns)
+            if pair is None:
+                return None
+            quality = {
+                "validity": "IMAGE_PAIR_ONLY",
+                "spatial_accuracy": "UNVERIFIED",
+                "depth_valid_fraction_preview_estimate": (
+                    self.valid_pct / 100.0 if self.valid_pct is not None else None),
+                "sync_diagnostics_at_read": self.sync.diagnostics(now_ns),
+            }
+            return pair, bundle_metadata(pair, self.calibration, quality, now_ns)
+
     def status(self):
         now = time.monotonic()
         with self.cv:
@@ -150,6 +184,9 @@ class State:
                 "rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024),
                 "mode": "PROD / NO AI / NO IR / NO ROBOT / NOT TABLE-CALIBRATED",
                 "raw_depth_unit": "millimetres", "depth_alignment": "rectified-left",
+                "rgbd_sync": self.sync.diagnostics(),
+                "calibration_read_only_state": self.calibration.get("state"),
+                "calibration_revision": self.calibration.get("revision"),
             }
 
 
@@ -189,6 +226,26 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/status":
             payload=json.dumps(state.status()).encode("utf-8")
             self.send(200,"application/json; charset=utf-8",payload)
+        elif path == "/api/frame-bundle/latest":
+            bundle = state.frame_bundle()
+            if bundle is None:
+                self.send(503, "application/json", b'{"sync_state":"NOT_READY"}')
+            else:
+                self.send(200, "application/json; charset=utf-8",
+                          json.dumps(bundle[1]).encode("utf-8"))
+        elif path == "/snapshot/frame-bundle.npz":
+            if not state.client_semaphore.acquire(blocking=False):
+                self.send(429, "text/plain", b"Too many clients")
+                return
+            try:
+                bundle = state.frame_bundle()
+                if bundle is None:
+                    self.send(503, "text/plain", b"No synchronized RGB-D bundle")
+                else:
+                    data = encode_replay_npz(*bundle)
+                    self.send(200, "application/octet-stream", data)
+            finally:
+                state.client_semaphore.release()
         elif path == "/healthz":
             s=state.status()
             self.send(200 if s["online"] else 503,"text/plain",
@@ -305,7 +362,9 @@ def run_camera(state: State, stop: threading.Event):
         state.start(str(device.getUsbSpeed()))
         if state.usb != "UsbSpeed.SUPER":
             raise RuntimeError("USB3 required in production; negotiated " + state.usb)
-        LOG.info("CAMERA_STARTED profile=%s USB=%s",state.profile,state.usb)
+        state.calibration = read_optics_readonly(device, dai, cfg["rgb_size"])
+        LOG.info("CAMERA_STARTED profile=%s USB=%s calibration=%s",
+                 state.profile, state.usb, state.calibration.get("state"))
         renderer_stop = threading.Event()
         renderer = threading.Thread(
             target=render_depth_previews, args=(state, renderer_stop), daemon=True
@@ -324,11 +383,17 @@ def run_camera(state: State, stop: threading.Event):
                     if data[:2]!=bytes.fromhex("ffd8") or data[-2:]!=bytes.fromhex("ffd9"):
                         raise RuntimeError("Invalid hardware JPEG packet")
                     state.publish("rgb",data)
+                    state.ingest_packet("rgb", data, rgb.getSequenceNum(),
+                        int(rgb.getTimestampDevice().total_seconds() * 1e9),
+                        cfg["rgb_size"][0], cfg["rgb_size"][1])
                     last_rgb=time.monotonic()
                     state.received["rgb"]+=1
                 if pkt is not None:
                     raw = pkt.getFrame().copy()
                     state.publish_depth(raw)
+                    state.ingest_packet("depth", raw, pkt.getSequenceNum(),
+                        int(pkt.getTimestampDevice().total_seconds() * 1e9),
+                        raw.shape[1], raw.shape[0])
                     last_depth = time.monotonic()
                 if now>=next_chip:
                     try:

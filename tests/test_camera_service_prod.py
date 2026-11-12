@@ -11,6 +11,8 @@ import numpy as np
 import cv2
 
 SCRIPT=Path(__file__).resolve().parents[1]/"scripts/camera/oak/camera_service_prod.py"
+import sys
+sys.path.insert(0, str(SCRIPT.parent))
 spec=importlib.util.spec_from_file_location("camera_service_prod", SCRIPT)
 camera=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(camera)
