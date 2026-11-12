@@ -1,7 +1,7 @@
 # Vision — podgląd RGB + głębia OAK-D Pro AF w przeglądarce (DEV)
 
 **Data:** 2026-11-12  
-**Status:** `OFFLINE_SOFTWARE_TEST_PASS / HARDWARE_NOT_TESTED / NOT_DEPLOYED`  
+**Status:** `HARDWARE_RGB_DEPTH_PASS / TAILSCALE_HTTP_PASS / SHORT_STABILITY_PASS / NOT_PRODUCTION`  
 **Zakres:** oddzielny, tylko do odczytu serwer HTTP/MJPEG dla Luxonis OAK-D Pro AF (overhead), host VENTUNO Q. Nie jest to aplikacja Vision Core ani sterowanie robotem.
 
 ## Funkcje
@@ -59,3 +59,21 @@ Bezpośredni agent Desktop Commander `vision` był offline; host odpowiadał na 
 ## Wycofanie
 
 Zatrzymać proces `Ctrl+C`. Nie istnieją zmiany w systemd, udev ani sterowaniu NERO. Usunąć tylko utworzony katalog staging podglądu, jeśli nie jest już potrzebny; nie usuwać `oak-overhead-v0` ani jego wyników testów.
+
+## 2026-11-12 — rzeczywista próba na VENTUNO Q (po przygotowaniu DEV)
+
+**Status uzupełniony:** `HARDWARE_RGB_DEPTH_PASS / TAILSCALE_HTTP_PASS / SHORT_STABILITY_PASS / NOT_PRODUCTION`.
+
+- VENTUNO Q po naprawie Remote MCP działał po restarcie; NVMe `/dev/nvme0n1p1` zamontowany jako ext4 RW.
+- OAK-D Pro AF wykryta przed uruchomieniem jako `03e7:2485`; brak aktywnego innego pipeline DepthAI.
+- Checkout gałęzi DEV w `/srv/vision-data/staging/oak-browser-preview-dev`; `py_compile` i 6/6 testów offline PASS na urządzeniu Vision w istniejącym venv `depthai==3.12.0`, `opencv-python-headless==5.0.0.93`.
+- Uruchomiony **ręcznie, bez systemd/autostartu** jeden proces `browser_preview.py` z `--bind <TS_IP_Vision> --port 18092`.
+- DepthAI przestawił urządzenie na `03e7:f63b` na gałęzi SuperSpeed; `UsbSpeed.SUPER` oraz log systemowy potwierdziły USB3. To odmienny, pozytywny wynik wobec wcześniejszego ograniczenia USB2 w innym torze danych.
+- `GET /` i `GET /api/status` osiągalne z **AI Platform** przez Tailscale; status `online=true`, `pipeline_running=true`, bez błędu.
+- `GET /stream/rgb.mjpg`: ok. 25 kompletnych klatek JPEG w 2 s; `GET /stream/depth.mjpg`: ok. 24 klatki JPEG w 2 s; odebrane z AI Platform, nie tylko w pętli localhost.
+- W trakcie pomiarów status RGB i depth ~12–13 FPS; pełny udział ważnych pikseli głębi ~61–65% w aktualnej, niekalibrowanej scenie.
+- Po ok. 1 min 44 s nadal `online=true`, brak nowych rozłączeń USB lub `X_LINK_ERROR` w tym oknie. CPU procesu ~146% jednego rdzenia logicznego w notacji `ps`, RSS ~993 MB; na hoście dostępne ~12,5 GB RAM. Te wartości wymagają dalszej optymalizacji, ale nie zablokowały funkcjonalnego testu.
+- Kamera działa bez włączania IR i bez NN, robot NERO nie otrzymał poleceń; brak zapisu prywatnych klatek na dysk (poza chwilowymi transferami HTTP odczytanymi na AI Platform i następnie usuniętymi).
+
+**Nadal NIE potwierdzono**: stabilności wielogodzinnej, rozłączenia USB w trakcie strumieniowania, kalibracji przestrzennej, automatycznego startu po restarcie ani integracji z Vision Core. W obecnym trybie źródłem serwera pozostaje terminalowy proces DEV (nie usługa systemd). Ponieważ kamera jest zasobem wyłącznym, autostart wymaga osobnej decyzji i centralnego właściciela pipeline, aby nie blokować testów pozostałych modułów.
+
