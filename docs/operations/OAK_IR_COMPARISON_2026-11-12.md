@@ -46,3 +46,20 @@ Kamera działała przez USB3 podczas testu bez AI. Nie odnotowano nieplanowanej 
 - Nie zaleca się pozostawiać flood 20% ciągle włączonego bez uzasadnienia wynikami w rzeczywistym położeniu ECU, szczególnie przy poborze dodatkowej mocy i pracy ciągłej.
 - Przed zatwierdzeniem aktywnego IR dla produkcji: wykonać A/B na **nieruchomym PCB/ECU** z matowym wzorcem, w znanej odległości i po docelowym montażu; sprawdzić błąd głębi, powtarzalność, wpływ odbić i nagrzewanie podczas długiej sesji.
 - Stan funkcji bezpieczeństwa NERO pozostaje niezależny od kamery; nie są dopuszczone żadne autonomiczne ruchy na podstawie tych pomiarów.
+
+
+## Uzupełnienie: bezpośredni obraz monochromatyczny stereo / IR
+
+Dodatkowa, osobna sesja kontrolowana (bez AI, bez NERO) na kamerze mono `CAM_B`, wyjście 1280×800 przy ~15 FPS. Zarejestrowano na NVMe pięć zdjęć `*_mono.jpg` przy OFF / dot 15% / flood 20% / dot+flood / OFF. Porównanie jest wizualne; **RGB i mapy głębi powstały w innej sesji i nie są zsynchronizowane czasowo z fotografiami mono.** Nie wprowadzano ręcznego blokowania autoekspozycji.
+
+| Faza | Odebrane ramki / 6 s | Średnia jasność mono (0–255) | Odchylenie standardowe | Temp. [°C] |
+|---|---:|---:|---:|---:|
+| OFF przed | 91 | 103,89 | 66,24 | 49,9 |
+| Dot 15% | 91 | 105,00 | 66,68 | 50,1 |
+| Flood 20% | 91 | 105,33 | 66,56 | 49,4 |
+| Dot 15% + flood 20% | 90 | 103,62 | 65,96 | 49,4 |
+| OFF po | 92 | 103,99 | 66,28 | 49,4 |
+
+Obserwacja wizualna: przy dot 15% na jasnej powierzchni stołu wyraźnie widać **rzutowaną siatkę punktów IR**; przy OFF ta tekstura znika. W centrum ujęcia leży ECU; rzeczywistej dokładności położenia ECU nie badano. Zmiany średniej jasności mono są niewielkie, co jest zgodne z tym, że efekt projektora polega przede wszystkim na dodaniu lokalnej tekstury ułatwiającej stereo, a nie na równomiernym rozjaśnieniu kadru. Flood może zwiększać oświetlenie bez analogicznego wzrostu jakości mapy głębi.
+
+**Zakończenie:** `IR_MONO_PASS`, `MONO_IR_OFF_ACK True True`, produkcyjna usługa systemd przywrócona automatycznie. Po zakończeniu zdalny odczyt `/api/status`: `online=true`, profil `balanced`, `UsbSpeed.SUPER`, około 30 FPS RGB i 29 FPS głębi, IR domyślnie wyłączone. Galeria lokalna uzupełniona o fotografie monochromatyczne i sprawdzona z AI Platform (HTTP 200); pliki nie wychodzą do GitHub.
