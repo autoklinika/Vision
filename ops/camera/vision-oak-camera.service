@@ -1,0 +1,22 @@
+[Unit]
+Description=Vision Camera Service — Luxonis OAK-D Pro AF RGB + StereoDepth (no AI)
+Documentation=https://github.com/autoklinika/Vision
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/vision-data/tools/vision-camera-service
+ExecStartPre=/usr/bin/mountpoint -q /srv/vision-data
+EnvironmentFile=/srv/vision-data/tools/vision-camera-service/camera.env
+ExecStart=/srv/vision-data/tools/vision-camera-service/venv/bin/python -u /srv/vision-data/tools/vision-camera-service/camera_service_prod.py --bind ${VISION_BIND} --port ${VISION_PORT} --profile ${VISION_PROFILE}
+Restart=always
+RestartSec=15s
+TimeoutStopSec=20s
+KillMode=control-group
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
