@@ -77,11 +77,11 @@ class PreviewState:
     def next_frame(self, kind: str, after: int, timeout=3.0):
         with self.cv:
             self.cv.wait_for(
-                lambda: self.seqs[kind] > after or self.error is not None
-                or (not self.running and self.seqs[kind] == 0),
+                lambda: self.seqs[kind] > after or self.error is not None,
                 timeout=timeout,
             )
-            if self.seqs[kind] > after:
+            if (self.seqs[kind] > after and self.frames[kind] is not None
+                    and self.running and self.error is None):
                 return self.seqs[kind], self.frames[kind]
             return None
 
@@ -220,7 +220,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
 
     def _stream(self, kind):
         state = self.server.state
-        current = state.next_frame(kind, -1, timeout=3.0)
+        current = state.next_frame(kind, 0, timeout=6.0)
         if current is None:
             self._send(503, "text/plain; charset=utf-8", b"Camera stream unavailable")
             return
