@@ -92,10 +92,10 @@ class PreviewHTTPTests(unittest.TestCase):
             for _ in (0, 1):
                 with urlopen(self.base + "/stream/rgb.mjpg", timeout=3) as response:
                     self.assertIn("multipart/x-mixed-replace", response.headers["Content-Type"])
-                    self.assertEqual(response.readline(), b"--frame\\r\\n")
-                    self.assertEqual(response.readline(), b"Content-Type: image/jpeg\\r\\n")
-                    self.assertEqual(response.readline(), b"Content-Length: 15\\r\\n")
-                    self.assertEqual(response.readline(), b"\\r\\n")
+                    self.assertEqual(response.readline(), b"--frame\r\n")
+                    self.assertEqual(response.readline(), b"Content-Type: image/jpeg\r\n")
+                    self.assertEqual(response.readline(), b"Content-Length: 15\r\n")
+                    self.assertEqual(response.readline(), b"\r\n")
                     self.assertEqual(response.read(len(jpeg)), jpeg)
         finally:
             state.fail("test shutdown")
