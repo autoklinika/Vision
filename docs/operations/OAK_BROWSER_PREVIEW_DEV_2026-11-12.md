@@ -52,7 +52,7 @@ Po uruchomieniu przetestować oba widoki, zmianę sceny, przerwanie kamery, zmia
 
 ## Testy i stan wdrożenia
 
-Dnia 2026-11-12 pobrano gałąź na AI Platform do tymczasowego katalogu, sprawdzono `py_compile` i wykonano testy `unittest` bez sprzętu: **5/5 PASS**. Uruchomienie wirtualnej kamery nie było częścią testu; nie stwierdzono realnej pracy OAK w przeglądarce.
+Dnia 2026-11-12 pobrano gałąź na AI Platform do tymczasowego katalogu, sprawdzono `py_compile` i wykonano testy `unittest` bez sprzętu: **6/6 PASS**. Uruchomienie wirtualnej kamery nie było częścią testu; nie stwierdzono realnej pracy OAK w przeglądarce.
 
 Bezpośredni agent Desktop Commander `vision` był offline; host odpowiadał na ping w Tailscale, ale nie było autoryzowanego zdalnego dostępu powłoki. Z tego powodu **nie włączono procesu ani usługi na VENTUNO Q**, nie zajęto kamery i nie zmieniono istniejących testów. Po odzyskaniu dostępu należy wykonać wyżej opisany test sprzętowy i dopiero potem rozważyć usługę Camera Service / Vision Core z centralnym właścicielem pipeline.
 
