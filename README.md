@@ -9,6 +9,7 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 - [Stan faktyczny VENTUNO Q i modułów (AS-BUILT, 10.11.2026)](docs/operations/VISION_AS_BUILT_2026-11-10.md).
 - [Otwarte problemy, ryzyka i bramki techniczne](docs/operations/OPEN_ITEMS_2026-11-10.md).
 - [Polityka `main`, eksperymentów i dopuszczenia Vision Core](docs/operations/RELEASE_GATES_2026-11-10.md).
+- [**ADR-VISION-ARCH-001 — Camera Service / Perception Engine / Vision Core / NERO / AI Platform**](docs/architecture/ADR_VISION_CAMERA_PERCEPTION_CORE_BOUNDARIES_2026-11-12.md), **ACCEPTED** jako architektura; implementacja częściowa.
 - [Architektura logiczna Vision](docs/architecture/OVERVIEW.md).
 - [ADR-VISION-ROBOT-001 — dwustopniowy STOP AgileX NERO](docs/architecture/ADR_VISION_NERO_TWO_STAGE_STOP_2026-11-10.md), **ACCEPTED** jako architektura; wdrożenie etapu 1 **częściowe**.
 - [ADR Sony — kanały HDMI/Wi-Fi/SD/USB](docs/architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md), **PROPOSED** — brak wdrożenia produkcyjnego.
