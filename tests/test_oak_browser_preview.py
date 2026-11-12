@@ -72,11 +72,34 @@ class PreviewHTTPTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as ex:
             urlopen(self.base + "/stream/rgb.mjpg", timeout=3)
         self.assertEqual(ex.exception.code, 503)
+        ex.exception.close()
 
     def test_unknown_endpoint(self):
         with self.assertRaises(HTTPError) as ex:
             urlopen(self.base + "/control/robot", timeout=3)
         self.assertEqual(ex.exception.code, 404)
+        ex.exception.close()
+
+    def test_two_clients_receive_same_frame_without_opening_camera(self):
+        original_state = self.server.state
+        state = mod.PreviewState()
+        state.start("UsbSpeed.HIGH")
+        jpeg = b"synthetic-frame"
+        state.publish("rgb", jpeg)
+        state.publish("depth", jpeg, valid_pct=77.0)
+        self.server.state = state
+        try:
+            for _ in (0, 1):
+                with urlopen(self.base + "/stream/rgb.mjpg", timeout=3) as response:
+                    self.assertIn("multipart/x-mixed-replace", response.headers["Content-Type"])
+                    self.assertEqual(response.readline(), b"--frame\\r\\n")
+                    self.assertEqual(response.readline(), b"Content-Type: image/jpeg\\r\\n")
+                    self.assertEqual(response.readline(), b"Content-Length: 15\\r\\n")
+                    self.assertEqual(response.readline(), b"\\r\\n")
+                    self.assertEqual(response.read(len(jpeg)), jpeg)
+        finally:
+            state.fail("test shutdown")
+            self.server.state = original_state
 
 
 if __name__ == "__main__":
