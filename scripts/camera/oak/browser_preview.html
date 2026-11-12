@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Vision — OAK-D Pro AF / Podgląd</title>
+  <style>
+    :root{color-scheme:light;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#1d2730;background:#f3f5f7}
+    *{box-sizing:border-box}body{margin:0}header{background:#fff;border-bottom:1px solid #d9dee4;padding:16px 22px}
+    .header{max-width:1500px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    h1{font-size:1.35rem;margin:0;font-weight:750}h2{font-size:1.08rem;margin:0 0 10px}
+    .sub,.muted{color:#5e6873}small{font-size:.82rem}
+    main{max-width:1500px;margin:auto;padding:20px 22px 32px}
+    .badge{display:inline-flex;gap:8px;align-items:center;border:1px solid #cbd3dd;border-radius:6px;padding:9px 12px;font-weight:700;background:#fafbfc}
+    .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#8c969f}
+    .badge.live .dot{background:#207947}.badge.live{border-color:#a6c6b3;color:#14623a}
+    .badge.off .dot{background:#bd4a30}.badge.off{color:#9b3626}
+    .metrics{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+    .metric{border:1px solid #d9dee4;border-radius:8px;background:#fff;padding:10px 14px;min-width:140px}
+    .metric strong{display:block;font-size:1.16rem;margin-top:3px;font-variant-numeric:tabular-nums}
+    .views{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+    .view{background:#fff;border:1px solid #d9dee4;border-radius:9px;padding:12px;min-width:0}
+    .view img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;background:#101820;border-radius:5px}
+    .view.depth img{aspect-ratio:8/5}
+    .note{background:#fff;border:1px solid #d9dee4;border-left:4px solid #667c91;margin-top:18px;border-radius:5px;padding:14px 16px;line-height:1.5}
+    #error{color:#a13224;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.86rem;margin-top:12px}
+    button{background:#fff;border:1px solid #b7c1cb;border-radius:6px;padding:8px 12px;cursor:pointer;color:#24323f;font-weight:650}
+    button:hover{background:#edf1f5} .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    @media(max-width:850px){.views{grid-template-columns:1fr}main{padding:14px}.metric{flex:1}header{padding:14px}}
+  </style>
+</head>
+<body>
+<header><div class="header">
+  <div><h1>Vision <span class="sub">/ OAK-D Pro AF</span></h1>
+    <small class="muted">Podgląd stanowiska · VENTUNO Q · wyłącznie odczyt</small></div>
+  <div class="actions"><span class="badge" id="camera-state"><span class="dot"></span><span id="state-label">Łączenie…</span></span>
+    <button type="button" onclick="location.reload()">Odśwież obraz</button></div>
+</div></header>
+<main>
+  <section class="metrics" aria-label="Parametry strumieni">
+    <div class="metric"><small class="muted">Interfejs USB</small><strong id="usb">—</strong></div>
+    <div class="metric"><small class="muted">RGB · FPS</small><strong id="rgbfps">—</strong></div>
+    <div class="metric"><small class="muted">Głębia · FPS</small><strong id="depthfps">—</strong></div>
+    <div class="metric"><small class="muted">Poprawne punkty głębi</small><strong id="valid">—</strong></div>
+  </section>
+  <section class="views" aria-label="Podgląd na żywo">
+    <article class="view">
+      <h2>Obraz kolorowy (RGB)</h2>
+      <img alt="Strumień RGB na żywo z kamery nad stołem" src="/stream/rgb.mjpg">
+      <p class="muted"><small>Rozdzielczość transmisji: 640 × 360. Podgląd, nie zdjęcie inspekcyjne.</small></p>
+    </article>
+    <article class="view depth">
+      <h2>Mapa głębi (stereo)</h2>
+      <img alt="Kolorowana mapa głębi na żywo z kamery Luxonis" src="/stream/depth.mjpg">
+      <p class="muted"><small>Kolory poglądowe dla 0,2–5 m. Czarny oznacza brak wiarygodnego odczytu.</small></p>
+    </article>
+  </section>
+  <p id="error" role="status" aria-live="polite"></p>
+  <div class="note"><strong>Tryb laboratoryjny DEV.</strong> Kamera nie została skalibrowana względem stołu ani robota. Podgląd nie aktywuje IR, nie uruchamia AI i nie steruje NERO. Pomiar głębi nie jest czujnikiem bezpieczeństwa. Obraz nie jest zapisywany na dysku ani przekazywany do chmury.</div>
+</main>
+<script>
+  const $=id=>document.getElementById(id);
+  const n=v=>typeof v==="number" ? v.toFixed(1) : "—";
+  async function poll(){
+    try{
+      const response=await fetch("/api/status",{cache:"no-store"});
+      if(!response.ok)throw Error("HTTP "+response.status);
+      const s=await response.json();
+      $("camera-state").className="badge "+(s.online?"live":"off");
+      $("state-label").textContent=s.online?"Kamera ONLINE":(s.pipeline_running?"Oczekiwanie na klatki":"Kamera OFFLINE");
+      $("usb").textContent=s.usb||"—";
+      $("rgbfps").textContent=n(s.rgb_fps);
+      $("depthfps").textContent=n(s.depth_fps);
+      $("valid").textContent=s.depth_valid_pct===null?"—":n(s.depth_valid_pct)+"%";
+      $("error").textContent=s.error?"Błąd urządzenia: "+s.error+" · sprawdź dostępność kamery i uruchom usługę ponownie.":"";
+    }catch(e){
+      $("camera-state").className="badge off";
+      $("state-label").textContent="Serwer niedostępny";
+      $("error").textContent="Brak połączenia z usługą podglądu.";
+    }
+  }
+  poll();
+  setInterval(poll,1200);
+</script>
+</body></html>
