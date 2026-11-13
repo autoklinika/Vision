@@ -59,7 +59,7 @@ class GeometryTests(unittest.TestCase):
         observation = observe_scene(metadata(), self.depth, previous)
         self.assertEqual(observation["schema_version"],
                          "perception.scene_observation.v1")
-        self.assertEqual(observation["validity"], "CAMERA_FRAME_ONLY")
+        self.assertEqual(observation["validity"], "EXPLORATORY_UNVERIFIED_PROJECTION")
         self.assertEqual(observation["robot_base_frame"]["status"], "UNAVAILABLE")
         self.assertGreaterEqual(len(observation["objects"]), 1)
         obj = observation["objects"][0]

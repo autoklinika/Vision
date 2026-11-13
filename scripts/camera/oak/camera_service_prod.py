@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Vision OAK-D Pro AF camera service: single-owner RGB MJPEG + 16-bit depth.
 
-Runs on Ventuno Q / DepthAI 3.12.0. No on-camera NN, IR, robot, or disk recording.
+Runs on Ventuno Q / DepthAI 3.12.0. No NN/robot/disk recording.
+IR and autofocus pilot require explicit nonproduction command-line opt-in.
 """
 from __future__ import annotations
 
@@ -18,7 +19,11 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
+from camera_optics import describe_output_transform, OpticalMetadataError, crop_diagnostic_jpeg
+from camera_features import (get_profile, apply_ir_test_levels, reset_ir_test_levels,
+                             make_focus_control, af_sensor_roi_from_transform)
 from camera_sync import (FramePacket, RgbdSynchronizer, bundle_metadata,
                          encode_replay_npz, read_optics_readonly)
 
@@ -60,10 +65,26 @@ class State:
         self.sync = RgbdSynchronizer()
         self.calibration = {"state": "UNAVAILABLE", "depth_projection_status": "UNAVAILABLE"}
         self.client_semaphore = threading.BoundedSemaphore(10)
+        self.roi_semaphore = threading.BoundedSemaphore(1)
+        self.optics_captured = {"rgb": False, "depth": False}
+        self.optics_errors = {}
+        self.optics_fail_count = {"rgb": 0, "depth": 0}
+        self.pilot_profile = None
+        self.pilot_status = "OFF"
+        self.focus_samples = deque(maxlen=500)
+        self.focus_error = None
+        self.af_actuator_diagnostic = False
+        self.af_diag_step = 0
 
     def start(self, usb: str):
         with self.cv:
             self.sync.reset()
+            self.optics_captured = {"rgb": False, "depth": False}
+            self.optics_errors = {}
+            self.optics_fail_count = {"rgb": 0, "depth": 0}
+            self.focus_samples.clear()
+            self.focus_error = None
+            self.af_diag_step = 0
             self.usb = usb
             self.running = True
             self.error = None
@@ -125,6 +146,15 @@ class State:
         with self.cv:
             return self.frames[kind]
 
+    def snapshot_live_rgb(self):
+        """Unlike legacy snapshots, refuse stale/failed frames for new ROI API."""
+        with self.cv:
+            if (not self.running or self.error is not None
+                    or not self.times["rgb"]
+                    or time.monotonic() - self.times["rgb"] > FRESH_SECONDS):
+                return None
+            return self.frames["rgb"]
+
     def raw_depth(self):
         with self.cv:
             return self.depth.copy() if self.depth is not None else None
@@ -140,6 +170,39 @@ class State:
                                  host_received_ns, width, height, payload)
             return self.sync.ingest(packet, now_ns=time.monotonic_ns())
 
+    def record_optics(self, stream, frame, width, height):
+        """Collect first ImgFrame transform, no extra hardware or pipeline."""
+        if self.optics_captured[stream] or self.optics_fail_count[stream] >= 3:
+            return
+        try:
+            optics = describe_output_transform(frame, width, height, stream if stream == "rgb" else "stereo_depth")
+        except (OpticalMetadataError, RuntimeError, AttributeError, ValueError) as exc:
+            with self.cv:
+                self.optics_errors[stream] = type(exc).__name__
+                self.optics_fail_count[stream] += 1
+            return
+        with self.cv:
+            self.calibration.setdefault("intrinsics", {})[optics["frame_of_reference"]] = optics
+            if stream == "depth":
+                self.calibration["depth_projection_status"] = "FRAME_TRANSFORM_REPORTED_UNVERIFIED"
+                self.calibration["depth_intrinsics_id"] = optics["intrinsics_id"]
+            self.optics_captured[stream] = True
+            self.optics_errors.pop(stream, None)
+
+    def record_focus(self, frame):
+        """DepthAI frame metadata only; lens position is not a focus-quality proof."""
+        try:
+            value = frame.getLensPosition()
+            raw = frame.getLensPositionRaw()
+            if value is None or not 0 <= int(value) <= 255:
+                return
+            with self.cv:
+                self.focus_samples.append((time.monotonic_ns(), int(value), int(raw)))
+                self.focus_error = None
+        except (AttributeError, TypeError, ValueError, RuntimeError) as exc:
+            with self.cv:
+                self.focus_error = type(exc).__name__
+
     def frame_bundle(self):
         with self.cv:
             if not self.running or self.error is not None:
@@ -154,6 +217,13 @@ class State:
                 "depth_valid_fraction_preview_estimate": (
                     self.valid_pct / 100.0 if self.valid_pct is not None else None),
                 "sync_diagnostics_at_read": self.sync.diagnostics(now_ns),
+                "feature_profile": self.pilot_profile.name if self.pilot_profile else "legacy",
+                "feature_profile_hardware_validated": False if self.pilot_profile else None,
+                "ir_commanded": ({
+                    "dot": self.pilot_profile.ir_dot,
+                    "flood": self.pilot_profile.ir_flood,
+                    "state": self.pilot_status,
+                } if self.pilot_profile else None),
             }
             return pair, bundle_metadata(pair, self.calibration, quality, now_ns)
 
@@ -182,11 +252,28 @@ class State:
                 "age_seconds": ages, "error": self.error,
                 "uptime_seconds": round(now-self.started),
                 "rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024),
-                "mode": "PROD / NO AI / NO IR / NO ROBOT / NOT TABLE-CALIBRATED",
+                "mode": ("EXPERIMENTAL PILOT / NO AI / NO ROBOT / NOT TABLE-CALIBRATED"
+                         if self.pilot_profile else
+                         "PROD / NO AI / NO IR / NO ROBOT / NOT TABLE-CALIBRATED"),
                 "raw_depth_unit": "millimetres", "depth_alignment": "rectified-left",
                 "rgbd_sync": self.sync.diagnostics(),
                 "calibration_read_only_state": self.calibration.get("state"),
                 "calibration_revision": self.calibration.get("revision"),
+                "depth_projection_status": self.calibration.get("depth_projection_status"),
+                "optics_captured": dict(self.optics_captured),
+                "optics_errors": dict(self.optics_errors),
+                "pilot_profile": self.pilot_profile.name if self.pilot_profile else None,
+                "pilot_status": self.pilot_status,
+                "focus_device_metadata": {
+                    "samples": len(self.focus_samples),
+                    "lens_position_last": self.focus_samples[-1][1] if self.focus_samples else None,
+                    "lens_position_min": min(x[1] for x in self.focus_samples) if self.focus_samples else None,
+                    "lens_position_max": max(x[1] for x in self.focus_samples) if self.focus_samples else None,
+                    "lens_position_raw_last": self.focus_samples[-1][2] if self.focus_samples else None,
+                    "error": self.focus_error,
+                    "quality_verified": False,
+                    "actuator_diagnostic_step": self.af_diag_step,
+                },
             }
 
 
@@ -246,6 +333,26 @@ class Handler(BaseHTTPRequestHandler):
                     self.send(200, "application/octet-stream", data)
             finally:
                 state.client_semaphore.release()
+        elif path == "/snapshot/rgb-roi.jpg":
+            if not state.roi_semaphore.acquire(blocking=False):
+                self.send(429, "text/plain", b"ROI worker busy")
+                return
+            try:
+                frame = state.snapshot_live_rgb()
+                if frame is None:
+                    self.send(503, "text/plain", b"No RGB frame")
+                    return
+                query = parse_qs(urlsplit(self.path).query)
+                if any(len(query.get(k, [])) != 1 for k in ("x","y","w","h")):
+                    self.send(400, "text/plain", b"ROI requires x,y,w,h")
+                    return
+                roi = tuple(float(query[k][0]) for k in ("x","y","w","h"))
+                cropped, _ = crop_diagnostic_jpeg(frame, roi)
+                self.send(200, "image/jpeg", cropped)
+            except (ValueError, TypeError, OverflowError):
+                self.send(400, "text/plain", b"Invalid ROI")
+            finally:
+                state.roi_semaphore.release()
         elif path == "/healthz":
             s=state.status()
             self.send(200 if s["online"] else 503,"text/plain",
@@ -341,6 +448,9 @@ def run_camera(state: State, stop: threading.Event):
     with dai.Pipeline() as p:
         device=p.getDefaultDevice()
         color=p.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+        pilot = state.pilot_profile
+        af_input = (color.inputControl.createInputQueue()
+                    if pilot and pilot.af_mode != "unchanged" else None)
         video=color.requestOutput(cfg["rgb_size"],type=dai.ImgFrame.Type.NV12,
                                   fps=cfg["rgb_fps"])
         encoder=p.create(dai.node.VideoEncoder).build(
@@ -372,16 +482,46 @@ def run_camera(state: State, stop: threading.Event):
         renderer.start()
         launched = time.monotonic()
         last_rgb = last_depth = launched
+        af_roi_attempts = 0
+        af_roi = None
         next_chip = 0.0
         try:
+            if pilot:
+                apply_ir_test_levels(device, pilot.ir_dot, pilot.ir_flood)
+                state.pilot_status = "EXPERIMENTAL_IR_COMMANDS_SENT"
+                if af_input:
+                    af_input.send(make_focus_control(dai, pilot.af_mode))
+                    state.pilot_status += "_AF_MODE_SENT"
             while not stop.is_set() and p.isRunning():
                 now=time.monotonic()
+                if af_input and state.af_actuator_diagnostic:
+                    if state.af_diag_step == 0 and now - launched >= 2.0:
+                        command = dai.CameraControl()
+                        command.setManualFocus(160)
+                        af_input.send(command)
+                        state.af_diag_step = 1
+                        LOG.info("AF_DIAG_MANUAL_COMMAND_SENT")
+                    elif state.af_diag_step == 1 and now - launched >= 5.0:
+                        af_input.send(make_focus_control(dai, "auto", af_roi))
+                        state.af_diag_step = 2
+                        LOG.info("AF_DIAG_AUTO_REFOCUS_COMMAND_SENT")
                 rgb=qr.tryGet()
                 pkt=qd.tryGet()
                 if rgb is not None:
                     data=bytes(rgb.getData())
                     if data[:2]!=bytes.fromhex("ffd8") or data[-2:]!=bytes.fromhex("ffd9"):
                         raise RuntimeError("Invalid hardware JPEG packet")
+                    state.record_optics("rgb", rgb, cfg["rgb_size"][0], cfg["rgb_size"][1])
+                    if pilot and pilot.roi and af_input and af_roi_attempts < 3:
+                        af_roi_attempts += 1
+                        try:
+                            af_roi = af_sensor_roi_from_transform(rgb.getTransformation(), pilot.roi)
+                            af_input.send(make_focus_control(dai, pilot.af_mode, af_roi))
+                            state.pilot_status = "AF_ROI_COMMAND_SENT_UNVERIFIED"
+                            af_roi_attempts = 3
+                        except (ValueError, RuntimeError, AttributeError):
+                            state.pilot_status = "AF_ROI_NOT_AVAILABLE"
+                    state.record_focus(rgb)
                     state.publish("rgb",data)
                     state.ingest_packet("rgb", data, rgb.getSequenceNum(),
                         int(rgb.getTimestampDevice().total_seconds() * 1e9),
@@ -390,6 +530,7 @@ def run_camera(state: State, stop: threading.Event):
                     state.received["rgb"]+=1
                 if pkt is not None:
                     raw = pkt.getFrame().copy()
+                    state.record_optics("depth", pkt, raw.shape[1], raw.shape[0])
                     state.publish_depth(raw)
                     state.ingest_packet("depth", raw, pkt.getSequenceNum(),
                         int(pkt.getTimestampDevice().total_seconds() * 1e9),
@@ -414,6 +555,17 @@ def run_camera(state: State, stop: threading.Event):
             if not stop.is_set():
                 raise RuntimeError("DepthAI pipeline stopped unexpectedly")
         finally:
+            if pilot:
+                if af_input and state.af_actuator_diagnostic:
+                    try:
+                        af_input.send(make_focus_control(dai, "auto"))
+                        LOG.info("AF_DIAG_FINAL_AUTO_COMMAND_SENT")
+                    except Exception:
+                        LOG.warning("AF final return command unavailable", exc_info=True)
+                failures = reset_ir_test_levels(device)
+                state.pilot_status = "IR_OFF_COMMAND_SENT_UNVERIFIED" if not failures else "IR_OFF_COMMAND_FAILED"
+                if failures:
+                    LOG.warning("IR reset failed for %s", failures)
             renderer_stop.set()
             with state.cv:
                 state.cv.notify_all()
@@ -428,6 +580,10 @@ def main():
     ap.add_argument("--bind",default="127.0.0.1")
     ap.add_argument("--port",type=int,default=18092)
     ap.add_argument("--profile",choices=PROFILES,default="balanced")
+    ap.add_argument("--pilot-profile",choices=("survey", "depth_precision", "detail", "low_light"),
+                    help="Opt-in experimental feature profile; NOT in production unit")
+    ap.add_argument("--af-actuator-diagnostic", action="store_true",
+                    help="DEV only: temporary manual focus and return to AF; never production")
     args=ap.parse_args()
     logging.basicConfig(level=logging.INFO,format="%(asctime)s %(levelname)s %(message)s")
     if not 1<=args.port<=65535:
@@ -438,6 +594,14 @@ def main():
     except BlockingIOError:
         ap.error("Another Vision OAK camera owner is running")
     state=State(args.profile)
+    if args.af_actuator_diagnostic and args.pilot_profile != "detail":
+        ap.error("AF actuator diagnostic is restricted to detail pilot")
+    if args.pilot_profile:
+        pilot = get_profile(args.pilot_profile)
+        if pilot.acquisition_profile != args.profile:
+            ap.error("pilot profile acquisition mode does not match --profile")
+        state.pilot_profile = pilot
+        state.af_actuator_diagnostic = args.af_actuator_diagnostic
     stop=threading.Event()
     server=ThreadingHTTPServer((args.bind,args.port),Handler)
     server.daemon_threads=True
