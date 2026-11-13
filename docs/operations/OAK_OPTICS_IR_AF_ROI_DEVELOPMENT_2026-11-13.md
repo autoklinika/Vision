@@ -61,3 +61,7 @@ W rzeczywistej scenie sprzed awarii: IR dot 15% poprawił pokrycie prawidłowej 
 5. Po zatwierdzeniu kryteriów: 2–3 godz. ciągłego RGB-D z obciążeniem Perception, FPS, capture age, dropout, CPU/RAM, temperatura i p50/p95/p99 latencji.
 
 **Nie uruchomiono Vision Core, NERO, wbudowanego AI kamery, GPU Platform, ROS2. Nie zmieniono STOP/E-STOP ani repo main.**
+
+## Aktualizacja po restarcie VENTUNO Q — 13.11.2026
+
+Powyższy bloker USB dotyczy **porannego audytu przed restartem VENTUNO**. Po restarcie hosta hub USB3 i OAK-D Pro AF zostały ponownie wykryte, a Camera Service wrócił do prawidłowej pracy. Następnie wykonano rzeczywiste krótkie próby geometrii, IR, ROI i autofocusa na kontrolowanym, pojedynczym właścicielu USB. Wszystkie zakończyły się PASS, a produkcję przywrócono. Pełne wyniki: OAK_OPTICS_IR_AF_ROI_HARDWARE_2026-11-13.md. Nadal nie ustalono przyczyny zaniku całego kontrolera USB3, nie potwierdzono metrologii XYZ ani długotrwałej niezawodności. Status raportu początkowego pozostaje historyczną obserwacją, a nie aktualnym stanem sprzętu.

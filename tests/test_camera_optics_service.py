@@ -92,6 +92,21 @@ class OpticalServiceTests(unittest.TestCase):
         self.assertEqual(bad2.exception.code, 503)
         bad2.exception.close()
 
+    def test_04_focus_metadata_is_not_quality_proof(self):
+        state = camera.State("detail")
+        state.start("UsbSpeed.SUPER")
+        class MockLensFrame:
+            def __init__(self, pos): self.pos = pos
+            def getLensPosition(self): return self.pos
+            def getLensPositionRaw(self): return self.pos * 4
+        state.record_focus(MockLensFrame(105))
+        state.record_focus(MockLensFrame(130))
+        info = state.status()["focus_device_metadata"]
+        self.assertEqual(info["samples"], 2)
+        self.assertEqual(info["lens_position_min"], 105)
+        self.assertEqual(info["lens_position_max"], 130)
+        self.assertFalse(info["quality_verified"])
+
 
 if __name__ == "__main__":
     unittest.main()

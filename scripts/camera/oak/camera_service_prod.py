@@ -71,6 +71,10 @@ class State:
         self.optics_fail_count = {"rgb": 0, "depth": 0}
         self.pilot_profile = None
         self.pilot_status = "OFF"
+        self.focus_samples = deque(maxlen=500)
+        self.focus_error = None
+        self.af_actuator_diagnostic = False
+        self.af_diag_step = 0
 
     def start(self, usb: str):
         with self.cv:
@@ -78,6 +82,9 @@ class State:
             self.optics_captured = {"rgb": False, "depth": False}
             self.optics_errors = {}
             self.optics_fail_count = {"rgb": 0, "depth": 0}
+            self.focus_samples.clear()
+            self.focus_error = None
+            self.af_diag_step = 0
             self.usb = usb
             self.running = True
             self.error = None
@@ -182,6 +189,20 @@ class State:
             self.optics_captured[stream] = True
             self.optics_errors.pop(stream, None)
 
+    def record_focus(self, frame):
+        """DepthAI frame metadata only; lens position is not a focus-quality proof."""
+        try:
+            value = frame.getLensPosition()
+            raw = frame.getLensPositionRaw()
+            if value is None or not 0 <= int(value) <= 255:
+                return
+            with self.cv:
+                self.focus_samples.append((time.monotonic_ns(), int(value), int(raw)))
+                self.focus_error = None
+        except (AttributeError, TypeError, ValueError, RuntimeError) as exc:
+            with self.cv:
+                self.focus_error = type(exc).__name__
+
     def frame_bundle(self):
         with self.cv:
             if not self.running or self.error is not None:
@@ -243,6 +264,16 @@ class State:
                 "optics_errors": dict(self.optics_errors),
                 "pilot_profile": self.pilot_profile.name if self.pilot_profile else None,
                 "pilot_status": self.pilot_status,
+                "focus_device_metadata": {
+                    "samples": len(self.focus_samples),
+                    "lens_position_last": self.focus_samples[-1][1] if self.focus_samples else None,
+                    "lens_position_min": min(x[1] for x in self.focus_samples) if self.focus_samples else None,
+                    "lens_position_max": max(x[1] for x in self.focus_samples) if self.focus_samples else None,
+                    "lens_position_raw_last": self.focus_samples[-1][2] if self.focus_samples else None,
+                    "error": self.focus_error,
+                    "quality_verified": False,
+                    "actuator_diagnostic_step": self.af_diag_step,
+                },
             }
 
 
@@ -452,6 +483,7 @@ def run_camera(state: State, stop: threading.Event):
         launched = time.monotonic()
         last_rgb = last_depth = launched
         af_roi_attempts = 0
+        af_roi = None
         next_chip = 0.0
         try:
             if pilot:
@@ -462,6 +494,17 @@ def run_camera(state: State, stop: threading.Event):
                     state.pilot_status += "_AF_MODE_SENT"
             while not stop.is_set() and p.isRunning():
                 now=time.monotonic()
+                if af_input and state.af_actuator_diagnostic:
+                    if state.af_diag_step == 0 and now - launched >= 2.0:
+                        command = dai.CameraControl()
+                        command.setManualFocus(160)
+                        af_input.send(command)
+                        state.af_diag_step = 1
+                        LOG.info("AF_DIAG_MANUAL_COMMAND_SENT")
+                    elif state.af_diag_step == 1 and now - launched >= 5.0:
+                        af_input.send(make_focus_control(dai, "auto", af_roi))
+                        state.af_diag_step = 2
+                        LOG.info("AF_DIAG_AUTO_REFOCUS_COMMAND_SENT")
                 rgb=qr.tryGet()
                 pkt=qd.tryGet()
                 if rgb is not None:
@@ -478,6 +521,7 @@ def run_camera(state: State, stop: threading.Event):
                             af_roi_attempts = 3
                         except (ValueError, RuntimeError, AttributeError):
                             state.pilot_status = "AF_ROI_NOT_AVAILABLE"
+                    state.record_focus(rgb)
                     state.publish("rgb",data)
                     state.ingest_packet("rgb", data, rgb.getSequenceNum(),
                         int(rgb.getTimestampDevice().total_seconds() * 1e9),
@@ -512,6 +556,12 @@ def run_camera(state: State, stop: threading.Event):
                 raise RuntimeError("DepthAI pipeline stopped unexpectedly")
         finally:
             if pilot:
+                if af_input and state.af_actuator_diagnostic:
+                    try:
+                        af_input.send(make_focus_control(dai, "auto"))
+                        LOG.info("AF_DIAG_FINAL_AUTO_COMMAND_SENT")
+                    except Exception:
+                        LOG.warning("AF final return command unavailable", exc_info=True)
                 failures = reset_ir_test_levels(device)
                 state.pilot_status = "IR_OFF_COMMAND_SENT_UNVERIFIED" if not failures else "IR_OFF_COMMAND_FAILED"
                 if failures:
@@ -532,6 +582,8 @@ def main():
     ap.add_argument("--profile",choices=PROFILES,default="balanced")
     ap.add_argument("--pilot-profile",choices=("survey", "depth_precision", "detail", "low_light"),
                     help="Opt-in experimental feature profile; NOT in production unit")
+    ap.add_argument("--af-actuator-diagnostic", action="store_true",
+                    help="DEV only: temporary manual focus and return to AF; never production")
     args=ap.parse_args()
     logging.basicConfig(level=logging.INFO,format="%(asctime)s %(levelname)s %(message)s")
     if not 1<=args.port<=65535:
@@ -542,11 +594,14 @@ def main():
     except BlockingIOError:
         ap.error("Another Vision OAK camera owner is running")
     state=State(args.profile)
+    if args.af_actuator_diagnostic and args.pilot_profile != "detail":
+        ap.error("AF actuator diagnostic is restricted to detail pilot")
     if args.pilot_profile:
         pilot = get_profile(args.pilot_profile)
         if pilot.acquisition_profile != args.profile:
             ap.error("pilot profile acquisition mode does not match --profile")
         state.pilot_profile = pilot
+        state.af_actuator_diagnostic = args.af_actuator_diagnostic
     stop=threading.Event()
     server=ThreadingHTTPServer((args.bind,args.port),Handler)
     server.daemon_threads=True
