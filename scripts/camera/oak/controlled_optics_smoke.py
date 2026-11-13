@@ -16,6 +16,9 @@ import time
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
+# The smoke imports Perception for replay; include its isolated script directory
+# regardless of the caller's current working directory.
+sys.path.insert(0, str(ROOT.parents[1] / "perception"))
 VENV = Path("/srv/vision-data/tools/vision-camera-service/venv/bin/python")
 ENV_FILE = Path("/srv/vision-data/tools/vision-camera-service/camera.env")
 OUT_DIR = Path("/srv/vision-data/staging/oak-optics-live-20261113")

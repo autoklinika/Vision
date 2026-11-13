@@ -24,6 +24,7 @@ from urllib.parse import parse_qs, urlsplit
 from camera_optics import describe_output_transform, OpticalMetadataError, crop_diagnostic_jpeg
 from camera_features import (get_profile, apply_ir_test_levels, reset_ir_test_levels,
                              make_focus_control, af_sensor_roi_from_transform)
+from camera_vendor_profiles import apply_stereo_preset, preset_for_profile
 from camera_sync import (FramePacket, RgbdSynchronizer, bundle_metadata,
                          encode_replay_npz, read_optics_readonly)
 
@@ -32,12 +33,15 @@ PAGE = Path(__file__).with_name("camera_service_prod.html")
 LOCK_PATH = "/tmp/vision-oak-browser-preview.lock"
 FRESH_SECONDS = 5.0
 PROFILES = {
+    # No hand-crafted stereo tuning: presets belong to DepthAI 3.12.0.
     "balanced": {"rgb_size": (1920, 1080), "rgb_fps": 30, "depth_fps": 30,
-                 "preview_fps": 12, "extended": False},
+                 "preview_fps": 12},
     "detail": {"rgb_size": (3840, 2160), "rgb_fps": 20, "depth_fps": 20,
-               "preview_fps": 10, "extended": False},
+               "preview_fps": 10},
     "near": {"rgb_size": (1920, 1080), "rgb_fps": 15, "depth_fps": 15,
-             "preview_fps": 10, "extended": True},
+             "preview_fps": 10},
+    "robotics": {"rgb_size": (1920, 1080), "rgb_fps": 30, "depth_fps": 30,
+                 "preview_fps": 12},  # diagnostic scene monitoring, never safety
 }
 
 
@@ -218,6 +222,7 @@ class State:
                     self.valid_pct / 100.0 if self.valid_pct is not None else None),
                 "sync_diagnostics_at_read": self.sync.diagnostics(now_ns),
                 "feature_profile": self.pilot_profile.name if self.pilot_profile else "legacy",
+                "stereo_vendor_preset": preset_for_profile(self.profile),
                 "feature_profile_hardware_validated": False if self.pilot_profile else None,
                 "ir_commanded": ({
                     "dot": self.pilot_profile.ir_dot,
@@ -241,7 +246,13 @@ class State:
             )
             return {
                 "online": bool(online), "pipeline_running": self.running,
-                "profile": self.profile, "model": "OAK-D Pro AF",
+                "profile": self.profile,
+                "stereo_vendor_preset": preset_for_profile(self.profile),
+                "stereo_preset_hardware_verified": bool(
+                    self.running and self.error is None
+                    and self.optics_captured["depth"]
+                    and self.sync.diagnostics().get("paired_count", 0) > 0),
+                "model": "OAK-D Pro AF",
                 "rgb_resolution": self.config["rgb_size"],
                 "depth_resolution": self.depth_shape,
                 "rgb_fps": round(self.fps["rgb"], 1),
@@ -463,9 +474,9 @@ def run_camera(state: State, stop: threading.Event):
         stereo=p.create(dai.node.StereoDepth)
         left.requestFullResolutionOutput(fps=cfg["depth_fps"]).link(stereo.left)
         right.requestFullResolutionOutput(fps=cfg["depth_fps"]).link(stereo.right)
-        stereo.setRectification(True)
-        stereo.setLeftRightCheck(True)
-        stereo.setExtendedDisparity(cfg["extended"])
+        # Official RVC2 DepthAI v3 preset: no custom subpixel/extended/filter mix.
+        # Explicit rectified-left retains the camera.frame_bundle.v1 contract.
+        preset_name = apply_stereo_preset(stereo, dai, state.profile)
         qd=stereo.depth.createOutputQueue(maxSize=4,blocking=False)
 
         p.start()
@@ -473,8 +484,10 @@ def run_camera(state: State, stop: threading.Event):
         if state.usb != "UsbSpeed.SUPER":
             raise RuntimeError("USB3 required in production; negotiated " + state.usb)
         state.calibration = read_optics_readonly(device, dai, cfg["rgb_size"])
-        LOG.info("CAMERA_STARTED profile=%s USB=%s calibration=%s",
-                 state.profile, state.usb, state.calibration.get("state"))
+        state.calibration["stereo_vendor_preset"] = preset_name
+        state.calibration["depth_alignment"] = "stereo_left_rectified_optical"
+        LOG.info("CAMERA_STARTED profile=%s preset=%s USB=%s calibration=%s",
+                 state.profile, preset_name, state.usb, state.calibration.get("state"))
         renderer_stop = threading.Event()
         renderer = threading.Thread(
             target=render_depth_previews, args=(state, renderer_stop), daemon=True

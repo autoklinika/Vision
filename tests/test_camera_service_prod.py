@@ -19,8 +19,10 @@ spec.loader.exec_module(camera)
 
 class StateTests(unittest.TestCase):
     def test_profiles_and_initial_status(self):
-        self.assertEqual(set(camera.PROFILES),{"balanced","detail","near"})
+        self.assertEqual(set(camera.PROFILES),{"balanced","detail","near","robotics"})
         st=camera.State("balanced")
+        self.assertEqual(st.status()["stereo_vendor_preset"], "FAST_ACCURACY")
+        self.assertFalse(st.status()["stereo_preset_hardware_verified"])
         self.assertFalse(st.status()["online"])
         self.assertEqual(st.status()["raw_depth_unit"],"millimetres")
 
