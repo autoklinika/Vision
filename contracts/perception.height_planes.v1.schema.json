@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "perception.height_planes.v1",
+  "description": "Camera-frame-only geometric diagnostic measurement. NOT a calibrated robot pose, motion command, or safety signal.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "frame_of_reference", "validity", "reason", "height_mm", "height_reference_status", "coordinate_frame_table", "coordinate_frame_robot_base", "safety_function", "table_plane", "top_plane", "quality"],
+  "properties": {
+    "schema_version": {"const": "perception.height_planes.v1"},
+    "frame_of_reference": {"const": "stereo_left_rectified_optical"},
+    "validity": {"enum": ["NOT_READY", "EXPLORATORY_UNVERIFIED_PROJECTION"]},
+    "reason": {"type": ["string", "null"]},
+    "height_mm": {"type": ["number", "null"], "minimum": 0},
+    "height_reference_status": {"const": "UNVERIFIED"},
+    "coordinate_frame_table": {"const": "UNAVAILABLE"},
+    "coordinate_frame_robot_base": {"const": "UNAVAILABLE"},
+    "safety_function": {"const": false},
+    "table_plane": {"type": ["object", "null"]},
+    "top_plane": {"type": ["object", "null"]},
+    "quality": {"type": "object"}
+  },
+  "allOf": [
+    {"if": {"properties": {"validity": {"const": "NOT_READY"}}},
+     "then": {"properties": {"height_mm": {"type": "null"}}}},
+    {"if": {"properties": {"validity": {"const": "EXPLORATORY_UNVERIFIED_PROJECTION"}}},
+     "then": {"properties": {"height_mm": {"type": "number", "exclusiveMinimum": 0},
+                            "top_plane": {"type": "object"}, "table_plane": {"type": "object"}}}}
+  ]
+}
