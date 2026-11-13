@@ -191,7 +191,10 @@ def observe_scene(frame_bundle: dict, depth_mm: np.ndarray,
         return base
     cal = frame_bundle.get("calibration", {})
     k_data = cal.get("intrinsics", {}).get("stereo_left_rectified_optical")
-    verified = k_data is not None
+    # Frame metadata alone is not a metrological accuracy certificate.
+    verified = bool(k_data is not None and
+        cal.get("depth_projection_status") == "METRIC_VERIFIED_ON_TARGET" and
+        k_data.get("validity") == "METRIC_VERIFIED")
     if k_data is None:
         k_data = cal.get("intrinsics", {}).get("stereo_left_raw_optical")
     if not k_data:
