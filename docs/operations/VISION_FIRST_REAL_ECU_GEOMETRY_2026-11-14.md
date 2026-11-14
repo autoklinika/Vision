@@ -49,3 +49,21 @@ Po zakończeniu kontroli produkcyjny Camera Service: **ONLINE**, USB SUPER, RGB 
 **Dane prywatne (nie commitować):** `/srv/vision-data/staging/vision-ecu-live-test-20261114` — rzeczywiste zdjęcia, RAW16, skrypty pilotowe, per-frame JSON i podgląd mapy głębi. Wszystkie surowe pliki 0600. Repo zawiera tylko zagregowany raport.
 
 **Następna pojedyncza potrzebna czynność:** operator mierzy suwmiarką rzeczywistą długość, szerokość oraz wysokość korpusu i maksymalną wysokość wystającego złącza; dopiero wtedy sprawdzamy bias i decydujemy o dokładności algorytmu. Przed ruchem robota konieczna kalibracja table↔robot_base oraz osobna bramka bezpieczeństwa.
+
+## Korekta: najwyższe punkty trzech złączy (14.11.2026)
+
+Poprzednia obwiednia całego ECU **P99 = 51,32 mm nie jest najwyższym punktem bryły**. P99 całego ECU pomija wąskie, wysokie złącza, ponieważ zajmują niewielką część punktów stereo. Dla przyszłego planowania trajektorii NERO NIE wolno utożsamiać globalnego P99 z maksymalną wysokością przeszkody.
+
+Ponownie przeanalizowano te same **25 rzeczywistych klatek RAW16**, bez ponownego otwierania kamery, bez nowej regulacji IR i bez ingerencji w produkcję. Lokalną płaszczyznę stołu dopasowano oddzielnie dla każdej klatki w 3D (RANSAC, threshold 6 mm, wycięcie ECU/większości planszy). Z mapy wysokości względem normalnej stołu wydzielono trzy widoczne gniazda, **w układzie depth rectified-left**. Małe stabilne rejony 5×5 wokół górnych krawędzi poddano filtrowaniu medianowemu — to nie raw MAX wszystkich pikseli.
+
+| Wtyczka / gniazdo | Lokalny obszar 5×5 (depth u,v) | Mediana wysokości nad stołem | std między 25 klatkami | Mediana punktu w układzie optycznym kamery XYZ [m] |
+|---|---|---:|---:|---|
+| Lewe czarne | 645,439 | 56,91 mm | 1,28 mm | [0,00965; 0,05797; 0,76600] |
+| **Środkowe szare — najwyższe** | **726,444** | **62,88 mm** | **1,12 mm** | **[0,08717; 0,06205; 0,76300]** |
+| Prawe czarne | 772,494 | 53,56 mm | 0,64 mm | [0,13398; 0,11285; 0,77900] |
+
+Każdy pomiar lokalnego obszaru posiadał poprawne dane we wszystkich 25/25 klatkach. W niezależnym sprawdzeniu **całego obszaru ECU** (nie tylko trzech ręcznie zidentyfikowanych złączy) zbudowano medianową mapę wysokości na podstawie 25 klatek, wymagając ważności pikseli w co najmniej 20 klatkach, a następnie filtracji medianowej 5×5. **Jedyny spójny obszar z wysokością powyżej 60 mm** miał powierzchnię 29 pikseli w pobliżu szarego złącza (box depth [720,442,731,446], centroid [725,6;443,4], najwyższa przefiltrowana wartość ~63,94 mm). Nie znaleziono spójnych obszarów >65 mm po filtracji. To potwierdza ranking wysokości złączy w obserwowanej scenie.
+
+**Uwaga:** wysokości to estymaty ze stereo, nie dokładne mechaniczne wymiary wtyczek. Wartość std opisuje korelację kolejnych klatek, nie niepewność bezwzględną. Nierówna widoczność krawędzi, powierzchnie odblaskowe i luki stereo mogą nadal zaniżać lub zawyżać wartości. Fizyczna wysokość szarej wtyczki do porównania z suwmiarką nie została jeszcze podana.
+
+**Konsekwencja dla Vision:** Perception powinien udostępniać oddzielnie: wysokość powierzchni korpusu (~25 mm), kilka lokalnych wierzchołków elementów wystających (~54–63 mm) z lokalizacją i jakością pomiaru oraz ostrożnościową przestrzeń zabronioną dla trajektorii. Takie dane są wyłącznie percepcją; przed ruchem robota wymagane są kalibracja stołu/robot_base, marginesy bezpieczeństwa i niezależne mechanizmy STOP.
