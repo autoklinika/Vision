@@ -70,16 +70,18 @@ Każdy pomiar lokalnego obszaru posiadał poprawne dane we wszystkich 25/25 klat
 
 ## Referencje mechaniczne operatora — 14.11.2026
 
-Operator podał fizyczne wysokości nad stołem: **szare środkowe złącze 68 mm**, **czarna wtyczka 64 mm**. W scenie występują dwa czarne złącza; operator nie wskazał jeszcze, czy 64 mm odnosi się do lewego czy prawego. Poniższe porównanie ma charakter diagnostyczny, nie jest korektą kalibracji.
+Operator podał fizyczne wysokości nad stołem: **szare środkowe złącze 68 mm**, **oba czarne złącza po 64 mm**. Operator potwierdził, że wysokość odnosi się zarówno do lewego, jak i prawego czarnego złącza. Poniższe porównanie ma charakter diagnostyczny, nie jest korektą kalibracji.
 
 | Złącze | Wysokość fizyczna (operator) | Pomiar stereo lokalnej łaty 5×5 | Różnica stereo − fizyczny |
 |---|---:|---:|---:|
 | Szare środkowe | 68,00 mm | 62,88 mm | **−5,12 mm** |
-| Lewe czarne, jeżeli to jego dotyczy 64 mm | 64,00 mm (przypisanie niepotwierdzone) | 56,91 mm | −7,09 mm (warunkowo) |
-| Prawe czarne, jeżeli to jego dotyczy 64 mm | 64,00 mm (przypisanie niepotwierdzone) | 53,56 mm | −10,44 mm (warunkowo) |
+| Lewe czarne | **64,00 mm** | 56,91 mm | **−7,09 mm** |
+| Prawe czarne | **64,00 mm** | 53,56 mm | **−10,44 mm** |
 
 Spójny szczyt szarego złącza z medianowej mapy 25 klatek osiągał około **63,94 mm** (różnica do referencji 68 mm: **−4,06 mm**), ale jest to inna definicja pomiaru niż mediana lokalnej łaty. Nie należy mieszać tych metod w wyznaczaniu offsetu.
 
 **Istotne ograniczenie**: wysokość fizyczna z suwmiarki może odnosić się do zewnętrznej krawędzi złącza słabo obserwowalnej przez stereo, podczas gdy lokalna łata 5×5 mierzy widoczne punkty bliżej wewnętrznej części. Różnica nie dowodzi stałego offsetu głębi ani błędnej skali kamery. Nie wprowadzamy automatycznej korekty +5 mm ani innych dopasowań do jednej sztuki ECU.
 
 **Kierunek Perception**: zachować odrębne pomiary 3D korpusu i wystających elementów; do wykrywania najwyższej przeszkody użyć przestrzennie spójnego szczytu ze wskaźnikiem pokrycia, zmienności i niepewności, a nie globalnego P99. Nie deklarować gotowości NERO do ruchu bez walidacji 3D i transformacji table↔robot_base.
+
+**Doprecyzowanie operatora:** pomiar 64 mm dotyczy obu czarnych złączy. Różnica między nimi w danych stereo (3,35 mm) mimo jednakowej wysokości rzeczywistej potwierdza, że nie wolno przyjmować jednego offsetu dla wszystkich gniazd. Oba pomiary nadal pozostają diagnostyczne, bez gwarancji poprawnej lokalizacji mechanicznego wierzchołka.
