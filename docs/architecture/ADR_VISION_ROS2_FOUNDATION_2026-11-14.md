@@ -4,8 +4,8 @@
 - **Status architektoniczny:** **ACCEPTED**.
 - **Status realizacji:** **PLANNED / DOCUMENTATION ONLY** — ROS 2 nie zainstalowano ani nie uruchomiono w ramach tego ADR. NERO nie uzyskał nowych uprawnień do ruchu.
 - **Docelowa platforma:** ROS 2 **Jazzy** / Ubuntu **24.04 ARM64** / Arduino VENTUNO Q (QCS8275); MoveIt 2 Jazzy.
-- **Zakres:** OAK-D Pro AF i przyszła kamera Eye-in-Hand, AgileX NERO, Vision Camera Service, Vision Perception Engine, Vision Core, ROS 2 + tf2, MoveIt 2, adaptery urządzeń i AI Platform.
-- **Powiązane ADR:** ADR-VISION-ARCH-001 (oddzielenie Camera Service / Perception / Core) oraz ADR-VISION-ROBOT-001 (NERO STOP i jego ograniczenia bezpieczeństwa). Są obecnie również w gałęziach dokumentacyjnych, nie wolno zakładać, że zostały wdrożone przez samą decyzję ROS 2.
+- **Zakres:** OAK-D Pro AF i przyszła Eye-in-Hand, AgileX NERO, oficjalny Luxonis ROS 2 driver v3, MoveIt 2 + occupancy map, tf2, opcjonalne wyspecjalizowane węzły ECU, Vision Core, adaptery urządzeń i AI Platform.
+- **Powiązane ADR:** ADR-VISION-ARCH-001 (historyczne granice odpowiedzialności Camera/Perception/Core) oraz ADR-VISION-ROBOT-001 (NERO STOP i ograniczenia bezpieczeństwa). Ten ADR **zastępuje plan budowy własnych, odrębnych usług Camera Service i Perception Engine**, zachowując zasady pojedynczego właściciela kamery, separacji sterowania i fail-closed. Poprzednie ADR pozostają w gałęziach dokumentacyjnych, bez automatycznego wdrożenia.
 - **Cel tej zmiany:** przyjąć nową bazę architektury i plan walidacji, nie instalować pakietów, nie zmieniać usług produkcyjnych, nie przejmować USB/CAN i nie wykonywać ruchów.
 
 ## 1. Kontekst
@@ -18,40 +18,48 @@ VENTUNO Q to komputer ARM64 z Ubuntu 24.04. Oficjalne źródła wspierają ROS 2
 
 **ROS 2 Jazzy jest standardową bazą komunikacji robotycznej i integracji przestrzennej Vision**. MoveIt 2 będzie preferowanym planistą ruchu NERO, po osobnej walidacji modelu i sterowników. **Nie oznacza to, że wszystkie programy Vision muszą być natywnymi węzłami ROS**, ani że ROS zastępuje Ubuntu, systemd, DepthAI SDK, WebGUI, AI Platform czy niezależny system bezpieczeństwa.
 
-Zachowujemy obowiązujące granice:
-- **Vision Camera Service**: pojedynczy właściciel każdego fizycznego OAK, akwizycja i diagnostyka. Preferowane oficjalne pipeline i komponenty DepthAI; interfejs ROS to sposób publikacji, a nie drugi równoczesny proces otwierający tę samą kamerę. Wariant (A) Camera Service + publisher ROS albo (B) oficjalny `depthai_ros_driver_v3` przejmujący rolę właściciela kamery wybierzemy **dopiero po testach porównawczych**. Nie uruchamiać obu wariantów jednocześnie na jednej kamerze.
-- **Vision Perception Engine**: interpretacja sceny ECU, lokalizacja, kształt, wysokości lokalnych przeszkód, jakość i niepewność. Wykorzystuje standardowe dane ROS/DepthAI, nie implementuje własnego stereo. Nie jest certyfikowanym czujnikiem bezpieczeństwa.
-- **tf2 / robot_state_publisher**: standaryzowane układy `camera_*_optical_frame`, `table`, `nero_base_link`, `tool0` (ostateczne nazwy zgodne z URDF), aktualizacja transformacji z kalibracją i znacznikami czasu. Zanim kalibracja zostanie zmierzona i zwalidowana, transformacje do `nero_base_link` są **UNAVAILABLE**, nigdy sztuczne identity.
-- **AgileX ROS 2 Driver / ros2_control (po walidacji)**: w przyszłości jedyny właściciel toru poleceń do NERO i stanów przegubów. Nie może współdzielić dostępu CAN/Ethernet z równoległym `pyAgxArm` czy eksperymentalnym kontrolerem. Przyjmujemy sterownik/transport wyłącznie po audycie wersji i potrzebnej konfiguracji.
-- **MoveIt 2**: URDF/SRDF, model kolizyjny, planowanie ruchu J1–J7, sceny z przeszkodami; wyłącznie środowisko symulowane dopóki bramki ruchu nie zostaną zamknięte. Plan nie jest gwarancją braku kolizji, jeżeli scena jest niepełna lub nieaktualna.
-- **Vision Core**: przyszła orkiestracja zadania ECU i zatwierdzanie planu, nie surowa obsługa USB, napędów ani bezpośrednie sterowanie GPU.
-- **AI Platform (Minisforum)**: modele AI, rozpoznanie wariantów ECU, cięższe zadania przez istniejący Resource Manager. Integracja może być asynchronicznym adapterem API/ROS; nie przenosimy zarządzania GPU do Camera Service, nie uzależniamy podstawowego zatrzymania od sieci.
-- **Sony A6100, kamera termiczna, Stream Deck Plus, UPS i WebGUI**: pozostają istniejącymi systemami i wchodzą przez adaptery/bridges tam, gdzie jest to potrzebne. **Nie wszystkie wspierają ROS 2 natywnie.**
+### Upraszczamy implementację: bez dwóch naszych osobnych usług
+
+1. **OAK-D: bezpośrednio oficjalny `depthai_ros_driver_v3`** jako domyślny jedyny właściciel danej kamery na VENTUNO Q. Publikuje obrazy, Depth i `PointCloud2` z `CameraInfo`, znacznikami czasu, kalibracją i diagnostyką. Jego `rgbd_pcl.launch.py` i `pointcloud.launch.py` stanowią punkt wyjścia. Istniejący eksperymentalny Vision Camera Service zachowujemy do porównania i rollbacku, **nie rozwijamy jako kolejnego docelowego produktu**. Migracja po fizycznym smoke teście RVC2 i przywróceniu produkcji; nigdy dwa USB-ownery jednocześnie.
+2. **Podstawowa geometria przeszkód: MoveIt 2 Occupancy Map Monitor** konsumujący wprost głębię lub chmurę punktów ROS i budujący OctoMap / Planning Scene dla NERO. Ten standardowy mechanizm zastępuje potrzebę własnej rozbudowanej usługi Perception Engine **w zadaniu bazowego omijania obiektów**. Konieczna walidacja rozdzielczości voxeli, widoczności czarnych powierzchni i wąskich wystających krawędzi; samo „MoveIt widzi PointCloud2” nie gwarantuje ochrony przed kolizją.
+3. **Specjalistyczna percepcja ECU — tylko tam, gdzie jest wartość dodana**: identyfikacja modelu ECU, dokładne położenie/orientacja względem złącz i PCB, segmentacja gniazd, lokalizacja otworów, cechy dla manipulatora lub analiza AI. Realizowana jako możliwie małe węzły ROS 2 i/lub istniejące pakiety PCL/Open3D/AI Platform. Nie utrzymujemy oddzielnego, ogólnego Perception Engine ani autorskiego stosu filtracji głębi „na zapas”.
+4. **tf2**: standardowe `camera_*_optical_frame`, `table`, `nero_base_link` i rzeczywiste `tool0` (nazwy sprawdzić z URDF). Kalibracja transformacji musi być zmierzona i zweryfikowana; brak kalibracji = `UNAVAILABLE/NO_GO`, nie domyślne identity.
+5. **MoveIt 2 + oficjalny AgileX ROS 2 driver**: model URDF/SRDF, kinematyka J1–J7, geometria narzędzi, planowanie i wykonanie po przetestowaniu centralnej bramki ruchu. Dokładnie jeden właściciel poleceń CAN/Ethernet, nie równoległy `pyAgxArm`.
+6. **Vision Core**: zachowujemy jako logikę procesu analizy ECU, decyzje operatorskie i orkiestrację, z wykorzystaniem ROS actions/services. Nie przejmuje sprzętu, nie przelicza własnego stereo i nie jest funkcją bezpieczeństwa.
+7. **AI Platform (Minisforum)**: cięższe modele AI i specjalizacja ECU poprzez jawne adaptery; nie przenosimy alokacji GPU do drivera kamery. **Sony A6100, termowizja, Stream Deck i WebGUI** nadal mogą używać API/bridge i nie są natywnymi węzłami ROS 2 tylko dlatego, że ROS stanowi bazę robotyki.
+
+**Wniosek z testów ECU:** wcześniejszy autorski median filter 5×5 usuwał wąskie wysokie złącza widoczne w RAW16. Nowy domyślny tor powinien przekazywać standardową chmurę do MoveIt 2 bez własnego agresywnego wygładzania. Jednak OctoMap również może pomijać cienkie szczyty lub źle obserwowane powierzchnie; zaliczenie wymaga sprawdzenia na dwóch zachowanych pomiarach ECU i fizycznych referencjach. Nie uznajemy braku danych Depth za wolną przestrzeń.
 
 ## 3. Szkic przepływu i kontraktów
 
 ```text
-OAK-D overhead / Eye-in-Hand [wyłączny owner sprzętu]
-   └── DepthAI Camera Service lub oficjalny DepthAI ROS Driver v3
-           ├─ /camera/*: Image, CameraInfo, Depth, PointCloud2, timestamp / frame_id
-           └─ health, quality, valid / stale / no depth
-                        ↓
-               Vision Perception Engine  ← AI Platform (opcjonalny adapter zleceń)
-                        ├─ ECU pose / orientation + covariance/quality
-                        ├─ wyspecyfikowane bryły i szczyty przeszkód + niepewność
-                        └─ invalid/stale i wersja kalibracji
-                        ↓
-               tf2 (camera → table → nero_base_link)
-                        ↓
-               MoveIt 2 + Planning Scene
-                        ↓
-        Vision Core: workflow, operator approval, central motion gate
-                        ↓
-        NERO Controller (jeden właściciel poleceń, status J1–J7)
-                        ↓
+  OAK-D Pro AF (overhead)  /  OAK Eye-in-Hand
+                  │
+   oficjalny depthai_ros_driver_v3 (1 USB owner na kamerę)
+     │        │                │
+     RGB      Depth            PointCloud2 / CameraInfo
+              └─────────┬───────────────┘
+                        │
+                tf2 + kalibracja
+                        │
+               MoveIt 2 Occupancy Map Monitor
+                 (Depth / PointCloud → OctoMap)
+                        │
+             MoveIt 2 Planning Scene + URDF NERO
+                        │
+             Planowanie trajektorii — FAKE ONLY
+                        │
+              Vision Core / operator / motion gate
+                        │
+              AgileX ROS 2 driver (PÓŹNIEJ)
+                        │
                        NERO
 
-  Niezależna ochrona operatora i zatrzymanie: POZA torami ROS/DDS/AI.
+  Dodatkowy mały węzeł rozpoznania ECU / złączy (tylko
+  gdy potrzebny) ← RGB, Depth, PointCloud, AI Platform.
+
+  Niezależna ochrona operatora / E-STOP:
+  POZA ROS 2, MoveIt 2, AI i kamerą.
 ```
 
 Standardowe typy wiadomości (kandydaci, do uzgodnienia po teście): `sensor_msgs/Image`, `sensor_msgs/CameraInfo`, `sensor_msgs/PointCloud2`, `sensor_msgs/JointState`, `geometry_msgs/PoseStamped`, `tf2_msgs/TFMessage`, `moveit_msgs/CollisionObject` / `PlanningScene`, `control_msgs/FollowJointTrajectory`. Dla jakości pomiaru i geometrii ECU opracować jawnie wersjonowane wiadomości z polami: `frame_id`, timestamp, kalibracja/revision, uncertainty, source frame(s), validity i max age. Brak wiadomości lub transformacji => **NOT_READY/NO_GO**, nigdy „zero” jako wartość zastępcza.
@@ -68,7 +76,7 @@ ROS 2/DDS ma QoS konfigurowalne dla strumieni obrazu i danych sterowania. Parame
 
 ## 5. Decyzje szczegółowe wymagające testu, nie domysłu
 
-- Oficjalny `depthai_ros_driver_v3` vs bridge z istniejącego Camera Service; porównać USB ownership, RVC2, wydajność, znaczniki czasu, IR/AF i rekonfigurację, następnie wybrać jeden.
+- **Preferujemy wprost `depthai_ros_driver_v3` zamiast własnego Camera Service**; przed wycofaniem starej usługi sprawdzić RVC2, USB ownership, sync, wydajność, IR/AF i rollback, a następnie wdrożyć tylko jednego ownera.
 - AgileX transport: dokumentacja `agx_arm_ros` opisuje CAN/SockeCAN `can_port`; użytkownik preferuje Ethernet. Nie zakładać, że oficjalny launch wspiera Ethernet bez dowodów. Nie uruchamiać dwóch równoległych sterowników.
 - Zgodność dokładnego modelu URDF/SRDF NERO i osprzętu J7, elementów Eye-in-Hand i Sony; kalibracja mocowania aparatu oraz narzędzia.
 - DDS middleware (Cyclone DDS jako kandydat w dokumentacji MoveIt), ROS_DOMAIN_ID, discovery i segmentacja sieci, parametry QoS oraz kontrola dostępu; nie wyciekać danych/sterowania do VLAN gości, do AI Platform tylko jawny adapter/namespace.
@@ -82,8 +90,8 @@ Pełny plan z mierzalnymi bramkami: [VISION_ROS2_ADOPTION_PLAN_2026-11-14.md](..
 - **Faza 0:** read-only preflight ROS/Jazzy/ARM64, NERO i USB, kopie ustawień i lista konfliktów; bez instalacji.
 - **Faza 1:** izolowane środowisko ROS 2 Jazzy na NVMe (lub test bezpiecznych paczek systemowych po zatwierdzeniu); talker/listener, DDS, tf2, no hardware control.
 - **Faza 2:** model NERO + MoveIt2 fake controller, RViz 2; testy rozwiązywania kinematyki, zasięg, kolizje, osprzęt J7.
-- **Faza 3:** integracja Luxonis w trybie jednego właściciela OAK; RGB/Depth/PointCloud, latency, synchronizacja; replay zapisanych ECU z najwyższymi złączami.
-- **Faza 4:** Planning Scene i kalibracja do stołu, NERO; analiza fail-closed i regresja po utracie czujnika/USB/DDS.
+- **Faza 3:** oryginalny Luxonis `depthai_ros_driver_v3` jako pojedynczy właściciel OAK; RGB/Depth/PointCloud2, latency, sync i diagnostyka; dotychczasowy Camera Service tylko rollback.
+- **Faza 4:** MoveIt 2 Occupancy Map Monitor z PointCloud2/Depth → OctoMap i Planning Scene; test, czy nie pomija wąskich szczytów ECU (~75 mm), kalibracja i fail-closed. Dodatkowa percepcja ECU tylko dla precyzyjnych operacji.
 - **Faza 5:** integracja rzeczywistego kontrolera tylko po odrębnej zgodzie operatora, zamknięciu interlocków, walidacji ruchu/STOP i ocenie bezpieczeństwa.
 
 Każda faza wymaga dowodów PASS i mechanizmu rollback. Żaden FAIL/NOT_READY nie odblokowuje kolejnego etapu.
@@ -93,6 +101,7 @@ Każda faza wymaga dowodów PASS i mechanizmu rollback. Żaden FAIL/NOT_READY ni
 - ROS 2 Jazzy / Ubuntu Noble ARM64: https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 - MoveIt 2 Jazzy: https://moveit.ai/install-moveit2/binary/
 - Luxonis DepthAI ROS v3 (Jazzy: `depthai_ros_driver_v3`): https://docs.luxonis.com/software-v3/depthai/ros/driver
+- MoveIt 2 3D Perception / Occupancy Map Monitor i OctoMap: https://moveit.ai/documentation/concepts/
 - AgileX ROS 2 Driver `arm_type:=nero`, parametry `auto_enable`: https://github.com/agilexrobotics/agx_arm_ros/blob/ros2/README_EN.md
 - AgileX MoveIt 2, fake demo oraz ryzyko real launch: https://github.com/agilexrobotics/agx_arm_ros/blob/ros2/src/agx_arm_moveit/README_EN.md
 
