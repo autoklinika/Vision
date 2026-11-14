@@ -1,5 +1,7 @@
 # Vision — stanowisko inspekcji PCB / ECU
 
+> **Nowy fundament Vision (ustalenia 14.11.2026, PR dokumentacyjny):** [założenia nowego systemu](docs/architecture/VISION_FOUNDATION_2026-11-14.md) i [archiwum rozmowy architektonicznej](docs/architecture/VISION_ARCHITECTURE_DISCUSSION_2026-11-14.md). Vision budujemy od podstaw, operator deklaruje ECU, a moduły i modele są wymienne. Pierwszy scenariusz dotyczy **ETC3 z dwiema czarnymi i jedną szarą wtyczką**, nie DAF SAC. Szczegóły wykonawcze pozostają do walidacji. Historyczne dokumenty niżej zachowują swoje oryginalne daty i statusy.
+
 Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q** (Ubuntu ARM64), aparacie Sony A6100, kamerze termowizyjnej i ramieniu **AgileX NERO**.
 
 **Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
