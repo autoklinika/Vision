@@ -73,3 +73,25 @@ Operator zmierzył rzeczywisty **najwyższy punkt całego drugiego ECU = 75,00 m
 **Diagnoza pozostaje otwarta**: (a) kamera widzi niewłaściwą / niższą powierzchnię niż rzeczywista krawędź, (b) ubytek stereo na ciemnej lub odbijającej powierzchni, (c) niepewność kalibracji geometrycznej. Różnica nie dowodzi błędu samej skali głębi; nie wprowadzać bez dowodów globalnego offsetu +9,72 mm ani poprawki do parametrów kamery.
 
 Operator nie podał jeszcze fizycznej długości/szerokości ani odrębnych wysokości obu listew złączy. **Następny sensowny test** to wskazać na obrazie fizycznie najwyższy punkt (lub porównać z przyłożonym wzorcem wysokości), a następnie sprawdzić, czy widać go w RGB, stereo i chmurze punktów. Robot NERO nie został użyty.
+
+## Audyt surowej głębi na krawędziach złączy — 14.11.2026
+
+Na polecenie operatora przeanalizowano **oryginalne 25 klatek RAW16 drugiego ECU** (`light_on_subpixel_on_ir_off_frames.npz`), bez nowej akwizycji, zmian ustawień kamery, zmian w programie produkcyjnym ani zmian parametrów stereowizji. Cel: ustalić, czy kamera w ogóle rejestruje najwyższe krawędzie na wysokości fizycznej 75 mm i czy to nasz filtr je usuwa. Użyto lokalnej płaszczyzny stołu RANSAC jak we wcześniejszym raporcie, zgodnej macierzy `K` oraz niezależnych obszarów lewej/prawej listwy czarnych złączy w **układzie rectified-left depth**, a nie w niezweryfikowanym RGB.
+
+| Obszar | Najwyższy punkt mediany 25 klatek RAW (min. 20 ważnych) | Klatki ważne w tym pikselu | Odchylenie między klatkami | Maksimum po medianie przestrzennej 5×5 |
+|---|---:|---:|---:|---:|
+| Lewe czarne złącza, punkt `u=634,v=333` | **76,61 mm** | 24/25 (powyżej 75 mm w 21 klatkach) | 1,37 mm | **56,83 mm** (maksimum całej listwy po filtracji; w samym pikselu 0) |
+| Prawe czarne złącza, punkt `u=722,v=410` | **74,99 mm** | 25/25 (powyżej 70 mm w 25 klatkach) | 1,06 mm | **65,28 mm** (maksimum całej listwy po filtracji) |
+| Fizyczne maksimum ECU | **75,00 mm** | referencja operatora | — | — |
+
+**Dowód utraty wysokich pikseli:** w pełnym obszarze ECU mediana surowych punktów (czasowa z warunkiem ≥20/25 ważnych klatek) zawiera **25 pikseli z wysokością ≥70 mm**, zgrupowanych m.in. w wydłużone obszary prawej (`2×7 px`) i lewej (`2×7 px`) listwy. Mediana przestrzenna **5×5 eliminuje wszystkie te piksele**, pozostawiając **0 pikseli ≥70 mm**. Surowy punkt 76,61 mm na lewym złączu ma tylko niewielkie sąsiedztwo podobnie wysokich pikseli i sam po tej filtracji znika.
+
+Szczegółowe liczby na klatkę (w obrębie lewych/prawych gniazd):
+- Lewe: surowych pikseli ≥70 mm jest medianowo **71/klatkę** (zakres 48–89), ≥75 mm **20/klatkę** (6–35). Mediana po czasie wskazuje 12 punktów ≥70 mm i 2 ≥75 mm. Po przestrzennej medianie 5×5 żadnego ≥70 mm.
+- Prawe: surowych pikseli ≥70 mm medianowo **32/klatkę** (19–47), ≥75 mm 4/klatkę (0–11). Mediana po czasie wskazuje 13 punktów ≥70 mm; po przestrzennej medianie 5×5 żadnego ≥70 mm.
+
+**Zaktualizowana diagnoza:** wcześniejsza różnica `65,28−75,00=−9,72 mm` dotyczy **wyniku naszego przetwarzania**, a nie dowodzi, że sama kamera nie potrafi widzieć punktów w okolicy 75 mm. Największa udowodniona przyczyna: filtr medianowy przestrzenny 5×5 **niszczy wąskie, lecz powtarzalne górne krawędzie złączy**. Brak gwarancji, że pojedyncze punkty RAW są dokładnymi mechanicznymi wierzchołkami — mogą obejmować artefakty na krawędziach stereo; zgodność ~75 mm jest obiecująca, ale nadal wymaga walidacji na niezależnych wzorcach.
+
+**Zalecenie dla nowej wersji Perception, bez wdrażania w tym teście:** oddzielić usuwanie szumu od zachowania ciągłych wąskich krawędzi; traktować *czasową powtarzalność punktów i niewielką spójną strukturę* jako sygnał zachowania lokalnego szczytu; nie używać globalnego P99 ani mediany 5×5 do wyznaczania maksymalnego pułapu przeszkody. Wycena i ocena niepewności oraz ręczna walidacja powinny być niezależne od algorytmu. Każdy ruch NERO nadal zablokowany do etapu kalibracji i bezpieczeństwa.
+
+**Dowody prywatne na NVMe:** `/srv/vision-data/staging/vision-ecu2-live-test-20261114/raw_connector_edge_audit_private.json`, `raw_ecu2_heights_temporal_no_spatial_filter.png`, `audit_raw_connector_edges.py` i oryginalny RAW16. Nie commitować danych zdjęciowych ani surowych map głębi.
