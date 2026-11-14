@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Vision — OAK-D / Camera Service</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#17232f;background:#f3f5f7;color-scheme:light}
+*{box-sizing:border-box}body{margin:0}
+header{background:#fff;border-bottom:1px solid #dbe1e8;padding:18px 22px}
+.wrap{max-width:1560px;margin:0 auto}
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+h1{font-size:1.4rem;font-weight:740;margin:0;letter-spacing:-.3px}
+h2{font-size:1.08rem;margin:0 0 12px}
+small,.sub{color:#5c6875}
+.head .sub{font-size:.88rem;margin-top:4px}
+.right{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.state{display:flex;gap:8px;align-items:center;border-radius:6px;border:1px solid #b7c2ce;background:#f7f9fb;padding:9px 12px;font-weight:700}
+.state:before{content:"";display:block;width:11px;height:11px;border-radius:50%;background:#8f9eab}
+.state.ok:before{background:#148154}.state.ok{border-color:#a6cbbb;color:#126543}
+.state.error:before{background:#ce4c36}.state.error{color:#983e2b}
+main{padding:20px 22px 35px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid #dde2e8;border-radius:8px;padding:12px 14px}
+.kpi small{display:block;font-size:.77rem}
+.kpi strong{display:block;font-variant-numeric:tabular-nums;font-size:1.28rem;margin-top:4px}
+.views{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.panel{background:#fff;padding:14px;border:1px solid #dce1e7;border-radius:10px;min-width:0}
+.headline{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.headline h2{margin:0}.viewport{width:100%;background:#121a22;border-radius:5px;display:block;object-fit:contain;aspect-ratio:16 / 9}
+.depth .viewport{aspect-ratio:8 / 5}
+.caption{font-size:.8rem;color:#64717d;margin:10px 0 0}
+a.action,button{display:inline-block;background:#fff;color:#243644;font-weight:650;font-size:.83rem;text-decoration:none;border:1px solid #bdc8d3;border-radius:5px;padding:7px 11px;cursor:pointer}
+a.action:hover,button:hover{background:#eef2f6}
+.information{background:#fff;border:1px solid #dce1e7;padding:14px 16px;border-radius:8px;margin-top:18px;line-height:1.55;font-size:.87rem}
+#error{color:#a63928;margin-top:10px;overflow-wrap:anywhere}
+.pill{font-size:.75rem;border:1px solid #b3c0cc;border-radius:5px;padding:4px 8px;color:#4f606e}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:800px){main{padding:14px}.views{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header><div class="wrap head">
+<div><h1>Vision <span class="sub">/ Camera Service</span></h1>
+<div class="sub">Luxonis OAK-D Pro AF · VENTUNO Q · RGB i StereoDepth</div></div>
+<div class="right"><span id="profile" class="pill">Profil: —</span>
+<span id="state" class="state"><span id="state-txt">Łączenie…</span></span>
+<button type="button" id="refresh">Odśwież strumienie</button></div>
+</div></header>
+<main class="wrap">
+<section class="kpis">
+<div class="kpi"><small>RGB · FPS</small><strong id="rgbfps">—</strong></div>
+<div class="kpi"><small>Głębia · FPS</small><strong id="depthfps">—</strong></div>
+<div class="kpi"><small>Poprawne punkty</small><strong id="valid">—</strong></div>
+<div class="kpi"><small>Odległość centrum</small><strong id="center">—</strong></div>
+<div class="kpi"><small>Temperatura procesora kamery</small><strong id="chip">—</strong></div>
+<div class="kpi"><small>Połączenie USB</small><strong id="usb">—</strong></div>
+</section>
+<section class="views">
+<article class="panel">
+<div class="headline"><h2>Obraz kolorowy RGB</h2>
+<a class="action" href="/snapshot/rgb.jpg" download="vision-rgb.jpg">Pobierz aktualną klatkę</a></div>
+<img class="viewport" id="rgbimg" alt="Na żywo — kolorowy obraz kamery overhead" src="/stream/rgb.mjpg">
+<p class="caption">Kompresja MJPEG na kamerze · <span id="rgbsize">—</span> · bez zapisu na dysku serwera.</p>
+</article>
+<article class="panel depth">
+<div class="headline"><h2>Mapa głębi stereo</h2>
+<a class="action" href="/snapshot/depth-mm.png" download="vision-depth-mm.png">Pobierz głębię 16-bit</a></div>
+<img class="viewport" id="depthimg" alt="Na żywo — mapa głębi z pomiarów stereo" src="/stream/depth.mjpg">
+<p class="caption">Kolory poglądowe 0,2–5 m; czarny = brak pomiaru. Surowa mapa 1280 × 800 w milimetrach.</p>
+</article>
+</section>
+<p id="error" role="status" aria-live="polite"></p>
+<div class="information">
+<b>Tryb produkcyjnego serwisu kamery (bez AI).</b> Jeden proces obsługuje urządzenie USB. Obraz RGB, surowa głębia i podgląd są dostępne dla wielu klientów, bez modelu neuronowego na OAK, bez włączania IR i bez poleceń ruchu AgileX NERO. Głębia odnosi się do układu optycznego kamery, <b>nie jest jeszcze skalibrowana względem stołu i robota</b>. Nie wolno traktować jej jako niezależnego zabezpieczenia E-STOP.
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const num=v=>typeof v==="number"?v.toFixed(1):"—";
+let previousOnline=null;
+const reload=()=>{const nonce=Date.now();$("rgbimg").src="/stream/rgb.mjpg?v="+nonce;$("depthimg").src="/stream/depth.mjpg?v="+nonce;};
+$("refresh").addEventListener("click",reload);
+async function status(){
+ try{
+  const resp=await fetch("/api/status",{cache:"no-store"});
+  if(!resp.ok)throw new Error("HTTP "+resp.status);
+  const s=await resp.json();
+  $("state").className="state "+(s.online?"ok":"error");
+  $("state-txt").textContent=s.online?"KAMERA ONLINE":(s.pipeline_running?"Łączenie z kamerą":"KAMERA OFFLINE");
+  $("profile").textContent="Profil: "+s.profile;
+  $("rgbfps").textContent=num(s.rgb_fps);
+  $("depthfps").textContent=num(s.depth_fps);
+  $("valid").textContent=s.depth_valid_pct===null?"—":num(s.depth_valid_pct)+"%";
+  $("center").textContent=s.center_depth_mm===null?"—":s.center_depth_mm+" mm";
+  $("chip").textContent=s.chip_temp_C===null?"—":num(s.chip_temp_C)+" °C";
+  $("usb").textContent=s.usb&&s.usb.endsWith("SUPER")?"USB 3.x":(s.usb||"—");
+  $("rgbsize").textContent=s.rgb_resolution.join(" × ");
+  $("error").textContent=s.error?"Błąd kamery: "+s.error:"";
+  if(s.online&&previousOnline===false)reload();
+  previousOnline=s.online;
+ }catch(err){
+  $("state").className="state error";
+  $("state-txt").textContent="SERWER OFFLINE";
+  $("error").textContent="Brak połączenia z usługą VENTUNO Q.";
+  previousOnline=false;
+ }
+}
+status();
+setInterval(status,1700);
+</script>
+</body></html>
