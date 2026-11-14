@@ -46,7 +46,7 @@ Skan wysokości całego ECU w ROI będącym poszerzeniem **automatycznie znalezi
 
 ### Ograniczenia
 
-- Wysokości to pomiar **widocznych** punktów stereo; nie gwarantują fizycznie najwyższego punktu mechanicznego, szczególnie na błyszczących, czarnych, częściowo zasłoniętych krawędziach. Brak porównania do suwmiarki dla tego ECU.
+- Wysokości to pomiar **widocznych** punktów stereo; nie gwarantują fizycznie najwyższego punktu mechanicznego, szczególnie na błyszczących, czarnych, częściowo zasłoniętych krawędziach. Fizyczną wysokość maksymalną całego ECU operator podał później jako 75 mm; porównanie opisano w uzupełnieniu poniżej.
 - Wykrycie geometryczne ECU 25/25 to **nie identyfikacja modelu ECU** ani walidacja dokładności mechanicznej.
 - Dla obecnej obudowy `top_surface` nie potrafi wiarygodnie wskazać pojedynczej dominującej powierzchni górnej (2/25); należy rozdzielić klasy powierzchni/wystających elementów, bez podawania wartości z dwóch klatek jako pewnych.
 - Wartości `std` są zmiennością z klatek, a nie całkowitą niepewnością kalibracji.
@@ -56,3 +56,20 @@ Skan wysokości całego ECU w ROI będącym poszerzeniem **automatycznie znalezi
 **Surowe dane nie są commitowane.** Prywatna lokalizacja: `/srv/vision-data/staging/vision-ecu2-live-test-20261114` (RAW16, zdjęcia RGB, mapa peak depth, per-frame JSON, skrypty jednorazowe). Produkcja i kod main niezmienione.
 
 **Kolejny etap:** fizyczny pomiar długości, szerokości i wysokości górnych krawędzi obu czarnych złączy względem stołu. Porównanie powinno pozostać niezależne od kodu estymatora.
+
+## Fizyczna weryfikacja najwyższego punktu — 14.11.2026
+
+Operator zmierzył rzeczywisty **najwyższy punkt całego drugiego ECU = 75,00 mm nad stołem**. Nie wskazano jeszcze, z którym konkretnie punktem obiektu/pikselem kamera ma tę wysokość zestawić; nie wolno automatycznie uznawać, że fizyczny szczyt i wyszukany szczyt głębi `u=720,v=409` są tą samą krawędzią.
+
+| Wartość | Wysokość |
+|---|---:|
+| Fizyczna maksymalna wysokość ECU (referencja operatora) | **75,00 mm** |
+| Najwyższy stabilny szczyt znaleziony przez Vision na mapie głębi | **65,28 mm** |
+| **Różnica: wynik Vision − rzeczywista najwyższa wysokość ECU** | **−9,72 mm** |
+| Globalny P99 (niepoprawny jako granica przeszkody) | 57,92 mm |
+
+**Bramka bezpieczeństwa: NIEZALICZONA.** Aktualny algorytm znajdowania szczytów zaniżył rzeczywistą maksymalną wysokość ECU o co najmniej wartość wynikającą z tego porównania, jeśli oba szczyty uznać za reprezentację tej samej wielkości. Nie jest znana całkowita maksymalna niepewność pomiaru ani ryzyko pomijania innych zasłoniętych fragmentów; nie wolno użyć wyniku 65,28 mm jako samodzielnej granicy planowania bezkolizyjnego NERO.
+
+**Diagnoza pozostaje otwarta**: (a) kamera widzi niewłaściwą / niższą powierzchnię niż rzeczywista krawędź, (b) ubytek stereo na ciemnej lub odbijającej powierzchni, (c) niepewność kalibracji geometrycznej. Różnica nie dowodzi błędu samej skali głębi; nie wprowadzać bez dowodów globalnego offsetu +9,72 mm ani poprawki do parametrów kamery.
+
+Operator nie podał jeszcze fizycznej długości/szerokości ani odrębnych wysokości obu listew złączy. **Następny sensowny test** to wskazać na obrazie fizycznie najwyższy punkt (lub porównać z przyłożonym wzorcem wysokości), a następnie sprawdzić, czy widać go w RGB, stereo i chmurze punktów. Robot NERO nie został użyty.
