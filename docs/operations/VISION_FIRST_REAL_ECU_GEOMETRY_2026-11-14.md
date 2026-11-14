@@ -64,6 +64,22 @@ Ponownie przeanalizowano te same **25 rzeczywistych klatek RAW16**, bez ponowneg
 
 Każdy pomiar lokalnego obszaru posiadał poprawne dane we wszystkich 25/25 klatkach. W niezależnym sprawdzeniu **całego obszaru ECU** (nie tylko trzech ręcznie zidentyfikowanych złączy) zbudowano medianową mapę wysokości na podstawie 25 klatek, wymagając ważności pikseli w co najmniej 20 klatkach, a następnie filtracji medianowej 5×5. **Jedyny spójny obszar z wysokością powyżej 60 mm** miał powierzchnię 29 pikseli w pobliżu szarego złącza (box depth [720,442,731,446], centroid [725,6;443,4], najwyższa przefiltrowana wartość ~63,94 mm). Nie znaleziono spójnych obszarów >65 mm po filtracji. To potwierdza ranking wysokości złączy w obserwowanej scenie.
 
-**Uwaga:** wysokości to estymaty ze stereo, nie dokładne mechaniczne wymiary wtyczek. Wartość std opisuje korelację kolejnych klatek, nie niepewność bezwzględną. Nierówna widoczność krawędzi, powierzchnie odblaskowe i luki stereo mogą nadal zaniżać lub zawyżać wartości. Fizyczna wysokość szarej wtyczki do porównania z suwmiarką nie została jeszcze podana.
+**Uwaga:** wysokości to estymaty ze stereo, nie dokładne mechaniczne wymiary wtyczek. Wartość std opisuje korelację kolejnych klatek, nie niepewność bezwzględną. Nierówna widoczność krawędzi, powierzchnie odblaskowe i luki stereo mogą nadal zaniżać lub zawyżać wartości. Fizyczne wysokości złączy zostały później podane przez operatora; porównanie i ograniczenia opisano w aktualizacji poniżej.
 
 **Konsekwencja dla Vision:** Perception powinien udostępniać oddzielnie: wysokość powierzchni korpusu (~25 mm), kilka lokalnych wierzchołków elementów wystających (~54–63 mm) z lokalizacją i jakością pomiaru oraz ostrożnościową przestrzeń zabronioną dla trajektorii. Takie dane są wyłącznie percepcją; przed ruchem robota wymagane są kalibracja stołu/robot_base, marginesy bezpieczeństwa i niezależne mechanizmy STOP.
+
+## Referencje mechaniczne operatora — 14.11.2026
+
+Operator podał fizyczne wysokości nad stołem: **szare środkowe złącze 68 mm**, **czarna wtyczka 64 mm**. W scenie występują dwa czarne złącza; operator nie wskazał jeszcze, czy 64 mm odnosi się do lewego czy prawego. Poniższe porównanie ma charakter diagnostyczny, nie jest korektą kalibracji.
+
+| Złącze | Wysokość fizyczna (operator) | Pomiar stereo lokalnej łaty 5×5 | Różnica stereo − fizyczny |
+|---|---:|---:|---:|
+| Szare środkowe | 68,00 mm | 62,88 mm | **−5,12 mm** |
+| Lewe czarne, jeżeli to jego dotyczy 64 mm | 64,00 mm (przypisanie niepotwierdzone) | 56,91 mm | −7,09 mm (warunkowo) |
+| Prawe czarne, jeżeli to jego dotyczy 64 mm | 64,00 mm (przypisanie niepotwierdzone) | 53,56 mm | −10,44 mm (warunkowo) |
+
+Spójny szczyt szarego złącza z medianowej mapy 25 klatek osiągał około **63,94 mm** (różnica do referencji 68 mm: **−4,06 mm**), ale jest to inna definicja pomiaru niż mediana lokalnej łaty. Nie należy mieszać tych metod w wyznaczaniu offsetu.
+
+**Istotne ograniczenie**: wysokość fizyczna z suwmiarki może odnosić się do zewnętrznej krawędzi złącza słabo obserwowalnej przez stereo, podczas gdy lokalna łata 5×5 mierzy widoczne punkty bliżej wewnętrznej części. Różnica nie dowodzi stałego offsetu głębi ani błędnej skali kamery. Nie wprowadzamy automatycznej korekty +5 mm ani innych dopasowań do jednej sztuki ECU.
+
+**Kierunek Perception**: zachować odrębne pomiary 3D korpusu i wystających elementów; do wykrywania najwyższej przeszkody użyć przestrzennie spójnego szczytu ze wskaźnikiem pokrycia, zmienności i niepewności, a nie globalnego P99. Nie deklarować gotowości NERO do ruchu bez walidacji 3D i transformacji table↔robot_base.
