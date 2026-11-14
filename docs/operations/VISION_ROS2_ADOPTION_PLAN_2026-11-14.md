@@ -63,3 +63,14 @@
 ## Zasada publikacji
 
 Ta dokumentacja jest przygotowana w osobnej gałęzi z PR względem `main`, bez automatycznego merge. Wdrożenie ROS 2, dodatkowych pakietów Ubuntu i integracji sterowników ma stan **NOT_STARTED**, dopóki osobny protokół odbioru nie potwierdzi zmiany.
+
+## Status testów laboratoryjnych z 2026-11-14
+
+Szczegółowy protokół: [VISION_ROS2_MOVEIT_ECU_OFFLINE_TEST_2026-11-14.md](VISION_ROS2_MOVEIT_ECU_OFFLINE_TEST_2026-11-14.md).
+
+- **ROS 2 Jazzy / ARM64 izolowane na NVMe: PASS.** Uruchomiono rzeczywiste biblioteki `rclpy`, oficjalny Luxonis ROS v3 i MoveIt 2. Produkcyjny system nie ma zainstalowanego `ros2`.
+- **MoveIt 2 PointCloudOctomapUpdater — OFFLINE PASS, ale geometria NIEZATWIERDZONA.** Oryginalny moduł przetworzył rzeczywiste chmury obu ECU; zachował wysokie punkty, lecz także fałszywie wysokie voxele, nawet ponad 120 mm na pierwszym ECU. Nie przeprowadzono 25-klatkowej fuzji, kalibracji do NERO ani symulacji jego trajektorii.
+- **Luxonis DepthAI ROS v3 — live camera stream FAIL/NOT_VERIFIED.** Oficjalny węzeł ROS załadował się, ale nie znalazł OAK-D w izolowanym kontenerze: zero RGB/Depth/PointCloud2. Przyczyna enumeracji/passthrough nieustalona; **nie wolno usuwać ani wyłączać produkcyjnego Camera Service jako docelowej migracji** przed pozytywnym realnym testem drivera.
+- **Przywrócenie produkcji PASS:** Camera Service ONLINE, USB SUPER, IR OFF, brak błędów. Robot NERO nie uczestniczył w testach.
+
+**Następna bramka:** poprawnie uruchomić oficjalny driver Luxonis na faktycznej kamerze w kontrolowanym teście USB, potwierdzić RGB/Depth/PointCloud2 i rollback; dopiero później rozważyć usunięcie starego Camera Service. Osobno poprawić walidację wiarygodności punktów przed OctoMap, aby nie tracić cienkich krawędzi ani nie ufać odosobnionym artefaktom.
