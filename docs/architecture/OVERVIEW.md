@@ -1,5 +1,7 @@
 # Vision — architektura logiczna v0.1
 
+> **Nowy punkt odniesienia:** [VISION_FOUNDATION_2026-11-14.md](VISION_FOUNDATION_2026-11-14.md). Ten starszy OVERVIEW opisuje historię i nie determinuje nowej implementacji greenfield. Zapis procesu decyzyjnego: [VISION_ARCHITECTURE_DISCUSSION_2026-11-14.md](VISION_ARCHITECTURE_DISCUSSION_2026-11-14.md).
+
 > **Uwaga historyczna:** ten dokument opisuje założenia bazowe z 10.10.2026, kiedy model ramienia i część kamer nie były jeszcze ustalone. Aktualnie wybrano AgileX NERO; architekturę STOP określa [ADR-VISION-ROBOT-001](ADR_VISION_NERO_TWO_STAGE_STOP_2026-11-10.md). Przegląd stanu 10.11.2026: [AS-BUILT](../operations/VISION_AS_BUILT_2026-11-10.md). Statusy `do wyboru` w dalszej części są historyczne, **nie** stanem obecnym.
 
 **Status:** projekt architektury, bez implementacji runtime. Dokument opisuje granice odpowiedzialności, a nie gotowe funkcjonalności.
