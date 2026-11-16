@@ -6,6 +6,11 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 
 **Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
 
+## ROS 2 i przenośność stanowiska (16.11.2026)
+
+- [Raport techniczny: ROS 2, NERO, MoveIt, Luxonis, ETC3 i przejście LAB → PROD](docs/architecture/VISION_ROS2_NERO_LAB_TO_PROD_TECHNICAL_REPORT_2026-11-16.md) — szczegółowe ustalenia, wymagania wejściowe, architektura i plan izolowanych testów; **DESIGN REPORT / PROPOSED**, bez wdrożenia na sprzęcie.
+- [ADR-VISION-STATION-001: jeden kod, profile LAB i PROD](docs/architecture/ADR_VISION_PORTABLE_STATION_LAB_PROD_2026-11-16.md) — **PROPOSED**, wymaga formalnego zatwierdzenia; zmiana stanowiska unieważnia odpowiednie kalibracje i dopuszczenie ruchu.
+
 ## Bieżąca dokumentacja projektu
 
 - [Stan faktyczny VENTUNO Q i modułów (AS-BUILT, 10.11.2026)](docs/operations/VISION_AS_BUILT_2026-11-10.md).
