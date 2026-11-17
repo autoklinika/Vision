@@ -1,0 +1,1446 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-13",
+  "model": "Sony ILCE-6100A",
+  "runtime": "Ubuntu ARM64 VENTUNO Q; gphoto2 2.5.28 / libgphoto2 2.5.31",
+  "prototype_source_sha256": "8fc71b344ae4487ab2b84aa63453404c0474c8c732a457eb6066abc3adb94efb",
+  "hardware_free_tests": {
+    "count": 17,
+    "status": "PASS",
+    "locations": [
+      "local workspace",
+      "VENTUNO Q ARM64"
+    ]
+  },
+  "final_single": {
+    "test": "AF_BEFORE_SINGLE_SHOT",
+    "utc_start": "20261013T205703779805Z",
+    "session": "sony-af-prototype-20261013T205703779805Z",
+    "planned_shots": 1,
+    "af_timeout_s": 8,
+    "interval_after_verified_pair_s": 10,
+    "status": "PASS",
+    "attempts": [
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.052801,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.160093,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.26688,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.372776,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.478459,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.584802,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.690336,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.797092,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.906587,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.013726,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.126305,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.245148,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.37834,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.491154,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.607223,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.723698,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.843799,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.953996,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.067059,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.184664,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 2.297046,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 2.297046,
+        "elapsed_s": 2.594207,
+        "number": 1,
+        "start_s": 4.290688,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24894208,
+            "sha256": "c4c453ec5ef264df3342abccc77373241021c825b716271ff96f9f2a9762a63b",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14611178,
+            "sha256": "5646efc3648d63d5fc2053db1a77d621adf0d6016ad34d26959ec06e3620ad4e",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 22:57:03",
+              "exposure_s": "0.16666666666666666",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.006529,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 6.194432
+      }
+    ],
+    "automatic_retries": 0,
+    "settings_changed": false,
+    "raw_full_decode": "UNKNOWN",
+    "sd_comparison": "UNKNOWN",
+    "limits": [
+      "AF state is a protocol confirmation, not optical quality validation.",
+      "No full RAW decode or direct SD comparison.",
+      "UVC receipts do not prove scene freshness or sensor-to-screen latency.",
+      "Private shell/debug logs and samples must not be committed."
+    ],
+    "config": {
+      "focusmode": "AF-A",
+      "capturemode": "Single Shot",
+      "capturetarget": "card+sdram",
+      "imagequality": "RAW+JPEG (X.Fine)"
+    },
+    "release_confirmed": true,
+    "uvc": {
+      "frames_received": 297,
+      "unique_payloads": 115,
+      "max_receive_gap_s": 0.110118,
+      "longest_identical_run_after_3s": {
+        "count": 15,
+        "start_s": 6.363778,
+        "span_s": 0.491762
+      },
+      "samples": [
+        {
+          "role": "before",
+          "index": 105,
+          "dimensions": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "role": "after",
+          "index": 295,
+          "dimensions": [
+            1920,
+            1080
+          ]
+        }
+      ],
+      "collector_errors": [],
+      "content_checks": 16,
+      "test_pattern_checks": 1,
+      "timing_method": "host_pipe_receipt_not_sensor_timestamp"
+    },
+    "full_press_requests": 1,
+    "verified_pairs": 1,
+    "elapsed_s": 10.726379,
+    "utc_end": "2026-10-13T20:57:14.513411+00:00"
+  },
+  "final_series": {
+    "test": "AF_BEFORE_SINGLE_SHOT",
+    "utc_start": "20261013T205902100686Z",
+    "session": "sony-af-prototype-20261013T205902100686Z",
+    "planned_shots": 10,
+    "af_timeout_s": 8,
+    "interval_after_verified_pair_s": 10,
+    "status": "PASS",
+    "attempts": [
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.03155,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.148161,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.262269,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.391151,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.507218,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.622376,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.736356,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.850584,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.954221,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.067343,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.183483,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.29808,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.411823,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.541981,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.656109,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.767609,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.88275,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.99686,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.106867,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.219142,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.341327,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.457798,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.574259,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.692194,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.806415,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 2.919533,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 3.034372,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 3.034372,
+        "elapsed_s": 3.279442,
+        "number": 1,
+        "start_s": 3.758176,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24877824,
+            "sha256": "219a060cc373355b5e08d72ef588159bf1371d7f9512c985c98fc75cbebd4030",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14499287,
+            "sha256": "7e5c5c056b984979afba6f2b5034cceb17d2aafae55957f2b364f32766079bb0",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 22:59:02",
+              "exposure_s": "0.25",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.016819,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 6.912226
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.017665,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.132147,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.248528,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.356659,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.474959,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.585412,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.699472,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.811374,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.919845,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.031051,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.142636,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.261158,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.377165,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.498723,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.612738,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.728001,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.842144,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.953948,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 2.066867,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 2.066867,
+        "elapsed_s": 2.3699,
+        "number": 2,
+        "start_s": 20.691222,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24886016,
+            "sha256": "2ab8d39337fdc2a80db42b9c0d6cdc6c509eb9b190c12b6d8d3d9e02953f3ff7",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14567798,
+            "sha256": "816123c8093e67bd1aa93f03cbcb2efea1d15138f940410385329a32bd5ca384",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 22:59:18",
+              "exposure_s": "0.25",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.00836,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.907888
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.037431,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.161077,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.280598,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.397843,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.510845,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.632128,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.744926,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 0.861007,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 0.861007,
+        "elapsed_s": 1.114984,
+        "number": 3,
+        "start_s": 36.634303,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24861440,
+            "sha256": "480063d694ff51b66d1e92e5b88e4525f7a950bfecbca17f0c2855a91b2e2143",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14306707,
+            "sha256": "496c0679223676e2b8389a1682e9d7d23c720de39ff5ee744e0d38ed4de26b11",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 22:59:33",
+              "exposure_s": "0.25",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.006716,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 4.642819
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.022746,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.13381,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.244687,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.354774,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.466625,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.579524,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.699164,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.813845,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.929134,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.04337,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.156703,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.272607,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.384704,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 1.504435,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 1.504435,
+        "elapsed_s": 1.790721,
+        "number": 4,
+        "start_s": 51.305117,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24857344,
+            "sha256": "db0219269e6c06700c1b720a594e78dec4277961cf42f99dcb9104b3c7c4b4b4",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14288723,
+            "sha256": "db2b1f35208452b557047394ced46ff57a9397d40cee65e25c1f21ba56a90507",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 22:59:48",
+              "exposure_s": "0.25",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.004977,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.221889
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.032859,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.149981,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.270441,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.384698,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.497073,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.612661,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.725906,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.839438,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.948629,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.055903,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.171968,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.28949,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.397002,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 1.505555,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 1.505555,
+        "elapsed_s": 1.801726,
+        "number": 5,
+        "start_s": 66.558533,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24857344,
+            "sha256": "690b42666efb840272988dfa18deea4f89477908a256eb2e3df8d04ca7de802b",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14277828,
+            "sha256": "e683724fca2f920cad1989e81122be216ed88f6e9c7ee3fa9ae58bb72672fb66",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 23:00:03",
+              "exposure_s": "0.25",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.008701,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 4.982597
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.02022,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.134235,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.247763,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.368075,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.486954,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.600744,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.716113,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.834619,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.948009,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.061922,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.177763,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.293999,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.411992,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.526436,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 1.634699,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 1.634699,
+        "elapsed_s": 1.905299,
+        "number": 6,
+        "start_s": 81.571085,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24886016,
+            "sha256": "b4554b23a20864a94eaf85ad94ea9b1f8034d3f3ceb9c277efbee5210f8ad3f1",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14587802,
+            "sha256": "2343de74125d7002fd0dd4f26398c48fc3f32a2dd7aa51afae638ab56abae817",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 23:00:18",
+              "exposure_s": "0.25",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.011818,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.544063
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.045968,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.166927,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.275404,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.390089,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.510035,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.622399,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.74002,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.852395,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.961524,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.074892,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.186917,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.307853,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.417423,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.530093,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.642099,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.754858,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.866314,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.97475,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 2.088635,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 2.088635,
+        "elapsed_s": 2.377641,
+        "number": 7,
+        "start_s": 97.153608,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24886016,
+            "sha256": "d656448137e48ae75bf03cfa6652ff87de288f6a24168a45c4176308102b3690",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14626941,
+            "sha256": "6b974cd077d1c0314363aff9e524a4c92ae7fd73be46e9dc5ce3ffea86d05940",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 23:00:34",
+              "exposure_s": "0.2",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.007807,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.855399
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.034725,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.151704,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.271393,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.386871,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.502837,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.616767,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.732532,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.851276,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.965636,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.080559,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.194671,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.317775,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.435573,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.555807,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.673658,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.782398,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.88772,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 1.994246,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 1.994246,
+        "elapsed_s": 2.236911,
+        "number": 8,
+        "start_s": 113.035966,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24873728,
+            "sha256": "f22f6514830248e2af6f865f808eb39b6b7dfb4ec7bcdb878e4e033a0e178e9f",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14392345,
+            "sha256": "a84ad10cebdd6f40e8d7c94215f2cc323e0c95e7b2459ac12e53731a00c2bc73",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 23:00:50",
+              "exposure_s": "0.125",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.009058,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.356211
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.017428,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.131367,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.251803,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.365422,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.485546,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.599045,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.713611,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.827963,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.952284,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.0697,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.18442,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.28957,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.404634,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 1.518366,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 1.518366,
+        "elapsed_s": 1.785212,
+        "number": 9,
+        "start_s": 128.414082,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24873728,
+            "sha256": "ee4fdc876f3d1e917b9aa967a0d91c6f3438b856849dfa0f61fe38b14611bebb",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14400810,
+            "sha256": "40bc09d11be38ef926b3e963d2d3bd0abb1e2ec37e8f5e937b8c1a8d9458c7b8",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 23:01:05",
+              "exposure_s": "0.125",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.005394,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.060425
+      },
+      {
+        "status": "PASS",
+        "phase": "RELEASE",
+        "full_press_requests": 1,
+        "af_samples": [
+          {
+            "since_halfpress_s": 0.019418,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.127871,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.23674,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.343837,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.453035,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.561981,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.677082,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.780639,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 0.889226,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.001181,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.109828,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.217437,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.328748,
+            "value": 1
+          },
+          {
+            "since_halfpress_s": 1.443512,
+            "value": 2
+          },
+          {
+            "since_halfpress_s": 1.559227,
+            "value": 2
+          }
+        ],
+        "release_errors": [],
+        "focus_baseline": 1,
+        "af_confirmation_s": 1.559227,
+        "elapsed_s": 1.849588,
+        "number": 10,
+        "start_s": 143.511243,
+        "files": [
+          {
+            "file": "original.arw",
+            "size_bytes": 24890112,
+            "sha256": "538dd98d072cbd6f722c3bc9b545535b674ddbdf0fec9823619d43def733b643",
+            "tiff_header": "PASS",
+            "raw_full_decode": "UNKNOWN"
+          },
+          {
+            "file": "original.jpg",
+            "size_bytes": 14552475,
+            "sha256": "cff8a47ab89b6c8d289d674185020f51bd0304c896fcc224cfb904c0bbbee073",
+            "dimensions": [
+              6000,
+              4000
+            ],
+            "exif": {
+              "datetime_original": "2026:10:13 23:01:20",
+              "exposure_s": "0.125",
+              "f_number": "5.6",
+              "iso": "6400",
+              "focal_length_mm": "50.0"
+            },
+            "full_decode": "PASS"
+          }
+        ],
+        "buffer_settle_samples": [
+          {
+            "elapsed_s": 0.005967,
+            "value": 0
+          }
+        ],
+        "complete_pair_s": 5.085126
+      }
+    ],
+    "automatic_retries": 0,
+    "settings_changed": false,
+    "raw_full_decode": "UNKNOWN",
+    "sd_comparison": "UNKNOWN",
+    "limits": [
+      "AF state is a protocol confirmation, not optical quality validation.",
+      "No full RAW decode or direct SD comparison.",
+      "UVC receipts do not prove scene freshness or sensor-to-screen latency.",
+      "Private shell/debug logs and samples must not be committed."
+    ],
+    "config": {
+      "focusmode": "AF-A",
+      "capturemode": "Single Shot",
+      "capturetarget": "card+sdram",
+      "imagequality": "RAW+JPEG (X.Fine)"
+    },
+    "release_confirmed": true,
+    "uvc": {
+      "frames_received": 4444,
+      "unique_payloads": 1896,
+      "max_receive_gap_s": 0.108292,
+      "longest_identical_run_after_3s": {
+        "count": 17,
+        "start_s": 52.627452,
+        "span_s": 0.533508
+      },
+      "samples": [
+        {
+          "role": "before",
+          "index": 90,
+          "dimensions": [
+            1920,
+            1080
+          ]
+        },
+        {
+          "role": "after",
+          "index": 4442,
+          "dimensions": [
+            1920,
+            1080
+          ]
+        }
+      ],
+      "collector_errors": [],
+      "content_checks": 293,
+      "test_pattern_checks": 0,
+      "timing_method": "host_pipe_receipt_not_sensor_timestamp"
+    },
+    "full_press_requests": 10,
+    "verified_pairs": 10,
+    "elapsed_s": 148.917023,
+    "utc_end": "2026-10-13T21:01:31.032191+00:00"
+  },
+  "statistics": {
+    "af_s": {
+      "min": 0.861007,
+      "median": 1.596963,
+      "max": 3.034372
+    },
+    "verified_pair_s": {
+      "min": 4.642819,
+      "median": 5.28905,
+      "max": 6.912226
+    },
+    "af_confirmations_over_1s": 9
+  },
+  "earlier_development_runs": {
+    "first_single_cached_reads": {
+      "status": "PASS",
+      "af_confirmation_observed_s": 3.231371,
+      "limit": "Earlier cache-based measurement, not a pure AF latency."
+    },
+    "uvc_busy_gate": {
+      "status": "EXPECTED_SAFE_STOP",
+      "manifest_status": "FAIL",
+      "full_press_requests": 0,
+      "error": "GateError:UVC_WARMUP_TIMEOUT",
+      "limitation": "Unexpected device-busy failure; cause not established. Later direct stream-process ownership replaced timeout wrapper."
+    },
+    "short_af_deadline_hardware_gate": {
+      "status": "EXPECTED_SAFE_STOP",
+      "prototype_revision": "before force-refresh change; gate logic retained and regression-tested",
+      "af_timeout_s": 0.05,
+      "full_press_requests": 0,
+      "release_confirmed": true,
+      "error": "GateError:GateError:AF_TIMEOUT_NO_SHUTTER"
+    },
+    "stale_buffer_stop": {
+      "status": "SAFE_STOP_THEN_FIXED",
+      "planned": 10,
+      "full_press_requests": 1,
+      "received_raw_jpeg_pairs": 1,
+      "error": "GateError:UNEXPECTED_PENDING_OBJECT_NO_NEXT_SHOT",
+      "uvc_sample": "Known grabber color bars, visually inspected; this run is not a shared-UVC PASS.",
+      "correction": "Force GetAllDevicePropData via wait-event before reading properties; add bounded empty-buffer check and known UVC test-pattern gate."
+    }
+  },
+  "final_samples_inspected": "Before/after final-series samples show camera scene, not grabber color bars; per-frame content and optical quality not established.",
+  "limits": [
+    "This closes only single and ten-shot diagnostics under the measured conditions.",
+    "No optical PCB autofocus accuracy, full RAW decode, sensor bit-depth or SD byte comparison for these photographs.",
+    "No concurrent BLE, 50/100 shots, recovery fault injection or multi-hour endurance.",
+    "Incoming UVC frames include identical payload runs; sensor-to-screen latency not measured.",
+    "Raw private debug logs and photos excluded from publication."
+  ],
+  "postflight": {
+    "focus_mode": "AF-A",
+    "capture_mode": "Single Shot",
+    "capture_target": "card+sdram",
+    "image_quality": "RAW+JPEG (X.Fine)",
+    "objects_in_memory": 0,
+    "ptp_readonly_rc": 0,
+    "video_reopen_readonly_rc": 0
+  }
+}
