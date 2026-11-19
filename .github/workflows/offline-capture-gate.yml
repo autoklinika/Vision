@@ -1,0 +1,25 @@
+name: Vision offline capture contract
+on:
+  push:
+    paths:
+      - 'scripts/replay/**'
+      - 'tests/test_capture_replay.py'
+      - '.github/workflows/offline-capture-gate.yml'
+  pull_request:
+    paths:
+      - 'scripts/replay/**'
+      - 'tests/test_capture_replay.py'
+      - '.github/workflows/offline-capture-gate.yml'
+jobs:
+  capture-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'numpy>=1.26,<3'
+      - run: python -m unittest discover -s tests -p 'test_capture_replay.py' -v
