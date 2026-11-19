@@ -1,0 +1,6 @@
+schema_version: 1
+coordinate_frame: table
+length_unit: mm
+status: NOT_MEASURED
+obstacles: []
+keep_out_zones: []

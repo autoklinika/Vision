@@ -1,0 +1,47 @@
+schema_version: 1
+profile_id: vision-station-v1
+policy: no_candidate_auto_approval
+sources:
+  nero_urdf:
+    status: VERIFIED_MODEL
+    link7_flange_xyz_m: [0.031, 0, -0.0235]
+    link7_flange_rpy_rad: [-1.5708, 0, -1.5708]
+    origin: official_vendor_model
+    sha256: null
+  sony_dummy_v2:
+    status: VERIFIED_MODEL
+    cad_envelope_mm: [120, 69, 92]
+    actual_print_accuracy_verified: false
+  adapter_v7:
+    status: VERIFIED_MODEL
+    nominal_diameter_mm: 39.8
+    thickness_mm: 10
+    central_hole_mm: 6
+    actual_attachment_tf_verified: false
+  nero_holes_old:
+    status: MEASURED_APPROX
+    A_table_mm: [645, 50]
+    B_table_mm: [723, 120]
+    cad_correspondence_verified: false
+  nero_yaw_old:
+    status: CANDIDATE
+    value_deg: -93.094058
+    approved_for_active_tf: false
+  charuco_print_old:
+    status: MEASURED_APPROX
+    reported_long_short_mm: [205, 147]
+    superseded_measurement_mm: [217, 145]
+    grid_edges_confirmed: false
+  depth_red_reference_old:
+    status: OBSERVED_UNVALIDATED
+    reference_height_mm: 50.4
+    center_table_xy_mm: [700, 415]
+    height_error_ir_off_mm: -10.87
+    height_error_ir_dot60_mm: -14.251
+  camera_extrinsics:
+    status: CANDIDATE
+    approved_for_motion_safety: false
+  table_size:
+    status: UNKNOWN
+    simulation_assumption_mm: [2100, 750]
+    verified: false

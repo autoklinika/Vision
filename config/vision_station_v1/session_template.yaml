@@ -1,0 +1,42 @@
+schema_version: 1
+profile_id: vision-station-v1
+session_id: null
+status: CAPTURE_NOT_STARTED
+date_local: null
+operator: null
+coordinate_convention:
+  origin: table_front_left
+  x: right
+  y: back
+  z: up
+  length_unit: mm
+hardware:
+  nero_serial: null
+  luxonis_serial: null
+  depthai_version: null
+  ros_distro: jazzy
+  camera_settings_id: null
+  adapter_revision: v7
+  sony_revision: V2
+  camera_fixed_during_session: null
+instruments:
+  length_instrument: null
+  length_uncertainty_mm: null
+  height_instrument: null
+  height_uncertainty_mm: null
+  mass_instrument: null
+charuco:
+  dictionary: null
+  squares_x: 5
+  squares_y: 7
+  nominal_square_mm: 29.5
+  actual_grid_long_mm: null
+  actual_grid_short_mm: null
+acceptance_thresholds:
+  base_fit_max_mm: null
+  camera_tf_translation_max_mm: null
+  camera_tf_rotation_max_deg: null
+  xyz_max_mm: null
+  height_max_mm: null
+  reprojection_rms_max_px: null
+comments: []
