@@ -6,6 +6,12 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 
 **Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
 
+## C7 V1 — laboratoryjne planowanie ujęć PCB Sony (20.11.2026)
+
+- [Decyzja i kontrakt C7 V1: Sony A6000 V2 na J7, profil LAB PLAN-ONLY](docs/architecture/C7_V1_SONY_NERO_LAB_PLAN_ONLY_2026-11-20.md).
+- Generator propozycji ujęć: `scripts/lab/c7_v1_photo_viewpoints.py`; profil `config/lab/c7_v1_sony_tool_planonly.json`; test syntetyczny `examples/lab/etc3_synthetic_scene.json`.
+- Ten etap **nie uruchamia Vision Core, nie rozwiązuje IK, nie publikuje TF i nie wysyła ruchu NERO**. ETC3 w przykładzie ma wymyślone wymiary; dane rzeczywiste będą dopiero wejściem z Perception.
+
 ## ROS 2 i przenośność stanowiska (16.11.2026)
 
 - [Raport techniczny: ROS 2, NERO, MoveIt, Luxonis, ETC3 i przejście LAB → PROD](docs/architecture/VISION_ROS2_NERO_LAB_TO_PROD_TECHNICAL_REPORT_2026-11-16.md) — szczegółowe ustalenia, wymagania wejściowe, architektura i plan izolowanych testów; **DESIGN REPORT / PROPOSED**, bez wdrożenia na sprzęcie.

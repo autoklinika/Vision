@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "profile_id": "vision-c7-v1-sony-a6000-j7-lab",
+  "purpose": "ETC3 PCB photo viewpoint candidates for isolated MoveIt 2 plan-only development",
+  "status": "LAB_ASSUMED_NOT_METROLOGICALLY_APPROVED",
+  "source_calibration_session": "20261119-vision-station-v1",
+  "measured_table_mm": {"width_x": 1500, "depth_y": 780, "origin": "front_left", "axes": "+X right, +Y back, +Z up"},
+  "candidate_T_table_base_link": [
+    [0, 1, 0, 0.675],
+    [-1, 0, 0, 0.090],
+    [0, 0, 1, 0.031],
+    [0, 0, 0, 1]
+  ],
+  "candidate_T_table_base_link_approved": false,
+  "vendor_T_link7_flange": {
+    "xyz_m": [0.031, 0, -0.0235],
+    "rpy_rad": [-1.5708, 0, -1.5708],
+    "source": "vendor nero_with_flange_description.xacro"
+  },
+  "sony_dummy_v2": {
+    "socket_to_lens_front_center_mm": [0, 74, 36],
+    "optical_axis_in_socket": [0, 1, 0],
+    "dimensions_body_mm": [120, 69, 92],
+    "adapter_v7_diameter_mm": 39.8,
+    "adapter_v7_thickness_mm": 10,
+    "reported_component_masses_g": {"dummy": 145, "adapter": 6, "component_sum": 151},
+    "rigid_mount_confirmed": true,
+    "physical_optical_center_equals_CAD_lens_front_center": false
+  },
+  "tool_hypothesis": {
+    "azimuth_magnitude_deg": 90,
+    "signed_azimuth_options_deg": [90, -90],
+    "azimuth_reference": "angle of Sony optical +Y from flange_link +X in flange_link XY",
+    "socket_plusZ_relative_flange_plusZ": 1,
+    "socket_plusZ_sign_physically_verified": false,
+    "flange_to_socket_axial_offset_mm": 0,
+    "axial_offset_physically_verified": false
+  },
+  "collision_models": {
+    "nominal_detailed_source": "Sony A6000 V2 CAD boxes and lens cylinder + J7 v7 adapter",
+    "secondary_conservative_envelope": {"shape": "cylinder", "radius_mm": 89.148, "length_mm": 89},
+    "secondary_envelope_guaranteed_as_built": false,
+    "historical_pose_conservative_table_overlap_mm": 1.449,
+    "reconcile_nominal_and_envelope_before_physical_execution": true
+  },
+  "planning_contract": {
+    "robot_target_link": "link7",
+    "target_frame": "base_link",
+    "target_is_ik_candidate_not_trajectory": true,
+    "camera_optical_direction_table": [0, 0, -1],
+    "assumed_camera_body_up_table": [0, 1, 0],
+    "working_distance_required_from_scenario": true,
+    "collision_check_required_by_MoveIt": true,
+    "continuous_collision_validation_completed": false
+  },
+  "execution_policy": {
+    "allow_trajectory_execution": false,
+    "publish_static_tf": false,
+    "activate_production_profile": false,
+    "send_robot_commands": false,
+    "use_for_collision_safety": false
+  }
+}
