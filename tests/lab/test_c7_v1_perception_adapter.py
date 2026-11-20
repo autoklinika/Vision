@@ -103,6 +103,41 @@ class TestPerceptionToPhotoScene(unittest.TestCase):
             with self.subTest(field=field,val=str(val)),self.assertRaises(ADAPTER.BlockedInput):
                 ADAPTER.import_observation(bad)
 
+    def test_separate_full_ecu_obstacle_preserved_for_lab_collision(self):
+        data=copy.deepcopy(self.fixture)
+        data["obstacle_envelope"]={
+            "source_status":"EXPLORATORY_UNVERIFIED",
+            "center_table_xy_mm":[750,415],
+            "size_xy_mm":[290,250],
+            "height_above_table_mm":60,
+            "yaw_table_deg":0}
+        result=ADAPTER.import_observation(data)
+        scene=result["scene"]
+        self.assertEqual(scene["obstacle_envelope"]["size_xy_mm"],[290.0,250.0])
+        self.assertEqual(scene["obstacle_envelope"]["height_above_table_mm"],60.0)
+        self.assertTrue(scene["obstacle_envelope"]["not_safety_approved"])
+        out=GENERATOR.generate(self.profile,scene)
+        self.assertEqual(out["candidate_count"],10)
+        self.assertFalse(out["physical_execution_allowed"])
+
+    def test_invalid_ecu_obstacle_is_fail_closed(self):
+        data=copy.deepcopy(self.fixture)
+        data["obstacle_envelope"]={
+            "source_status":"EXPLORATORY_UNVERIFIED",
+            "center_table_xy_mm":[750,415],
+            "size_xy_mm":[290,250],
+            "height_above_table_mm":60,
+            "yaw_table_deg":0}
+        for key,value in (
+            ("height_above_table_mm",5),
+            ("size_xy_mm",[-2,250]),
+            ("source_status","APPROVED"),
+            ("center_table_xy_mm",[float('nan'),415])):
+            bad=copy.deepcopy(data)
+            bad["obstacle_envelope"][key]=value
+            with self.subTest(key=key,value=str(value)),self.assertRaises(ADAPTER.BlockedInput):
+                ADAPTER.import_observation(bad)
+
     def test_physical_execution_field_is_never_output(self):
         raw=copy.deepcopy(self.fixture)
         raw["execution_allowed"]=True

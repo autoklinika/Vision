@@ -172,6 +172,27 @@ def import_observation(raw: dict, *, source_path: str = "") -> dict:
                                            "quadrant_fraction",0)
             }
         }
+        # Optional scene obstacle representing the *whole ECU assembly*, not
+        # PCB substrate. Required for real C7 live data to avoid treating the
+        # PCB's median height as the highest connector/case collision surface.
+        env=raw.get("obstacle_envelope")
+        if env is not None:
+            if not isinstance(env,dict) or env.get("source_status") != "EXPLORATORY_UNVERIFIED":
+                raise BlockedInput("Whole-ECU obstacle must declare its unverified provenance")
+            ocenter=_vector(env.get("center_table_xy_mm"),"obstacle center_table_xy_mm",2)
+            osize=_vector(env.get("size_xy_mm"),"obstacle size_xy_mm",2)
+            oz=_finite(env.get("height_above_table_mm"),"obstacle height_above_table_mm",0.1)
+            oyaw=_finite(env.get("yaw_table_deg",0),"obstacle yaw_table_deg")
+            if min(osize)<=0 or oz < z:
+                raise BlockedInput("Invalid obstacle size or connector height smaller than PCB top")
+            output["obstacle_envelope"]={
+                "source_status":"EXPLORATORY_UNVERIFIED",
+                "center_table_xy_mm":ocenter,
+                "size_xy_mm":osize,
+                "height_above_table_mm":oz,
+                "yaw_table_deg":oyaw,
+                "not_safety_approved":True
+            }
         if not isinstance(output["ecu_type"],str) or not output["ecu_type"].strip():
             raise BlockedInput("ECU identity required")
         return {

@@ -299,14 +299,25 @@ def table_scene(profile,scene):
     center=B@np.array([W/2,D/2,-.025,1.])
     a=world_object(TABLE_ID,[box([W,D,.05])],[pose_Rt(B[:3,:3],center[:3])])
     pcb=scene["pcb"]
-    yaw=math.radians(float(pcb.get("yaw_table_deg",0)))
-    size=np.array(pcb["size_xy_mm"],float)/1000
-    thick=float(pcb["top_z_mm"])/1000
-    pos=np.array([pcb["center_table_xy_mm"][0]/1000,
-                  pcb["center_table_xy_mm"][1]/1000,thick/2,1.])
+    env=scene.get("obstacle_envelope")
+    if env is None:
+        # Historical synthetic fixture: PCB prism stands in for the ECU.
+        source={"center_table_xy_mm":pcb["center_table_xy_mm"],
+                "size_xy_mm":pcb["size_xy_mm"],
+                "height_above_table_mm":pcb["top_z_mm"],
+                "yaw_table_deg":pcb.get("yaw_table_deg",0)}
+    else:
+        if env.get("not_safety_approved") is not True or env.get("source_status")!="EXPLORATORY_UNVERIFIED":
+            raise ValueError("Source ECU obstacle must remain unverified")
+        source=env
+    yaw=math.radians(float(source.get("yaw_table_deg",0)))
+    size=np.array(source["size_xy_mm"],float)/1000
+    thick=float(source["height_above_table_mm"])/1000
+    pos=np.array([source["center_table_xy_mm"][0]/1000,
+                  source["center_table_xy_mm"][1]/1000,thick/2,1.])
     Tc=B@T(rz(yaw),pos[:3])
-    if thick <=0:
-        raise ValueError("Synthetic PCB prism thickness must be positive for collision test")
+    if thick<=0 or any(v<=0 for v in size):
+        raise ValueError("Invalid hypothetical ECU obstacle envelope")
     b=world_object(ECU_ID,[box([*size,thick])],[pose_Rt(Tc[:3,:3],Tc[:3,3])])
     return [a,b]
 
@@ -339,7 +350,8 @@ def main():
         "unapproved_table_to_base":True,
         "unapproved_tool_to_flange":True,
         "robot_joint_reference":"Historical 2026-11-18 state for IK seed only, not live position",
-        "table_and_synthetic_pcb_prism_in_planning_scene":True,
+        "table_and_ECU_obstacle_in_planning_scene":True,
+        "whole_ECU_obstacle_envelope_unapproved":scene.get("obstacle_envelope") is not None,
         "other_scene_obstacles_missing":True,
         "nominal_tool_and_conservative_tool_separately_checked":True,
         "continuous_collision_check":False,

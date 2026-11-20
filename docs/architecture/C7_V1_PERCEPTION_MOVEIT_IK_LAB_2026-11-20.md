@@ -67,3 +67,17 @@ Uruchomienia laboratoryjne zapisują `perception_import.json`, `scene.json`, `vi
 - Nawet po pojawieniu się prawdziwych danych PCB wynik pozostaje PLAN-ONLY; załączenie napędów i fizyczna realizacja to odrębna decyzja operatora.
 
 **Repozytorium:** osobny PR oparty na C7 V1 PR #33; surowe prywatne dane RGB-D oraz pełne raporty pozostają na VENTUNO Q NVMe.
+
+## Rozszerzenie: rzeczywisty ETC3 20.11.2026 — nadal PLAN-ONLY
+
+- Bieżące RGB 1920×1080 i **12 map StereoDepth 1280×800** z OAK-D Pro AF, IR OFF, bez zmiany usług i bez NERO.
+- Wykryto obszar widocznej PCB z rzeczywistego obrazu. Wyznaczono wstępny `table` XY z 50 archiwalnych klatek ChArUco, po rozwiązaniu hipotezy ułożenia planszy (kierunki jej osi oraz fizyczny róg siatki). **Nie oznacza to zatwierdzonego TF**: poprzednie pozycje planszy były mierzone ręcznie i nie mają niezależnego wzorca bezwzględnego XY.
+- Oddzielono barwną maskę widocznej PCB od obwiedni całego ECU. Scena testowa może zawierać `obstacle_envelope` z obrysem całego ECU oraz wyższymi złączami, by nie utożsamiać wysokości laminatu z maksymalną wysokością przeszkody.
+- Laboratorium MoveIt 2 wykonuje `IK/FK/GetStateValidity/Pilz PTP` także na **realnym kandydacie pozycji ETC3** (źródła i raporty tylko na NVMe; nie publikujemy zdjęć ani surowych danych ECU w GitHubie).
+- Próby roboczych odległości czoła obiektywu **230 / 275 / 300 mm**: odpowiednio 6/10, 10/10, 10/10 rozwiązań IK przy testowanych hipotezach ±90°. Dla 275 i 300 mm tylko jeden z dwóch przykładowych przejazdów Pilz PTP uzyskał poprawny plan; drugi zakończył się błędem 99999. Użytkownik nie wybrał fizycznej odległości fotografowania, a min. dystans ostrzenia Sony nie został sprawdzony.
+- Ocena statyczna w szczegółowym i zachowawczym modelu narzędzia jest pozytywna dla wszystkich 10 pozycji wariantów 275/300 mm przy tym konkretnym roboczym modelu; **nie daje to zgody na fizyczny ruch**.
+- Stała konfiguracja na VENTUNO Q pozostaje nienaruszona; domena LAB=201 jest zatrzymywana po testach, CAN TX=0, `can0 DOWN`, brak publikacji TF.
+
+Pełne źródła i rezultaty (włącznie z błędami C5, kalibracją fabryczną OAK i oznaczeniem niezatwierdzonych założeń):
+`/srv/vision-data/calibration/sessions/20261119-vision-station-v1/validation/C7_V1_LIVE_ETC3_SCAN_AND_PLAN_ONLY_20261120.md`
+oraz `c7_v1_live_ETC3_RGBD_to_moveit_20261120_summary.json` na tym samym NVMe.

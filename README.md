@@ -16,7 +16,7 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 
 - [Integracja Perception, generatora ujęć i izolowanego MoveIt 2](docs/architecture/C7_V1_PERCEPTION_MOVEIT_IK_LAB_2026-11-20.md), z opisem ograniczeń rzeczywistych danych ETC3 i wymaganych układów odniesienia.
 - `scripts/lab/run_c7_v1_planonly_moveit.sh` — powtarzalny, bezruchowy przebieg: import Perception → kandydackie zdjęcia → IK → sprawdzenie kolizji → plan PTP → wyłączenie prywatnego MoveIt.
-- Historyczny ETC3 zawiera otwartą płytkę widoczną w RGB, ale **nie ma jeszcze wyodrębnionego PCB w układzie table**; algorytm nie zastępuje jej obrysem całego ECU. Rzeczywisty zapis pozostaje zablokowany przed planowaniem robota.
+- Historyczny ETC3 z 14 listopada nadal **nie posiada weryfikowalnej geometrii PCB w układzie stołu** i jest blokowany. Nowa sesja RGB-D z 20 listopada pozwoliła wygenerować wyłącznie **niezatwierdzony kandydat table XY PCB** i wykonać testy IK/kolizji w izolowanym MoveIt 2; fotografie, dane i wyniki pozostały na NVMe.
 - Przygotowany przyszły kontrakt `contracts/vision.perception_pcb_table.v1.schema.json`. Parametry w `examples/lab` są tylko syntetyczne. Nie ma publikacji TF ani ruchu NERO.
 
 ## ROS 2 i przenośność stanowiska (16.11.2026)
