@@ -26,7 +26,7 @@ class C7V1ViewpointsTest(unittest.TestCase):
         self.assertFalse(p["zoom_substitutes_collision_check"])
         self.assertFalse(p["zoom_substitutes_focus_check"])
         self.assertTrue(p["prefer_clear_standoff_over_close_up"])
-        self.assertIsNone(p["required_clearance_margin_mm"])
+        self.assertEqual(p["required_clearance_margin_mm"],5.0)
         self.assertTrue(p["clearance_margin_must_exceed_combined_geometry_uncertainty"])
         self.assertTrue(p["full_trajectory_obstacle_checks_required"])
         self.assertTrue(p["conservative_tool_model_required"])

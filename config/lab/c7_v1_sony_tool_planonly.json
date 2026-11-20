@@ -132,13 +132,22 @@
     "zoom_substitutes_focus_check": false,
     "prefer_clear_standoff_over_close_up": true,
     "photo_working_distance_requires_optical_focus_check": true,
-    "required_clearance_margin_mm": null,
+    "required_clearance_margin_mm": 5.0,
     "clearance_margin_must_exceed_combined_geometry_uncertainty": true,
     "full_trajectory_obstacle_checks_required": true,
     "conservative_tool_model_required": true,
-    "include_whole_ECU_connectors_table_clamps_robot_mount_and_cables": true,
     "operator_present_for_all_lab_motion": true,
     "accepted_laboratory_stop_mode": "supervised_software_HOLD",
-    "unapproved_geometry_does_not_authorize_motion": true
+    "unapproved_geometry_does_not_authorize_motion": true,
+    "clearance_margin_basis": "user accepted 5mm LAB buffer, not independently validated absolute safe clearance",
+    "include_whole_ECU_connectors_table_robot_Sony_tool": true,
+    "current_ETC3_scene_has_extra_clamps_or_loose_cables": false,
+    "margin_inflation_rule": "5mm beyond raw ECU footprint on each XY edge; 5mm above raw visible ECU P99 Z; excludes existing 15mm/12mm prior lab buffers"
+  },
+  "obstacle_profile_for_live_ETC3": {
+    "margin_xy_per_side_mm": 5.0,
+    "margin_above_highest_visible_ECU_z_mm": 5.0,
+    "other_clamps_cables_present_in_current_scene": false,
+    "unverified_stereo_obstacle_envelope_not_safe_geometry_certification": true
   }
 }

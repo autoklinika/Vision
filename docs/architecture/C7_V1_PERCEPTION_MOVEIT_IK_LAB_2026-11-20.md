@@ -61,7 +61,7 @@ Uruchomienia laboratoryjne zapisują `perception_import.json`, `scene.json`, `vi
 ## Niezmienione ograniczenia
 
 - C2 table-to-base i C7 rzeczywisty znak 90° / offset i TCP optyczny są **kandydatami**.
-- Nie dokonano kontroli ciągłego toru między waypointami. Obiekty poboczne: zaciski, kable, złącza ECU i inne przedmioty mogą nie być w scenie.
+- Nie dokonano kontroli ciągłego toru między waypointami. W aktualnej scenie brak dodatkowych zacisków i przewodów (potwierdzone przez operatora). Złącza ECU uwzględniamy w obwiedni całego ETC3.
 - Kontakt narzędzia z `link6` i `link7` jest pomijany na mocy przyjętych `touch_links`. To nie jest fizyczna weryfikacja odległości.
 - Prawdziwe Sony ma ograniczenia ogniskowania/ostrości, które nie zostały tu zweryfikowane.
 - Nawet po pojawieniu się prawdziwych danych PCB wynik pozostaje PLAN-ONLY; załączenie napędów i fizyczna realizacja to odrębna decyzja operatora.
@@ -116,9 +116,15 @@ Wymagania dla kolejnych etapów:
 
 - **Oddzielić kryterium fotograficzne od geometryczno-kolizyjnego:** niewielki błąd kadrowania nie jest problemem samym w sobie, ale nie wolno stosować go jako uzasadnienia małego prześwitu.
 - **Preferować ujęcie z większego dystansu** i odpowiedni zoom, zamiast zbliżać aparat do najwyższych elementów ECU. Rzeczywisty zakres ostrzenia i skuteczność zoomu Sony dla wybranego dystansu wymagają osobnego sprawdzenia.
-- **Modelować przeszkody jako bryły 3D:** całe ECU i trzy złącza, stół, ramię i adapter J7/Sony, zaciski montażowe, przewody oraz inne obiekty w przestrzeni roboczej. Nie traktować samego laminatu PCB jako najwyższej przeszkody.
-- **Planowanie:** uwzględnić niepewność RGB-D i niezatwierdzonych C2/C7; odstęp od przeszkód powinien pokrywać tę niepewność i dodatkowy margines. Żadna liczba w milimetrach nie zostaje automatycznie uznana za bezpieczną bez walidacji całej sceny.
+- **Modelować przeszkody jako bryły 3D:** całe ECU i trzy złącza, stół, ramię i adapter J7/Sony; bez nieistniejących dodatkowych zacisków i przewodów. Nie traktować samego laminatu PCB jako najwyższej przeszkody.
+- **Planowanie:** uwzględnić niepewność RGB-D i niezatwierdzonych C2/C7; odstęp od przeszkód powinien pokrywać tę niepewność i dodatkowy margines. Operator wybrał bufor kolizyjny C7 V1 5 mm, dodawany do surowej obwiedni ETC3 po każdej stronie w XY i ponad Z; nie dodajemy wcześniejszych 15 mm/12 mm ani nie uznajemy wyniku za zatwierdzoną geometrię.
 - **Wykonanie:** testy całego planowanego ruchu, pozycja startowa z aktualnego JointState, operator stale obecny przy stanowisku. Zgodnie z przyjętą procedurą laboratoryjną korzystamy z programowego HOLD.
 - **Odbiór:** nie wymagamy pomiarów pozycji PCB do 1 mm, ale nie ogłaszamy fizycznego ruchu bezpiecznym na podstawie wyłącznie poprawnych IK, planów PTP i dyskretnych kontroli waypointów.
 
 Ta decyzja nie zmienia aktualnych bramek allow_trajectory_execution=false, send_robot_commands=false i publish_static_tf=false. Nie stanowi aprobaty dokładności aktualnego table TF ani ograniczeń konstrukcyjnych Sony.
+
+## Korekta bieżącej sceny ETC3 — margines 5 mm (20.11.2026)
+
+Operator potwierdził, że nie ma dodatkowych zacisków ani przewodów w aktualnej scenie. Nie modelujemy fikcyjnych przeszkód. Margines C7 V1 przyjmujemy **5 mm względem pierwotnej zmierzonej obwiedni całego ETC3**: +5 mm na każdej krawędzi XY (czyli +10 mm do całej szerokości i długości) oraz +5 mm ponad Z. Wcześniejsze zapasy +15 mm/stronę i +12 mm Z **zastępujemy**, nie sumujemy. To założenie LAB/PLAN-ONLY na życzenie operatora.
+
+Wymiary obwiedni z poprzedniego zapisu 265.512 × 225.328 × 48.25 mm dają po korekcie 275.512 × 235.328 × 53.25 mm. Środek obwiedni ECU X666.461, Y416.864 mm. Dotyczy tylko wariantu ETC3 275 mm (czoło obiektywu względem górnej powierzchni PCB); nie zmieniono rzeczywistych pomiarów, zapisanych surowych danych ani robotycznych limitów URDF.
