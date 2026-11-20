@@ -12,6 +12,13 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 - Generator propozycji ujęć: `scripts/lab/c7_v1_photo_viewpoints.py`; profil `config/lab/c7_v1_sony_tool_planonly.json`; test syntetyczny `examples/lab/etc3_synthetic_scene.json`.
 - Ten etap **nie uruchamia Vision Core, nie rozwiązuje IK, nie publikuje TF i nie wysyła ruchu NERO**. ETC3 w przykładzie ma wymyślone wymiary; dane rzeczywiste będą dopiero wejściem z Perception.
 
+## C7 V1 — Vision Perception → MoveIt 2 LAB (20.11.2026)
+
+- [Integracja Perception, generatora ujęć i izolowanego MoveIt 2](docs/architecture/C7_V1_PERCEPTION_MOVEIT_IK_LAB_2026-11-20.md), z opisem ograniczeń rzeczywistych danych ETC3 i wymaganych układów odniesienia.
+- `scripts/lab/run_c7_v1_planonly_moveit.sh` — powtarzalny, bezruchowy przebieg: import Perception → kandydackie zdjęcia → IK → sprawdzenie kolizji → plan PTP → wyłączenie prywatnego MoveIt.
+- Historyczny ETC3 z 14 listopada nadal **nie posiada weryfikowalnej geometrii PCB w układzie stołu** i jest blokowany. Nowa sesja RGB-D z 20 listopada pozwoliła wygenerować wyłącznie **niezatwierdzony kandydat table XY PCB** i wykonać testy IK/kolizji w izolowanym MoveIt 2; fotografie, dane i wyniki pozostały na NVMe.
+- Przygotowany przyszły kontrakt `contracts/vision.perception_pcb_table.v1.schema.json`. Parametry w `examples/lab` są tylko syntetyczne. Nie ma publikacji TF ani ruchu NERO.
+
 ## ROS 2 i przenośność stanowiska (16.11.2026)
 
 - [Raport techniczny: ROS 2, NERO, MoveIt, Luxonis, ETC3 i przejście LAB → PROD](docs/architecture/VISION_ROS2_NERO_LAB_TO_PROD_TECHNICAL_REPORT_2026-11-16.md) — szczegółowe ustalenia, wymagania wejściowe, architektura i plan izolowanych testów; **DESIGN REPORT / PROPOSED**, bez wdrożenia na sprzęcie.

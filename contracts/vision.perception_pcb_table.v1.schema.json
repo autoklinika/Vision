@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/autoklinika/Vision/blob/feature/c7-v1-ik-perception-20261120/contracts/vision.perception_pcb_table.v1.schema.json",
+  "title": "vision.perception_pcb_table.v1",
+  "description": "Non-safety experimental PCB top-surface observation in table frame for C7 V1 LAB. Not emitted by the existing camera-frame-only Perception Engine until table registration and PCB segmentation are implemented.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "safety_function",
+    "source_kind",
+    "source_bundle_id",
+    "source_artifact_sha256",
+    "frame_of_reference",
+    "object_class",
+    "pcb_surface",
+    "calibration_approved",
+    "ecu_type",
+    "pcb",
+    "camera"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vision.perception_pcb_table.v1"
+    },
+    "status": {
+      "enum": [
+        "CANDIDATE_UNVERIFIED",
+        "OPERATOR_MEASURED_UNVERIFIED"
+      ]
+    },
+    "fixture_only": {
+      "type": "boolean",
+      "description": "If true, source_kind MUST equal synthetic_fixture; no real-world source claim."
+    },
+    "safety_function": {
+      "const": false
+    },
+    "source_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "operator_measured",
+        "vision_perception_candidate"
+      ]
+    },
+    "source_bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "frame_of_reference": {
+      "const": "table"
+    },
+    "object_class": {
+      "const": "pcb"
+    },
+    "pcb_surface": {
+      "const": "top"
+    },
+    "calibration_approved": {
+      "const": false
+    },
+    "ecu_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pcb": {
+      "type": "object",
+      "required": [
+        "center_table_xy_mm",
+        "size_xy_mm",
+        "top_z_mm",
+        "yaw_table_deg"
+      ],
+      "properties": {
+        "center_table_xy_mm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "size_xy_mm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "top_z_mm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "yaw_table_deg": {
+          "type": "number"
+        }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "required": [
+        "lens_front_working_distance_mm"
+      ],
+      "properties": {
+        "lens_front_working_distance_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "quadrant_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 0.5
+        }
+      }
+    },
+    "obstacle_envelope": {
+      "type": "object",
+      "description": "Optional unapproved whole-ECU obstacle envelope including connectors; not bare PCB surface",
+      "required": [
+        "source_status",
+        "center_table_xy_mm",
+        "size_xy_mm",
+        "height_above_table_mm",
+        "yaw_table_deg"
+      ],
+      "properties": {
+        "source_status": {
+          "const": "EXPLORATORY_UNVERIFIED"
+        },
+        "center_table_xy_mm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "size_xy_mm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "height_above_table_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "yaw_table_deg": {
+          "type": "number"
+        },
+        "buffer_xy_each_side_mm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "buffer_height_mm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "buffer_is_software_conservatism_not_guaranteed_clearance": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "fixture_only": {
+            "const": true
+          }
+        },
+        "required": [
+          "fixture_only"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_kind": {
+            "const": "synthetic_fixture"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source_kind": {
+            "enum": [
+              "operator_measured",
+              "vision_perception_candidate"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

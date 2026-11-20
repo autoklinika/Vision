@@ -1,0 +1,25 @@
+{
+  "schema_version": "vision.perception_pcb_table.v1",
+  "status": "CANDIDATE_UNVERIFIED",
+  "fixture_only": true,
+  "safety_function": false,
+  "source_kind": "synthetic_fixture",
+  "source_bundle_id": "ETC3_POC_SYNTHETIC_GEOMETRY_001",
+  "source_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "frame_of_reference": "table",
+  "object_class": "pcb",
+  "pcb_surface": "top",
+  "calibration_approved": false,
+  "ecu_type": "ETC3",
+  "notes": "Fully invented synthetic PCB scene. This does not represent real ETC3 PCB dimensions, location or height.",
+  "pcb": {
+    "center_table_xy_mm": [750, 410],
+    "size_xy_mm": [120, 80],
+    "top_z_mm": 45,
+    "yaw_table_deg": 0
+  },
+  "camera": {
+    "lens_front_working_distance_mm": 230,
+    "quadrant_fraction": 0.28
+  }
+}

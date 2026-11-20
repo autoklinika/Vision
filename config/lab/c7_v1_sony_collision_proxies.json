@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "profile_status": "LAB_CAD_PROXIES_NOT_AS_BUILT",
+  "source": "2026-11-18 Sony A6000 V2 CAD collision-only Xacro and J7 v7 assembly",
+  "socket_frame": "sony_dummy_socket_at_M5",
+  "collision_primitives": [
+    {"name": "body", "type": "box", "origin_xyz_m": [-0.021, -0.002, 0.03345], "origin_rpy_rad": [0, 0, 0], "size_xyz_m": [0.13, 0.042, 0.0769]},
+    {"name": "left_grip", "type": "box", "origin_xyz_m": [-0.0665, 0.01455, 0.03345], "origin_rpy_rad": [0, 0, 0], "size_xyz_m": [0.039, 0.0351, 0.0769]},
+    {"name": "lens", "type": "cylinder", "origin_xyz_m": [0, 0.04375, 0.036], "origin_rpy_rad": [-1.5707963267948966, 0, 0], "radius_m": 0.038, "length_m": 0.0705},
+    {"name": "adapter", "type": "cylinder", "origin_xyz_m": [0, 0, -0.005], "origin_rpy_rad": [0, 0, 0], "radius_m": 0.0199, "length_m": 0.01}
+  ],
+  "conservative_proxy": {
+    "shape": "cylinder",
+    "radius_m": 0.089148,
+    "length_m": 0.089,
+    "origin_xyz_m": [0, 0, 0.0395],
+    "origin_rpy_rad": [0, 0, 0],
+    "guaranteed_collision_envelope": false
+  },
+  "touch_links_assumed": ["link7", "link6"],
+  "validated_against_complete_fabricated_physical_tool": false,
+  "allow_movement_from_this_collision_model": false
+}
