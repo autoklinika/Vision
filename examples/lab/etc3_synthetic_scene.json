@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "scenario_id": "ETC3_POC_SYNTHETIC_GEOMETRY_001",
+  "ecu_type": "ETC3",
+  "evidence_kind": "synthetic_fixture",
+  "notes": "Test logic only: PCB position and dimensions below are INVENTED FIXTURE VALUES, not measurements of the real ETC3, its housing or its two-black-one-grey connector PCB.",
+  "pcb": {
+    "center_table_xy_mm": [750, 410],
+    "size_xy_mm": [120, 80],
+    "top_z_mm": 45,
+    "yaw_table_deg": 0
+  },
+  "camera": {
+    "lens_front_working_distance_mm": 230,
+    "quadrant_fraction": 0.28
+  }
+}
