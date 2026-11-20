@@ -1,0 +1,24 @@
+[Unit]
+Description=Vision NERO C7 lab one-shot limited FollowJointTrajectory + operator HOLD (no auto enable)
+Documentation=file:/srv/vision-data/experiments/c7-nero-follow-action-20261120/README.md
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/vision-data/experiments/c7-nero-follow-action-20261120
+ExecStartPre=/usr/bin/python3 /srv/vision-data/experiments/nero-stop-hold-integration-20261117/preflight_readonly_receiver.py
+ExecStart=/bin/bash /srv/vision-data/experiments/c7-nero-follow-action-20261120/bin/start_limited_guarded.sh
+Environment=HOME=/home/arduino
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=PYTHONUNBUFFERED=1
+Restart=no
+TimeoutStartSec=35
+TimeoutStopSec=8
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
