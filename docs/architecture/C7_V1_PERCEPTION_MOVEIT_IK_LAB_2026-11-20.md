@@ -99,7 +99,7 @@ oraz `c7_v1_live_ETC3_RGBD_to_moveit_20261120_summary.json` na tym samym NVMe.
 - Aktualne 12 map stereo 1280×800: mediana głębi w wybranym stałym obszarze wynosiła 780–781 mm. To potwierdza krótkoterminową powtarzalność, **nie dokładność absolutną**. W archiwum C6 (IR OFF) odchyłki wysokości dla trzech rzeczywistych wzorców wynosiły około −0.909, −4.144 i −4.560 mm (zależne od powierzchni).
 - Obrys barwnej maski PCB z rzeczywistego ETC3 nadal może częściowo obejmować ramkę ECU. Obwiednia kolizyjna całego ECU z wystającymi złączami została utworzona niezależnie i zawiera umowny zapas; nie jest zatwierdzonym modelem wymiarowym.
 
-**Decyzja:** geometria pozwala kontynuować symulacje C7 V1 PLAN-ONLY; **NIE pozwala jeszcze przejść do fizycznego ruchu.** Minimalna niezależna weryfikacja: porównać co najmniej jedno łatwo rozpoznawalne miejsce na ETC3, zmierzone fizycznie w X,Y względem lewego przedniego rogu stołu, oraz rzeczywistą szerokość i długość obudowy z projekcją C7. Przed rzeczywistym ruchem potrzebne są także aktualne J1–J7, C2/C7 i pełna scena oraz kontrola prześwitów.
+**Decyzja:** geometria pozwala kontynuować symulacje C7 V1 PLAN-ONLY; **NIE pozwala jeszcze przejść do fizycznego ruchu**. Nie wymagamy dokładności fotograficznej 1 mm. Przed ruchem wymagamy wiarygodnej oceny gabarytów i prześwitów (z błędem pomiaru i zapasem); orientacyjny pomiar jednego narożnika lub wymiarów obudowy ETC3 pozostaje jedną z prostych metod niezależnej kontroli, **nie obowiązkiem pomiaru do milimetra ani powtórzeniem pełnej kalibracji**. Wymagane są również aktualne J1–J7, geometria C2/C7 wystarczająca do ochrony przed kolizją, pełna scena i sprawdzenie prześwitów całej trajektorii.
 
 **Dowody tylko na prywatnym NVMe:**
 
@@ -107,3 +107,18 @@ oraz `c7_v1_live_ETC3_RGBD_to_moveit_20261120_summary.json` na tym samym NVMe.
 - `validation/c7_v1_ik_perception_lab/etc3_live_275mm_both_tool_models_plan_20261120/ik_result.json`
 
 Nie publikowano na GitHubie prywatnych zdjęć ETC3 ani pełnych logów.
+
+## ADR — priorytet bezpieczeństwa i kadrowanie zoomem (20.11.2026)
+
+Użytkownik przyjął dla C7 V1 **brak obowiązku dokładności pozycjonowania Sony do 1 mm**. Cel operacyjny to bezpieczne prowadzenie NERO z zamontowanym aparatem; korektę kadru można wykonywać zoomem optycznym Sony, gdy aparat znajduje się już w bezpiecznej pozycji i może prawidłowo ustawić ostrość.
+
+Wymagania dla kolejnych etapów:
+
+- **Oddzielić kryterium fotograficzne od geometryczno-kolizyjnego:** niewielki błąd kadrowania nie jest problemem samym w sobie, ale nie wolno stosować go jako uzasadnienia małego prześwitu.
+- **Preferować ujęcie z większego dystansu** i odpowiedni zoom, zamiast zbliżać aparat do najwyższych elementów ECU. Rzeczywisty zakres ostrzenia i skuteczność zoomu Sony dla wybranego dystansu wymagają osobnego sprawdzenia.
+- **Modelować przeszkody jako bryły 3D:** całe ECU i trzy złącza, stół, ramię i adapter J7/Sony, zaciski montażowe, przewody oraz inne obiekty w przestrzeni roboczej. Nie traktować samego laminatu PCB jako najwyższej przeszkody.
+- **Planowanie:** uwzględnić niepewność RGB-D i niezatwierdzonych C2/C7; odstęp od przeszkód powinien pokrywać tę niepewność i dodatkowy margines. Żadna liczba w milimetrach nie zostaje automatycznie uznana za bezpieczną bez walidacji całej sceny.
+- **Wykonanie:** testy całego planowanego ruchu, pozycja startowa z aktualnego JointState, operator stale obecny przy stanowisku. Zgodnie z przyjętą procedurą laboratoryjną korzystamy z programowego HOLD.
+- **Odbiór:** nie wymagamy pomiarów pozycji PCB do 1 mm, ale nie ogłaszamy fizycznego ruchu bezpiecznym na podstawie wyłącznie poprawnych IK, planów PTP i dyskretnych kontroli waypointów.
+
+Ta decyzja nie zmienia aktualnych bramek allow_trajectory_execution=false, send_robot_commands=false i publish_static_tf=false. Nie stanowi aprobaty dokładności aktualnego table TF ani ograniczeń konstrukcyjnych Sony.

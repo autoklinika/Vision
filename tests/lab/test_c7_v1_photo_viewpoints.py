@@ -19,6 +19,21 @@ class C7V1ViewpointsTest(unittest.TestCase):
         self.profile = json.loads((ROOT / "config/lab/c7_v1_sony_tool_planonly.json").read_text())
         self.scene = json.loads((ROOT / "examples/lab/etc3_synthetic_scene.json").read_text())
 
+    def test_safety_first_zoom_policy_does_not_authorize_motion(self):
+        p = self.profile["design_priorities"]
+        self.assertFalse(p["photographic_positioning_accuracy_1mm_required"])
+        self.assertTrue(p["optical_zoom_allowed_for_framing"])
+        self.assertFalse(p["zoom_substitutes_collision_check"])
+        self.assertFalse(p["zoom_substitutes_focus_check"])
+        self.assertTrue(p["prefer_clear_standoff_over_close_up"])
+        self.assertIsNone(p["required_clearance_margin_mm"])
+        self.assertTrue(p["clearance_margin_must_exceed_combined_geometry_uncertainty"])
+        self.assertTrue(p["full_trajectory_obstacle_checks_required"])
+        self.assertTrue(p["conservative_tool_model_required"])
+        self.assertEqual(p["accepted_laboratory_stop_mode"], "supervised_software_HOLD")
+        self.assertFalse(self.profile["execution_policy"]["allow_trajectory_execution"])
+        self.assertFalse(self.profile["execution_policy"]["send_robot_commands"])
+
     def test_five_views_two_azimuths_and_fail_closed(self):
         output = PHOTO.generate(self.profile, self.scene)
         self.assertEqual(output["status"], "OFFLINE_VIEWPOINT_CANDIDATES_ONLY")
