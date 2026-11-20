@@ -81,3 +81,29 @@ Uruchomienia laboratoryjne zapisują `perception_import.json`, `scene.json`, `vi
 Pełne źródła i rezultaty (włącznie z błędami C5, kalibracją fabryczną OAK i oznaczeniem niezatwierdzonych założeń):
 `/srv/vision-data/calibration/sessions/20261119-vision-station-v1/validation/C7_V1_LIVE_ETC3_SCAN_AND_PLAN_ONLY_20261120.md`
 oraz `c7_v1_live_ETC3_RGBD_to_moveit_20261120_summary.json` na tym samym NVMe.
+
+## Diagnostyka granic J7 i walidacja geometrii (20.11.2026)
+
+### Źródło błędu PTP +90°: numeryczny limit J7
+
+- Faktyczne logi izolowanego MoveIt 2 z próby 275 mm: `CheckStartStateBounds` zwrócił błąd, ponieważ joint7 miał z IK wartość dokładnie −90° (`−π/2`), a URDF producenta określa minimum `−1.5707963 rad` (czyli ok. −89.99999846°). Niewielka różnica wynosiła 0.0000000268 rad. W kolejnych przebiegach problematyczny był punkt startowy albo docelowy, zależnie od gałęzi IK.
+- Dodano `scripts/lab/c7_v1_joint_limits.py`, który odczytuje **niezmieniony URDF** i w trybie offline wprowadza margines `0.0001 rad` wyłącznie dla wartości przy samej granicy; korekty >0.02° są odrzucane. Każdy skorygowany punkt podlega powtórnej kontroli FK (błąd pozycji <0.25 mm, orientacji <0.05°), przed uruchomieniem Pilz.
+- Na realnym kandydacie pozycji ETC3 i wysokości fotografowania 275 mm poprawka J7 wyniosła około 0.00573°. Ponownie wyznaczono trajektorie Pilz PTP **dla +90° i −90°**, oddzielnie dla **dokładniejszego modelu Sony** i dla wcześniejszej **konserwatywnej obwiedni walcowej**. Oba warianty zakończyły się PASS w sprawdzonych punktach; w reprezentatywnym końcowym uruchomieniu +90° wymagał 2584 punktów, a −90° 359 punktów, dla **każdego** modelu kolizyjnego. Brak komend ruchu NERO.
+- Ta poprawka jest **tylko rozwiązaniem laboratoryjnego błędu planowania**. Nie zmienia zakresów J7 producenta, nie rusza silników ani robotycznego sterownika. Nie zastępuje testu ciągłej kolizji i niezależnej oceny rzeczywistych prześwitów.
+
+### Sprawdzenie dokładności geometrycznej, bez ponownego pomiaru stanowiska
+
+- Przeprowadzono niezależne **porównanie zarejestrowanych obrazów statycznej płyty mocowania NERO** między wcześniejszymi 5 pozycjami ChArUco a aktualnym skanem ETC3 (SIFT + RANSAC, nie dopasowanie PCB). Zaobserwowana zmiana skali 2D względem C5 wynosiła **1.406–1.938%**, mediana **1.569%** na pięciu ujęciach. W pięciu klatkach aktualnej serii RGB względem jednej próbki C5 zmieniała się od ok. **1.674% do 2.436%**.
+- Nie można z tego wywnioskować, czy przyczyną jest autofocus/oddychanie obiektywu, zmiana projekcji/kadrowania, czy inne przesunięcie; wykryta różnica nie jest też równoznaczna z błędem położenia kamery w milimetrach. **Nie wolno przenieść starego C5 TF do rzeczywistego sterowania bez kotwicy i kontroli zmiany parametrów optycznych.**
+- 50 historycznych obrazów ChArUco miało medianę RMS reprojekcji około 0.208 px, lecz pięć pozycji planszy zostało oznaczonych ręcznie, bez niezależnego pomiaru dokładności XY. Rozrzut między stacjami nie jest certyfikatem błędu bezwzględnego.
+- Aktualne 12 map stereo 1280×800: mediana głębi w wybranym stałym obszarze wynosiła 780–781 mm. To potwierdza krótkoterminową powtarzalność, **nie dokładność absolutną**. W archiwum C6 (IR OFF) odchyłki wysokości dla trzech rzeczywistych wzorców wynosiły około −0.909, −4.144 i −4.560 mm (zależne od powierzchni).
+- Obrys barwnej maski PCB z rzeczywistego ETC3 nadal może częściowo obejmować ramkę ECU. Obwiednia kolizyjna całego ECU z wystającymi złączami została utworzona niezależnie i zawiera umowny zapas; nie jest zatwierdzonym modelem wymiarowym.
+
+**Decyzja:** geometria pozwala kontynuować symulacje C7 V1 PLAN-ONLY; **NIE pozwala jeszcze przejść do fizycznego ruchu.** Minimalna niezależna weryfikacja: porównać co najmniej jedno łatwo rozpoznawalne miejsce na ETC3, zmierzone fizycznie w X,Y względem lewego przedniego rogu stołu, oraz rzeczywistą szerokość i długość obudowy z projekcją C7. Przed rzeczywistym ruchem potrzebne są także aktualne J1–J7, C2/C7 i pełna scena oraz kontrola prześwitów.
+
+**Dowody tylko na prywatnym NVMe:**
+
+- `validation/c7_v1_ETC3_independent_geometry_consistency_20261120.json`
+- `validation/c7_v1_ik_perception_lab/etc3_live_275mm_both_tool_models_plan_20261120/ik_result.json`
+
+Nie publikowano na GitHubie prywatnych zdjęć ETC3 ani pełnych logów.

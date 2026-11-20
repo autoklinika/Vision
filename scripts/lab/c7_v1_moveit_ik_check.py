@@ -17,6 +17,9 @@ from moveit_msgs.msg import (RobotState, PlanningScene, CollisionObject,
                              AttachedCollisionObject, Constraints, JointConstraint, PlanningSceneComponents)
 from moveit_msgs.srv import (GetPositionIK, GetPositionFK, GetStateValidity,
                              ApplyPlanningScene, GetMotionPlan, GetPlanningScene)
+from c7_v1_joint_limits import load_urdf_joint_limits, inset_at_limit
+
+OFFLINE_URDF = Path("/srv/vision-data/experiments/vision-nero-moveit-20261117/ws/src/agx_arm_description/agx_arm_urdf/nero/urdf/nero_description.urdf")
 
 JOINTS=[f"joint{i}" for i in range(1,8)]
 HIST_JOINT_DEG=[89.083,48.099,2.832,117.542,-1.002,1.171,14.504]
@@ -243,7 +246,20 @@ class Lab(Node):
                 "angle_error_deg":round(orientation_error_deg,6),
                 "matches_ik_target":err_mm<3 and orientation_error_deg<1.5}
 
-    def pilz_plan(self,start,goal):
+    def pilz_plan(self,start,goal,*,start_target,goal_target):
+        # Pilz requires every starting joint to lie *strictly* inside the URDF
+        # bounds. Numerical IK at -pi/2 can be 2.7e-8rad outside Nero's
+        # joint7 lower limit -1.5707963rad. Never modify the URDF or actual robot.
+        limits=load_urdf_joint_limits(OFFLINE_URDF,JOINTS)
+        start_fix=inset_at_limit(start,JOINTS,limits)
+        goal_fix=inset_at_limit(goal,JOINTS,limits)
+        start=list(start_fix['corrected_q'])
+        goal=list(goal_fix['corrected_q'])
+        start_fk=self.verify_fk(start_target,start)
+        goal_fk=self.verify_fk(goal_target,goal)
+        for tag,rec in [('start',start_fk),('goal',goal_fk)]:
+            if rec['position_error_mm']>=0.25 or rec['angle_error_deg']>=0.05:
+                raise RuntimeError(f'BOUND_CORRECTION_ALTERED_{tag.upper()}_TCP: {rec}')
         req=GetMotionPlan.Request();p=req.motion_plan_request
         p.group_name="arm";p.pipeline_id="pilz_industrial_motion_planner";p.planner_id="PTP"
         p.allowed_planning_time=6.;p.num_planning_attempts=1
@@ -262,7 +278,13 @@ class Lab(Node):
         response=self.call(self.plan,req,timeout=25).motion_plan_response
         points=response.trajectory.joint_trajectory.points
         out={"error_code":int(response.error_code.val),"plan_success":False,
-             "waypoint_count":len(points),"invalid_waypoints":[]}
+             "waypoint_count":len(points),"invalid_waypoints":[],
+             "joint_limit_fix":{
+                "source":"vendor URDF; offline-only numeric inset, no modification of URDF",
+                "start":start_fix,'goal':goal_fix,
+                "tcp_start_fk_after_adjustment":start_fk,
+                "tcp_goal_fk_after_adjustment":goal_fk,
+                "physical_motion_allowed":False}}
         if response.error_code.val==1 and points:
             for i,x in enumerate(points):
                 v=self.state_check(list(x.positions))
@@ -358,6 +380,7 @@ def main():
         "CAN_TX_before":before,
         "results":[],
         "optional_plans":[],
+        "optional_plans_conservative_tool":[],
         "scene_applied":False,
         "scene_cleanup_completed":False,
         "published_active_TF":False,
@@ -481,11 +504,33 @@ def main():
             lab.assert_tool(4)
             q1=[math.radians(v) for v in a1["IK_solution_joint_deg"]]
             q2=[math.radians(v) for v in b1["IK_solution_joint_deg"]]
-            result=lab.pilz_plan(q1,q2)
+            target_a=next(x for x in candidates["candidates"]
+                          if x["view_id"]==a1["view_id"] and x["mount_signed_azimuth_assumption_deg"]==signed)
+            target_b=next(x for x in candidates["candidates"]
+                          if x["view_id"]==b1["view_id"] and x["mount_signed_azimuth_assumption_deg"]==signed)
+            result=lab.pilz_plan(q1,q2,start_target=target_a,goal_target=target_b)
             result.update({"from":a1["view_id"],"to":b1["view_id"],"azimuth_deg":signed,
                            "physical_execution_allowed":False})
             report["optional_plans"].append(result)
-            print("IK_TO_IK_PILZ",signed,result,flush=True)
+            print("IK_TO_IK_PILZ",signed,
+                  {"code":result["error_code"],"success":result["plan_success"],
+                   "waypoints":result["waypoint_count"],"invalid":len(result["invalid_waypoints"])},flush=True)
+            lab.clear_tool()
+            lab.assert_tool(None)
+            # Strict second run against the previous conservative cylinder:
+            # endpoint tests alone are not a clearance assessment of motion.
+            lab.set_scene(tool=tool_object(geometry,profile,signed,"CONSERVATIVE"))
+            lab.assert_tool(1)
+            result_conservative=lab.pilz_plan(q1,q2,start_target=target_a,goal_target=target_b)
+            result_conservative.update({"from":a1["view_id"],"to":b1["view_id"],
+                "azimuth_deg":signed,"collision_model":"CONSERVATIVE_YAW_INVARIANT_CYLINDER",
+                "physical_execution_allowed":False})
+            report["optional_plans_conservative_tool"].append(result_conservative)
+            print("IK_TO_IK_PILZ_CONSERVATIVE",signed,
+                  {"code":result_conservative["error_code"],
+                   "success":result_conservative["plan_success"],
+                   "waypoints":result_conservative["waypoint_count"],
+                   "invalid":len(result_conservative["invalid_waypoints"])},flush=True)
             lab.clear_tool()
             lab.assert_tool(None)
         # Explicitly remove isolated planning objects.
