@@ -7,6 +7,7 @@ import math
 from .archive import Archive, digest, _name
 from .models import Context, Evidence, GateError, State
 from .workflow import CHECKS, Workflow
+from .profiles import valid_quaternion
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,7 @@ class View:
     view_id: str
     target: tuple[float, float, float]  # ECU-relative, not joints
     require_raw: bool = False
+    orientation_xyzw: tuple[float, float, float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,8 @@ class PhotographySession:
                 _name(v.view_id)
                 if len(v.target) != 3 or any(not isinstance(n, (int, float)) or isinstance(n, bool) or not math.isfinite(n) for n in v.target):
                     raise ValueError('invalid ECU-relative target')
+                if v.orientation_xyzw is not None and not valid_quaternion(v.orientation_xyzw):
+                    raise ValueError('invalid ECU-relative orientation')
                 if v.require_raw and 'raw' not in workflow.profiles['capture'].capabilities:
                     raise ValueError('capture profile lacks raw capability')
             if archive.path.name != workflow.context.session_id:
@@ -141,6 +145,7 @@ class PhotographySession:
                 self.archive.write(name, original.data)
                 files.append({'name': name, 'kind': original.kind, 'sha256': original.sha256, 'source_id': original.source_id})
             record = {'view_id': result.identity.view_id, 'target': self.views[len(self.records)].target,
+                      'orientation_xyzw': self.views[len(self.records)].orientation_xyzw,
                       'motion_reference': self.motion.reference, 'motion_timestamp': self.motion.identity.timestamp,
                       'state_timestamp': self.motion.state_timestamp, 'measured_state': self.motion.measured_state,
                       'capture_reference': result.reference, 'capture_timestamp': result.identity.timestamp, 'files': files}
