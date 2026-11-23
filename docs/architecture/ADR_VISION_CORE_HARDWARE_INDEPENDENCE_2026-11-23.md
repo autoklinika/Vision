@@ -22,6 +22,7 @@ Zmiana aparatu, obiektywu, sensora RGB-D, robota albo mocowania **nie może wymu
 4. **Interfejsy i profile oddzielają kod od sprzętu:** wymiana urządzenia zmienia adapter/driver i odpowiedni profil, a nie kod scenariusza. Adaptery powinny być cienkie; nie wprowadzamy konkurencyjnego, ogólnego Camera Service ani Perception Engine.
 5. **Stała geometria stanowiska jest wersjonowana i zamrożona po odbiorze.** Obiekt ECU pozostaje dynamiczny: aktualne położenie, obrót, obwiednia, wysokości i punkty inspekcyjne pochodzą z bieżącej obserwacji Luxonis lub zamiennego sensora.
 6. **Plan jest związany z kontekstem.** Zmiana obiektu, sceny, kalibracji, narzędzia, robota albo nieaktualne dane unieważniają możliwość wykonania wcześniej wyliczonej trajektorii. Brak danych oznacza NOT_READY (fail-closed).
+7. **Obowiązkowa bramka zakończenia etapu.** Vision Core nie rozpoczyna etapu zależnego, dopóki nie zweryfikuje, że wszystkie obowiązkowe warunki poprzedzających go etapów zostały spełnione. Samo przyjęcie polecenia przez usługę nie jest potwierdzeniem ukończenia.
 
 ## Kontrakty logiczne
 
@@ -76,6 +77,20 @@ Każda sesja/obserwacja/plan musi znać co najmniej: session_id, station_profile
 
 Przed wykonaniem Core potwierdza, że bieżący kontekst jest zgodny z kontekstem planowania. Przesunięcie ECU, zmiana sensora, nowy obiektyw, inny robot lub utrata ważności obserwacji wymagają nowego planu i kontroli kolizji. Nie wznawiamy automatycznie wcześniejszego ruchu.
 
+## Nadzór Workflow: obowiązkowe bramki etapów
+
+**Reguła nadrzędna: żaden etap scenariusza nie może rozpocząć się przed otrzymaniem i zweryfikowaniem przez Core potwierdzenia wykonania wszystkich wymaganych warunków jego poprzedników.** Core deleguje zadania do właściwych adapterów/akcji ROS 2, ale pozostaje właścicielem stanu sesji i decyzji o przejściu do następnego etapu.
+
+1. **Jawna maszyna stanów.** Każda instancja etapu ma identyfikator i stan co najmniej: PENDING, READY, RUNNING, SUCCEEDED, FAILED, CANCELLED, BLOCKED lub TIMED_OUT. Przejście do SUCCEEDED wymaga wyników potwierdzonych przez określone dla etapu kryteria akceptacji.
+2. **Odróżnienie ACK od wyniku.** Przyjęcie żądania, uruchomienie akcji albo odebranie feedbacku ROS 2 nie oznacza sukcesu. Przykładowo ruch wymaga terminalnego SUCCEEDED oraz sprawdzenia rzeczywistego stanu robota; zdjęcie wymaga potwierdzenia zapisu i integralności pliku, a lokalizacja ECU — aktualnej obserwacji z wymaganą jakością.
+3. **Kontrakt potwierdzenia.** Wynik musi być powiązany z session_id, step_id, request_id/correlation_id, czasem wykonania, wersjami aktywnych profili i sceny oraz wymaganymi danymi dowodowymi. Wyniki przeterminowane lub odnoszące się do innego kontekstu nie otwierają bramki.
+4. **Tylko spełnione zależności.** Core uruchamia następny krok wyłącznie wtedy, gdy wszystkie jego wymagane zależności mają zweryfikowany status SUCCEEDED. Dopuszczamy niezależne etapy równoległe tylko przy jawnie zdefiniowanym grafie zależności; następny etap nie może ominąć żadnej obowiązkowej bramki.
+5. **Błędy, timeout i anulowanie.** FAILED, BLOCKED, TIMED_OUT, CANCELLED, brak wymaganych wyników lub zmiana konfiguracji zatrzymują automatyczne przejście. Core rejestruje przyczynę, anuluje dalszą dyspozycję zadań i stosuje właściwą dla stanu procedurę HOLD/odzyskiwania. Nie zakłada, że zawsze wolno automatycznie wykonać PARK po błędzie.
+6. **Powtórzenia i wznowienie.** Retry jest jawnie dozwolony tylko dla etapów, których skutki można bezpiecznie rozpoznać i skontrolować. Nie ponawiamy automatycznie poleceń ruchu ani migawki po niejednoznacznym timeout. Po restarcie Core odtwarza dziennik sesji, uzgadnia stan faktyczny usług i sprzętu oraz wymaga nowej walidacji przed wznowieniem.
+7. **Dziennik audytowy.** Każda dyspozycja, odpowiedź, przejście stanu i odmowa przejścia trafiają do trwałego dziennika sesji. Core zapisuje *dlaczego* krok został uznany za zakończony i który wynik pozwolił otworzyć następną bramkę.
+
+Bramka Workflow jest kontrolą **aplikacyjną**; nie zastępuje nadzoru trajektorii w MoveIt 2/sterowniku robota ani przyjętej na stanowisku procedury HOLD.
+
 ## Zakres Vision Core 0.1
 
 Pierwszy Workflow: **deklaracja ECU → obserwacja → dynamiczna scena → plan → kontrola gotowości → wykonanie pod nadzorem → wynik → PARK**. Integracja rzeczywistego wyzwalania i transferu zdjęć Sony jest niezależnym kolejnym etapem. Nie blokujemy budowy Core na oczekiwanie na pełną automatyzację aparatu.
@@ -89,6 +104,10 @@ Pierwszy Workflow: **deklaracja ECU → obserwacja → dynamiczna scena → plan
 5. Nowy RobotProfile nie zmienia specyfikacji inspekcji ECU, ale wymaga walidacji ograniczeń i wykonania.
 6. Brak depth, CameraInfo, TF albo zbyt stary timestamp daje NOT_READY — bez ruchu.
 7. Testy offline nie wysyłają CAN; ruch rzeczywisty wymaga aktualnych enkoderów i nadzoru operatora.
+8. ACK przyjęcia zadania bez terminalnego sukcesu albo bez kompletu wymaganych wyników nie odblokowuje kolejnego etapu.
+9. FAILED, TIMED_OUT, CANCELLED, wynik niezgodny z session_id/scene_revision i zmiana konfiguracji blokują dalszy Workflow; nie ma automatycznego wznowienia ruchu.
+10. Po restarcie Core nie powtarza bezwarunkowo ostatniej akcji; odczytuje dziennik i rzeczywiste stany usług, a następnie ponownie sprawdza warunki wejścia.
+
 
 ## Konsekwencje i ograniczenia
 
