@@ -146,6 +146,19 @@ class PhotographyTests(unittest.TestCase):
         self.assertEqual(before, sum(e.kind == 'dispatch' for e in f.journal.replay('session')))
         self.assertEqual(list(f.archive.path.iterdir()), [])
 
+    def test_view_orientation_record_and_legacy_constructor(self):
+        legacy = View('legacy', (1, 2, 3), False)
+        self.assertIsNone(legacy.orientation_xyzw)
+        oriented = replace(self.views[0], orientation_xyzw=(0, 0, 0, 1))
+        self.photo = PhotographySession(self.engine, self.archive, (oriented, self.views[1]))
+        self.photo.accept_motion(self.motion())
+        self.photo.accept_capture(self.capture())
+        self.assertEqual(self.photo.records[0]['orientation_xyzw'], (0, 0, 0, 1))
+
+    def test_invalid_view_orientation_rejected(self):
+        with self.assertRaises(GateError):
+            PhotographySession(self.engine, self.archive, (replace(self.views[0], orientation_xyzw=(0, 0, 0, 2)),))
+
     def test_ack_only_blocks(self):
         self.photo.accept_motion(self.motion())
         with self.assertRaises(GateError): self.photo.accept_capture(replace(self.capture(), transfer_complete=False))

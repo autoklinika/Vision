@@ -33,22 +33,37 @@ class ECUProfile(Profile):
     pcb_regions: tuple[tuple[float, float, float, float], ...] = ()
     view_targets: tuple[tuple[float, float, float], ...] = ()
     tolerances: tuple[float, ...] = ()
+    view_quaternions_xyzw: tuple[tuple[float, float, float, float], ...] = ()
 
     def __post_init__(self):
         super().__post_init__()
-        for name in ('nominal_dimensions', 'pcb_regions', 'view_targets', 'tolerances'):
+        for name in ('nominal_dimensions', 'pcb_regions', 'view_targets', 'tolerances', 'view_quaternions_xyzw'):
             value = getattr(self, name)
             object.__setattr__(self, name, tuple(tuple(x) if isinstance(x, (list, tuple)) else x for x in value))
 
 
+def valid_quaternion(q):
+    try:
+        return (len(q) == 4 and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                and math.isfinite(v) for v in q)
+                and abs(math.hypot(*q) - 1.0) <= 1e-5)
+    except (TypeError, OverflowError):
+        return False
+
+
 def _valid_ecu(p):
     def numbers(values, length, positive=False):
-        return len(values) == length and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and (not positive or v > 0) for v in values)
+        try:
+            return len(values) == length and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and (not positive or v > 0) for v in values)
+        except (TypeError, OverflowError):
+            return False
     return (isinstance(p, ECUProfile) and bool(p.declared_type and p.variant)
             and numbers(p.nominal_dimensions, 2, True) and numbers((p.max_height,), 1, True)
             and bool(p.pcb_regions) and all(numbers(r, 4) and r[2] > 0 and r[3] > 0 for r in p.pcb_regions)
             and bool(p.view_targets) and all(numbers(t, 3) for t in p.view_targets)
-            and bool(p.tolerances) and numbers(p.tolerances, len(p.tolerances), True))
+            and bool(p.tolerances) and numbers(p.tolerances, len(p.tolerances), True)
+            and (not p.view_quaternions_xyzw or (len(p.view_quaternions_xyzw) == len(p.view_targets)
+                 and all(valid_quaternion(q) for q in p.view_quaternions_xyzw))))
 
 
 def validate_profiles(profiles: Mapping[str, Profile], available_calibrations: Mapping[str, str], requirements: Mapping[str, frozenset[str]]) -> list[str]:
