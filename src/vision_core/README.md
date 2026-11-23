@@ -22,3 +22,9 @@ No camera, robot, ROS 2 installation, private ECU images or physical station geo
 ## Scope and limitations
 
 The `Evidence.checks` set is a **claim made by a future trusted integration adapter**. Core verifies correlation, context, declared checks, freshness and workflow order; it does not itself measure focus, verify physical robot state, hash files, perform perception, activate HOLD, authorize recovery PARK or drive equipment. Numeric tolerances, capture controls, exact ROS 2 bindings and external-state reconciliation belong to later packages. SQLite files and artifact references must be stored privately with appropriate permissions. Do not treat successful offline tests as approval for unsupervised physical motion.
+
+Plan-bound spatial coverage requires canonical per-view capture bindings derived from the
+verified original file hashes, source identifiers and capture references. These bind a
+coverage claim to acquired originals but do not independently authenticate the adapter or
+prove that its measured footprints correspond to those images. Legacy unbound 0.2
+photography remains supported and relies on the trusted coverage provider's view IDs.

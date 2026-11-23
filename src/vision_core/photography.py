@@ -4,6 +4,8 @@ No methods in this module issue hardware requests. Adapter results are inputs.
 """
 from dataclasses import dataclass
 import math
+import hashlib
+import json
 from .archive import Archive, digest, _name
 from .models import Context, Evidence, GateError, State
 from .workflow import CHECKS, Workflow
@@ -53,6 +55,12 @@ class CaptureResult:
     reference: str
 
 
+@dataclass(frozen=True, order=True)
+class CaptureBinding:
+    view_id: str
+    sha256: str
+
+
 @dataclass(frozen=True)
 class CoverageProof:
     context: Context
@@ -61,14 +69,28 @@ class CoverageProof:
     timestamp: float
     verified: bool
     reference: str
+    plan_hash: str | None = None
+    capture_bindings: tuple[CaptureBinding, ...] = ()
 
 
 class PhotographySession:
-    def __init__(self, workflow: Workflow, archive: Archive, views: tuple[View, ...]):
+    def __init__(self, workflow: Workflow, archive: Archive, views: tuple[View, ...], plan=None):
         self.workflow, self.archive, self.views = workflow, archive, tuple(views)
         if workflow.states['S07'] != State.RUNNING or workflow.states['S06'] != State.SUCCEEDED:
             raise GateError('S07 must be running after verified S06')
         try:
+            errors = workflow._context_errors(workflow.context)
+            if errors:
+                raise ValueError('; '.join(errors))
+            if workflow._repeatable() or workflow.accepted_plan_hash:
+                from .repeatability import InspectionPlan, photography_views
+                motion_results = [e for e in workflow.journal.replay(workflow.context.session_id) if e.kind == 'result_accepted' and e.step_id == 'S06' and e.request_id == workflow.requests.get('S06')]
+                if len(motion_results) != 1 or motion_results[0].data['evidence'].get('plan_hash') != workflow.accepted_plan_hash:
+                    raise ValueError('motion plan binding missing')
+                if not isinstance(plan, InspectionPlan) or plan.digest != workflow.accepted_plan_hash:
+                    raise ValueError('accepted inspection plan required')
+                if self.views != photography_views(plan, workflow.context, workflow.profiles, workflow.calibrations, workflow.requirements, workflow.clock(), workflow.max_age):
+                    raise ValueError('views do not match accepted plan')
             if not views or len({v.view_id for v in views}) != len(views):
                 raise ValueError('empty or duplicate views')
             for v in views:
@@ -97,12 +119,16 @@ class PhotographySession:
         w = self.workflow
         if w.states['S07'] != State.RUNNING or w.snapshots.get('S07') != w.context:
             raise ValueError('S07 is not running with its dispatched context')
+        errors = w._context_errors(w.context)
+        if errors:
+            raise ValueError('; '.join(errors))
         if len(self.records) >= len(self.views):
             raise ValueError('duplicate or late view')
         if (identity.context != w.context or identity.request_id != w.requests['S07']
                 or identity.view_id != self.views[len(self.records)].view_id
                 or not isinstance(identity.timestamp, (int, float)) or not math.isfinite(identity.timestamp)
                 or not 0 <= w.clock() - identity.timestamp <= w.max_age
+                or w.dispatch_times.get('S07') is None or identity.timestamp < w.dispatch_times['S07']
                 or identity.timestamp < w.context.observation_timestamp):
             raise ValueError('mismatched or stale result identity')
 
@@ -133,6 +159,9 @@ class PhotographySession:
             files = []
             sources, hashes = set(self.sources), set(self.hashes)
             for original in result.originals:
+                if not isinstance(original.data, bytes) or len(original.data) > self.archive.max_bytes:
+                    raise ValueError('capture original exceeds limit')
+            for original in result.originals:
                 if ((original.kind == 'jpeg' and not original.data.startswith(b'\xff\xd8\xff'))
                         or (original.kind == 'png' and not original.data.startswith(b'\x89PNG\r\n\x1a\n'))
                         or not original.source_id or original.source_id in sources or not original.data
@@ -156,22 +185,37 @@ class PhotographySession:
         except (ValueError, TypeError, AttributeError, OSError) as exc:
             self._fail(str(exc))
 
+    def capture_bindings(self):
+        if len(self.records) != len(self.views):
+            raise GateError('captures incomplete')
+        bindings = []
+        for record in self.records:
+            document = {'view_id': record['view_id'], 'capture_reference': record['capture_reference'],
+                        'originals': sorted(({k: f[k] for k in ('kind', 'source_id', 'sha256')} for f in record['files']), key=lambda f: f['kind'])}
+            encoded = json.dumps(document, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False).encode('ascii')
+            bindings.append(CaptureBinding(record['view_id'], hashlib.sha256(encoded).hexdigest()))
+        return tuple(sorted(bindings))
+
     def complete_capture(self):
         if self.workflow.states['S07'] != State.RUNNING or self.workflow.snapshots.get('S07') != self.workflow.context:
             raise GateError('S07 is not running with its dispatched context')
+        errors = self.workflow._context_errors(self.workflow.context)
+        if errors:
+            self._fail('; '.join(errors))
         if len(self.records) != len(self.views) or self.motion is not None:
             self._fail('not all views transferred')
         try:
             for record in self.records:
                 for file in record['files']:
                     self.archive.verify(file['name'], file['sha256'])
+            self.workflow._record('S07', 'capture_complete_verified', {'plan_hash': self.workflow.accepted_plan_hash, 'view_ids': [r['view_id'] for r in self.records]})
             self._complete('S07', 'verified originals and motion journal')
         except (ValueError, OSError) as exc:
             self._fail(str(exc))
 
     def _complete(self, step: str, reference: str):
         w = self.workflow
-        w.complete(Evidence(w.context.session_id, step, w.requests[step], w.context, w.clock(), True, True, frozenset(CHECKS[step]), reference))
+        w.complete(Evidence(w.context.session_id, step, w.requests[step], w.context, w.clock(), True, True, frozenset(CHECKS[step]), reference, w.accepted_plan_hash))
 
     def assess(self, policy, proof: CoverageProof):
         from .quality import evaluate
@@ -179,11 +223,21 @@ class PhotographySession:
         try:
             if w.states['S08'] != State.RUNNING:
                 raise ValueError('S08 must be running')
-            if (proof.context != w.context or proof.request_id != w.requests['S08'] or proof.verified is not True
+            errors = w._context_errors(w.context)
+            if errors:
+                raise ValueError('; '.join(errors))
+            captures = [e.data for e in w.journal.replay(w.context.session_id) if e.kind == 'capture_verified' and e.request_id == w.requests['S07']]
+            import json
+            if captures != json.loads(json.dumps(self.records)) or len(captures) != len(self.views):
+                raise ValueError('coverage does not match recorded captures')
+            if (proof.plan_hash != w.accepted_plan_hash or proof.context != w.context or proof.request_id != w.requests['S08'] or proof.verified is not True
                     or proof.view_ids != frozenset(v.view_id for v in self.views) or not proof.reference
                     or not math.isfinite(proof.timestamp) or not 0 <= w.clock() - proof.timestamp <= w.max_age
+                    or w.dispatch_times.get('S08') is None or proof.timestamp < w.dispatch_times['S08']
                     or proof.timestamp < w.context.observation_timestamp):
                 raise ValueError('independent spatial coverage proof missing or invalid')
+            if w.accepted_plan_hash and proof.capture_bindings != self.capture_bindings():
+                raise ValueError('coverage capture bindings mismatch')
             for record in self.records:
                 for f in record['files']:
                     self.archive.verify(f['name'], f['sha256'])
@@ -193,8 +247,8 @@ class PhotographySession:
                 derived_name = record['view_id'] + '.derived.' + image['kind']
                 derived_hash = self.archive.write(derived_name, data)
                 record['derived'] = {'name': derived_name, 'sha256': derived_hash}
-            w._record('S08', 'quality_verified', {'views': self.records, 'coverage_reference': proof.reference, 'coverage_timestamp': proof.timestamp})
-            self.coverage = {'reference': proof.reference, 'timestamp': proof.timestamp, 'view_ids': sorted(proof.view_ids)}
+            w._record('S08', 'quality_verified', {'views': self.records, 'coverage_reference': proof.reference, 'coverage_timestamp': proof.timestamp, 'plan_hash': w.accepted_plan_hash})
+            self.coverage = {'reference': proof.reference, 'timestamp': proof.timestamp, 'view_ids': sorted(proof.view_ids), 'capture_bindings': [vars(b) for b in self.capture_bindings()]}
             self._complete('S08', proof.reference)
         except (ValueError, TypeError, AttributeError, OSError, StopIteration) as exc:
             if w.states['S08'] == State.RUNNING:

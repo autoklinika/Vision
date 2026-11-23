@@ -10,9 +10,15 @@ import math
 from typing import Mapping
 
 from .models import Context, Evidence, GateError, State
-from .photography import CoverageProof, View
+from .photography import CaptureBinding, CoverageProof, View
 from .profiles import PROFILE_KINDS, ECUProfile, valid_quaternion, validate_profiles
 from .workflow import CHECKS
+
+MAX_VIEWS = 128
+MAX_FOOTPRINTS = 128
+MAX_PCB_REGIONS = 128
+MAX_GRID_CELLS = 100_000
+MAX_COORDINATE_MM = 1_000_000.0
 
 
 def _json(value):
@@ -38,7 +44,9 @@ def _rect(rect):
     if not isinstance(rect, (tuple, list)) or len(rect) != 4 or not all(_number(x) for x in rect) or rect[2] <= 0 or rect[3] <= 0:
         raise GateError('invalid rectangle (x, y, width, height)')
     x, y, w, h = map(float, rect)
-    if not all(math.isfinite(v) for v in (x + w, y + h, w * h)):
+    if (not all(math.isfinite(v) for v in (x + w, y + h, w * h))
+            or max(abs(x), abs(y), abs(x + w), abs(y + h)) > MAX_COORDINATE_MM
+            or x + w <= x or y + h <= y or w * h <= 0):
         raise GateError('rectangle overflow')
     return (x, y, x + w, y + h)
 
@@ -89,6 +97,11 @@ def create_plan(context: Context, profiles: Mapping, calibrations: Mapping, requ
                 observation: ObservedECU, now: float, max_age: float, *, min_coverage: float,
                 require_raw: bool) -> InspectionPlan:
     ecu = profiles.get('ecu')
+    if isinstance(ecu, ECUProfile) and (not isinstance(ecu.view_targets, (tuple, list))
+            or not isinstance(ecu.view_quaternions_xyzw, (tuple, list))
+            or not isinstance(ecu.pcb_regions, (tuple, list))
+            or len(ecu.view_targets) > MAX_VIEWS or len(ecu.pcb_regions) > MAX_PCB_REGIONS):
+        raise GateError('plan geometry exceeds limits')
     if isinstance(ecu, ECUProfile) and (not ecu.view_quaternions_xyzw
             or len(ecu.view_quaternions_xyzw) != len(ecu.view_targets)
             or not all(valid_quaternion(q) for q in ecu.view_quaternions_xyzw)):
@@ -156,7 +169,7 @@ def complete_s05(workflow, plan: InspectionPlan):
     if workflow.states['S05'] != State.RUNNING:
         raise GateError('S05 is not running')
     workflow.complete(Evidence(workflow.context.session_id, 'S05', workflow.requests['S05'], workflow.context,
-                               workflow.clock(), True, True, frozenset(CHECKS['S05']), 'inspection-plan:sha256:' + plan.digest))
+                               workflow.clock(), True, True, frozenset(CHECKS['S05']), 'inspection-plan:sha256:' + plan.digest, plan.digest), _verified_plan=plan)
 
 
 @dataclass(frozen=True)
@@ -178,13 +191,19 @@ class SpatialCoverageEvidence:
     frame_id: str
     provenance_reference: str
     verified: bool
+    capture_bindings: tuple[CaptureBinding, ...] = ()
 
 
 def _areas(regions, footprints):
+    if (not isinstance(regions, (tuple, list)) or not isinstance(footprints, (tuple, list))
+            or len(regions) > MAX_PCB_REGIONS or len(footprints) > MAX_FOOTPRINTS):
+        raise GateError('coverage geometry exceeds limits')
     # Coordinate compression computes the union of required regions and its
     # intersection with measured footprints, even when either set overlaps.
     xs = sorted({v for r in regions + footprints for v in (r[0], r[2])})
     ys = sorted({v for r in regions + footprints for v in (r[1], r[3])})
+    if (len(xs) - 1) * (len(ys) - 1) > MAX_GRID_CELLS:
+        raise GateError('coverage grid exceeds limit')
     total = covered = 0.0
     for x1, x2 in zip(xs, xs[1:]):
         for y1, y2 in zip(ys, ys[1:]):
@@ -201,6 +220,10 @@ def _areas(regions, footprints):
 
 def coverage_proof(plan: InspectionPlan, evidence: SpatialCoverageEvidence, request_id: str,
                    context, profiles, calibrations, requirements, now, max_age):
+    if (not isinstance(evidence.footprints, (tuple, list))
+            or len(evidence.footprints) > MAX_FOOTPRINTS
+            or any(not isinstance(f, SpatialFootprint) for f in evidence.footprints)):
+        raise GateError('invalid or excessive footprints')
     verify_plan(plan, context, profiles, calibrations, requirements, now, max_age)
     ids = frozenset(t.view_id for t in plan.targets)
     if (not request_id or evidence.session_id != context.session_id or evidence.plan_hash != plan.digest
@@ -208,6 +231,10 @@ def coverage_proof(plan: InspectionPlan, evidence: SpatialCoverageEvidence, requ
             or evidence.frame_id != 'ecu_local' or not evidence.provenance_reference or evidence.verified is not True
             or not _fresh(evidence.timestamp, now, max_age) or evidence.timestamp < plan.observation.timestamp
             or evidence.captured_view_ids != ids or not evidence.footprints
+            or not isinstance(evidence.capture_bindings, tuple)
+            or any(not isinstance(b, CaptureBinding) or not isinstance(b.sha256, str) or len(b.sha256) != 64 or any(c not in '0123456789abcdef' for c in b.sha256) for b in evidence.capture_bindings)
+            or len(evidence.capture_bindings) != len(ids) or {b.view_id for b in evidence.capture_bindings} != ids
+            or tuple(sorted(evidence.capture_bindings)) != evidence.capture_bindings
             or any(f.verified is not True or f.view_id not in ids for f in evidence.footprints)
             or {f.view_id for f in evidence.footprints} != ids):
         raise GateError('NOT_READY: invalid measured spatial evidence')
@@ -216,14 +243,15 @@ def coverage_proof(plan: InspectionPlan, evidence: SpatialCoverageEvidence, requ
     if fraction < plan.min_coverage:
         raise GateError('NOT_READY: insufficient measured coverage')
     return CoverageProof(context, request_id, ids, evidence.timestamp, True,
-                         evidence.provenance_reference + ':sha256:' + _hash(_coverage_document(evidence))), fraction
+                         evidence.provenance_reference + ':sha256:' + _hash(_coverage_document(evidence)), plan.digest, evidence.capture_bindings), fraction
 
 
 def _coverage_document(e):
     return {'session_id': e.session_id, 'plan_hash': e.plan_hash, 'scene_revision': e.scene_revision,
             'profile_revisions': dict(e.profile_revisions), 'timestamp': e.timestamp,
             'captured_view_ids': sorted(e.captured_view_ids), 'footprints': [asdict(f) for f in e.footprints],
-            'frame_id': e.frame_id, 'provenance_reference': e.provenance_reference, 'verified': e.verified}
+            'frame_id': e.frame_id, 'provenance_reference': e.provenance_reference, 'verified': e.verified,
+            'capture_bindings': [asdict(b) for b in e.capture_bindings]}
 
 
 class RetryLedger:

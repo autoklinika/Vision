@@ -19,7 +19,12 @@ def _name(value: str) -> str:
 
 
 class Archive:
-    def __init__(self, root: str, session_id: str):
+    def __init__(self, root: str, session_id: str, max_bytes: int = 128 * 1024 * 1024,
+                 max_manifest_bytes: int = 16 * 1024 * 1024):
+        if any(type(v) is not int or v < 1 for v in (max_bytes, max_manifest_bytes)):
+            raise ValueError('invalid archive limits')
+        self.max_bytes = max_bytes
+        self.max_manifest_bytes = max_manifest_bytes
         # Open every existing component without following symlinks.
         path = Path(root).absolute()
         fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
@@ -47,16 +52,24 @@ class Archive:
             raise ValueError('invalid archive entry')
         fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=self.fd)
         try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode) or os.fstat(fd).st_mode & 0o222:
+            info = os.fstat(fd)
+            limit = min(self.max_bytes, self.max_manifest_bytes) if name == 'manifest-v1.json' else self.max_bytes
+            if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o222 or info.st_size > limit:
                 raise ValueError('archive entry is not a regular file')
             with os.fdopen(fd, 'rb', closefd=False) as f:
-                return f.read()
+                data = f.read(limit + 1)
+                if len(data) > limit:
+                    raise ValueError('archive entry exceeds limit')
+                return data
         finally:
             os.close(fd)
 
     def write(self, name: str, data: bytes) -> str:
         if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,180}', name) or '..' in name or not data:
             raise ValueError('invalid archive entry')
+        limit = min(self.max_bytes, self.max_manifest_bytes) if name == 'manifest-v1.json' else self.max_bytes
+        if not isinstance(data, bytes) or len(data) > limit:
+            raise ValueError('archive entry exceeds limit')
         temp = '.tmp-' + uuid.uuid4().hex
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=self.fd)
         try:

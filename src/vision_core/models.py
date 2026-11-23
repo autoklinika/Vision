@@ -44,6 +44,7 @@ class Evidence:
     terminal_success: bool
     checks: frozenset[str]
     reference: str
+    plan_hash: str | None = None
 
 
 @dataclass(frozen=True)
