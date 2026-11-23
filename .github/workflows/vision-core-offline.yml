@@ -10,5 +10,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: PYTHONPATH=src python -m unittest discover -s tests/core -v
+      # Foundation has no image dependencies. Full integration tests, including
+      # OpenCV, run in the Photography and Repeatability workflows.
+      - name: Foundation-only tests, no OpenCV required
+        run: |
+          PYTHONPATH=src python -m unittest discover -s tests/core -p test_workflow.py -v
+          PYTHONPATH=src python -m unittest discover -s tests/core -p test_audit_hardening.py -v
+          PYTHONPATH=src python -m unittest discover -s tests/core -p test_uncertain_transaction.py -v
       - run: python -m compileall -q src/vision_core tests/core

@@ -1,3 +1,4 @@
+from vision_core.photography import CaptureBinding
 import json
 import math
 import os
@@ -28,7 +29,7 @@ class RepeatabilityTests(unittest.TestCase):
         plan = plan or self.plan
         return SpatialCoverageEvidence('session', plan.digest, 'scene1', self.c.profile_revisions, NOW,
             frozenset(t.view_id for t in plan.targets), tuple(SpatialFootprint(t.view_id, (0, 0, 10, 20), True) for t in plan.targets),
-            'ecu_local', 'synthetic-measurement', True)
+            'ecu_local', 'synthetic-measurement', True, tuple(CaptureBinding(t.view_id, 'a' * 64) for t in plan.targets))
 
     def proof(self, e, plan=None):
         return coverage_proof(plan or self.plan, e, 's08', *self.args)
