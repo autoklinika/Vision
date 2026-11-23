@@ -1,5 +1,9 @@
 # Vision — stanowisko inspekcji PCB / ECU
 
+> **Aktualny stan zaakceptowany laboratoryjnie, 23.11.2026:** [Vision Guided Positioning V1](docs/baselines/VISION_GUIDED_POSITIONING_V1_2026-11-23.md) — kamera Luxonis wykrywa ETC3/PTM, MoveIt 2 planuje ruch, a AgileX NERO fizycznie wykonuje dojazdy i wraca do PARK. Operator potwierdził centralne pozycjonowanie nad PCB PTM. To **LAB**, nie wydanie produkcyjne; prywatne surowe obrazy, TF i snapshot runtime pozostają poza GitHub. Zobacz także [porządek repozytorium](docs/process/REPOSITORY_HYGIENE_V1.md) i [archiwum PR](docs/operations/OPEN_PR_PORTFOLIO_2026-11-23.md).
+
+> **Uwaga:** kolejne historyczne sekcje README i datowane audyty opisują stan z października i pierwszej połowy listopada 2026. Nie należy interpretować ich jako bieżącego statusu hardware po odbiorze V1.
+
 > **Nowy fundament Vision (ustalenia 14.11.2026, PR dokumentacyjny):** [założenia nowego systemu](docs/architecture/VISION_FOUNDATION_2026-11-14.md) i [archiwum rozmowy architektonicznej](docs/architecture/VISION_ARCHITECTURE_DISCUSSION_2026-11-14.md). Vision budujemy od podstaw, operator deklaruje ECU, a moduły i modele są wymienne. Pierwszy scenariusz dotyczy **ETC3 z dwiema czarnymi i jedną szarą wtyczką**, nie DAF SAC. Szczegóły wykonawcze pozostają do walidacji. Historyczne dokumenty niżej zachowują swoje oryginalne daty i statusy.
 
 Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q** (Ubuntu ARM64), aparacie Sony A6100, kamerze termowizyjnej i ramieniu **AgileX NERO**.
