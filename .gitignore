@@ -48,3 +48,18 @@ Thumbs.db
 
 # Lokalny raport audytu - nie publikujemy identyfikatorów ani topologii hosta
 vision_audit_report*.txt
+
+
+# Prywatne zrzuty Vision/ROS2 oraz binarne próbki RGB-D
+*.npz
+*.npy
+*.cdr
+*.mcap
+*.db3
+*.pcd
+*.ply
+*.tar.gz
+*.tar.zst
+*.7z
+/baselines/
+/snapshots/
