@@ -10,6 +10,10 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 
 **Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
 
+## Obowiązująca architektura Vision Core
+
+- [ADR-VISION-CORE-001 — Hardware Independence & Modular Architecture](docs/architecture/ADR_VISION_CORE_HARDWARE_INDEPENDENCE_2026-11-23.md) — **ACCEPTED (23.11.2026)**: Core jest niezależnym od sprzętu koordynatorem inspekcji. Aparat, obiektyw, RGB-D i robot są wymienne przez interfejsy, adaptery i profile. Nowe urządzenie wymaga odpowiedniej kalibracji i weryfikacji, lecz nie przepisywania scenariuszy ECU.
+
 ## ROS 2 i przenośność stanowiska (16.11.2026)
 
 - [Raport techniczny: ROS 2, NERO, MoveIt, Luxonis, ETC3 i przejście LAB → PROD](docs/architecture/VISION_ROS2_NERO_LAB_TO_PROD_TECHNICAL_REPORT_2026-11-16.md) — szczegółowe ustalenia, wymagania wejściowe, architektura i plan izolowanych testów; **DESIGN REPORT / PROPOSED**, bez wdrożenia na sprzęcie.
