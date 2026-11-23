@@ -73,6 +73,8 @@ Do pakietu audytowego dołączono testy:
 **Po audycie:** 79 testów (łącznie z nowymi przypadkami i testem end-to-end); uruchamiane razem.
 **CI dla pakietu napraw:** wymagany osobny rzeczywisty przebieg GitHub Actions po utworzeniu draft PR; wynik poprzednich PR nie potwierdza automatycznie poprawek.
 
+**Podział CI:** workflow Foundation uruchamia 18 testów niezależnych od OpenCV (14 Foundation + 2 audyt współbieżności + 2 niepewny zapis). Workflow Photography i Repeatability instalują przypięte numpy/OpenCV i każdy uruchamia pełny zestaw 79 testów; dzięki temu Foundation nie wymaga zależności obrazowych. Wszystkie trzy muszą przejść na ostatecznym commicie PR naprawczego.
+
 Komendy walidacyjne: PYTHONPATH=src python3 -m unittest discover -s tests/core -v, python3 -m compileall -q src/vision_core tests/core, git diff --cached --check.
 
 ## 6. Granice rzeczywistej integracji i źródła ryzyka
