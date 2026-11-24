@@ -1,4 +1,6 @@
-# Audyt stanowiska Vision
+# Audyt stanowiska Vision — instrukcja historyczna
+
+> Ten dokument zachowuje pierwotną instrukcję audytu z października. Nie jest aktualną procedurą uruchomieniową. Nie kopiować poniższych ścieżek ani komend bez weryfikacji prywatnego NVMe i aktualnego środowiska; surowe logi wyłącznie w prywatnym, uzgodnionym magazynie. Aktualne raporty i odbiory: [indeks dokumentacji](../README.md#odbiory-i-kalibracja).
 
 Skrypt `scripts/audit/vision_audit_v1.sh` wykonuje **wyłącznie operacje odczytu**. Nie instaluje pakietów, nie wymaga `sudo`, nie uruchamia kamer ani napędów i nie pobiera informacji uwierzytelniających.
 

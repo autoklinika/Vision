@@ -19,3 +19,7 @@ nie zwiększały liczników przez ponowne odkrywanie zaimportowanych TestCase.
 Osobny skrypt `tools/lab/inspection_planner/moveit_smoke.py` sprawdza prawdziwe
 usługi MoveIt na syntetycznej scenie w izolowanej domenie ROS z wyłączonym
 wykonywaniem trajektorii. Nie uruchamia sterownika robota ani aparatu.
+
+## WebGUI — niezależny klient
+
+Testy React/TypeScript, importer Python i Chromium znajdują się w `webgui/tests/`. Polecenia, izolacja i granice testów: [webgui/README.md](../webgui/README.md). Nie wymagają ROS 2, VENTUNO ani realnego API; prywatna animacja ma osobne testy opt-in. CI backendu nie jest dowodem uruchomienia testów GUI.

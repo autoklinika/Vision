@@ -3,8 +3,8 @@
 ## Repozytorium
 
 - Jedno repozytorium projektu: `autoklinika/Vision`; inne projekty pozostają odrębne.
-- `main` jest stanem referencyjnym. Pierwsza inicjalizacja zatwierdzona przez właściciela projektu.
-- Każda następna zmiana na gałęzi `feature/`, `fix/` lub `docs/` i przez PR; merge tylko po jednoznacznym zatwierdzeniu przez właściciela.
+- `main` jest kanoniczną bazą zatwierdzonego kodu i dokumentacji; nie jest gwarancją wdrożenia na stanowisku. [Bieżący indeks dokumentacji](../README.md).
+- Nowa zmiana od aktualnego `origin/main`, na gałęzi `feat/`, `fix/`, `docs/` lub `lab/` zgodnie z [Repository Hygiene V1](REPOSITORY_HYGIENE_V1.md), i przez PR; merge tylko po jednoznacznym zatwierdzeniu przez właściciela. Stare nazwy `feature/` zachowujemy w historii.
 - PR musi opisywać zakres, ryzyka sprzętowe, testy, zgodność z Ubuntu/ARM64 i rollback.
 - Obrazy produkcyjne, dane surowe i duże modele trzymamy poza Git (w przyszłości: dedykowana retencja/archiwizacja).
 
