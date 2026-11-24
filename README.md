@@ -82,3 +82,5 @@ Vision Runtime Stage A coordinator contract: [S01–S04 implementation](docs/imp
 Vision Runtime Stage B read-only adapter: [ROS2 Luxonis adapter](docs/implementation/VISION_RUNTIME_ROS2_LUXONIS_ADAPTER_V1.md).
 
 [Luxonis real ROS2 read-only acceptance — 24 Nov 2026](docs/audits/VISION_RUNTIME_LUXONIS_LIVE_READONLY_ACCEPTANCE_2026-11-24.md) — RGB/Depth/CameraInfo/PointCloud2 and local TF passed; ECU S03/S04 still NOT_READY.
+
+[ETC3 live RGB-D localization — offline laboratory diagnostic, 24 Nov 2026](docs/audits/VISION_ETC3_LIVE_RGBD_LOCALIZATION_2026-11-24.md) — camera-frame location, tabletop plane and visible hull are provisional; absolute station TF and S03/S04 remain blocked.
