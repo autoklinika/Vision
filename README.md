@@ -76,3 +76,7 @@ Historia wcześniejszych testów: [weryfikacja VENTUNO Q](docs/hardware/VENTUNO_
 ECU reference profile V1 usage and release gates: [implementation guide](docs/implementation/VISION_ECU_REFERENCE_PROFILE_V1_IMPLEMENTATION.md).
 
 - [ECU library backend V1](docs/implementation/VISION_ECU_LIBRARY_BACKEND_V1.md) — offline catalog and reference-profile draft editing service.
+
+Vision Runtime Stage A coordinator contract: [S01–S04 implementation](docs/implementation/VISION_RUNTIME_V1_S01_S04.md).
+
+Vision Runtime Stage B read-only adapter: [ROS2 Luxonis adapter](docs/implementation/VISION_RUNTIME_ROS2_LUXONIS_ADAPTER_V1.md).
