@@ -46,9 +46,10 @@ async function readSnapshot(): Promise<Snapshot> {
   if (!globalThis.isSecureContext) return unavailable('secure context required. Use HTTPS or loopback.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), statusTimeoutMs);
+  let response: Response | undefined;
   try {
     const url = new URL(statusPath, location.origin);
-    const response = await fetch(url, {
+    response = await fetch(url, {
       method: 'GET', mode: 'same-origin', credentials: 'omit', cache: 'no-store',
       redirect: 'error', signal: controller.signal, headers: {Accept: 'application/json'},
     });
@@ -65,6 +66,12 @@ async function readSnapshot(): Promise<Snapshot> {
   } catch {
     return unavailable('status request failed or response invalid. System state is UNKNOWN.');
   } finally {
+    // Stop the underlying fetch even when headers or final URL fail validation
+    // before we acquire a reader. Never leave an invalid body downloading.
+    controller.abort();
+    if (response?.body && !response.body.locked && !response.bodyUsed) {
+      void response.body.cancel().catch(() => {});
+    }
     clearTimeout(timer);
   }
 }

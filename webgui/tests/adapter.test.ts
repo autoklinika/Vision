@@ -94,3 +94,63 @@ it('each new read can recover; a failed read cannot retain an old successful rep
   expect((await realAdapter.readSnapshot()).connection).toBe('API_AVAILABLE');
   expect(network).toHaveBeenCalledTimes(3);
 });
+
+it('cancels a rejected response before reading its body', async () => {
+  secure();
+  for (const kind of ['status', 'type', 'length', 'url']) {
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({cancel});
+    const r = new Response(stream, {
+      status: kind === 'status' ? 503 : 200,
+      headers: {
+        'Content-Type': kind === 'type' ? 'text/plain' : 'application/json; charset=utf-8',
+        ...(kind === 'length' ? {'Content-Length':'4097'} : {}),
+      },
+    });
+    Object.defineProperty(r, 'url', {value: kind === 'url' ? 'https://untrusted.test/api/v1/status' : statusUrl});
+    const network = vi.fn((_url: URL, _init: RequestInit) => Promise.resolve(r));
+    vi.stubGlobal('fetch', network);
+    const s = await realAdapter.readSnapshot();
+    expect(s).toMatchObject({connection:'UNAVAILABLE',readiness:'UNKNOWN',reportTime:null});
+    expect(network.mock.calls[0][1].signal?.aborted).toBe(true);
+    expect(cancel, kind).toHaveBeenCalledTimes(1);
+  }
+});
+
+it('rejects an oversized streamed body with no declared content length', async () => {
+  secure();
+  const cancel = vi.fn();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) { controller.enqueue(new Uint8Array(4097)); },
+    cancel,
+  });
+  const r = new Response(stream, {headers:{'Content-Type':'application/json; charset=utf-8'}});
+  Object.defineProperty(r, 'url', {value:statusUrl});
+  const network = vi.fn((_url: URL, _init: RequestInit) => Promise.resolve(r));
+  vi.stubGlobal('fetch', network);
+  expect(await realAdapter.readSnapshot()).toMatchObject({connection:'UNAVAILABLE',reportTime:null});
+  expect(cancel).toHaveBeenCalledTimes(1);
+  expect(network.mock.calls[0][1].signal?.aborted).toBe(true);
+});
+
+it('keeps the timeout active after headers while awaiting the body', async () => {
+  secure();
+  vi.useFakeTimers();
+  const network = vi.fn((_url: URL, init: RequestInit) => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        init.signal!.addEventListener('abort', () => controller.error(new Error('private detail')), {once:true});
+      },
+    });
+    const r = new Response(stream, {headers:{'Content-Type':'application/json; charset=utf-8'}});
+    Object.defineProperty(r, 'url', {value:statusUrl});
+    return Promise.resolve(r);
+  });
+  vi.stubGlobal('fetch', network);
+  const pending = realAdapter.readSnapshot();
+  await vi.advanceTimersByTimeAsync(statusTimeoutMs);
+  const s = await pending;
+  expect(s).toMatchObject({connection:'UNAVAILABLE',readiness:'UNKNOWN',reportTime:null});
+  expect(s.reason).not.toContain('private detail');
+  expect(network.mock.calls[0][1].signal?.aborted).toBe(true);
+});

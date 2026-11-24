@@ -6,7 +6,7 @@
 
 - [Versioned wire contract](../../contracts/vision-api/v1/README.md), JSON Schema and shared synthetic fixtures.
 - `src/vision_api/status.py` defines a closed, non-sensitive API-only boot status.
-- `src/vision_api/server.py` exposes the exact GET route on loopback, with bounded response and socket timeout, explicit Host/Origin checks, no CORS, no redirects, structured generic errors and no file access or commands.
+- `src/vision_api/server.py` exposes the exact GET route on loopback, with bounded response and a socket inactivity timeout (not an aggregate request deadline), explicit Host/Origin checks, no CORS, no redirects, structured generic errors and no file access or commands.
 - `webgui/src/api/realAdapter.ts` issues only the same-origin GET, requires secure context and validates HTTP status, content type, final URL, bounded body, encoding, full closed wire shape and UTC timestamp. Failure produces UNKNOWN/UNAVAILABLE. No writes, auth, cookies, cross-origin fallback or demo substitution.
 - The startup read is independent of the intro; both startup and desktop show API-only last-report status and explicit Refresh. The previous result is discarded during a new read and on failure. There is no claim of a live connection, sensor observation or readiness from a successful API reply.
 - The Vite lab proxy is opt-in via a numeric loopback port and forwards only the exact status route. It is not a reverse proxy deployment plan. Do not expose the lab dev or preview server externally.

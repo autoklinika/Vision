@@ -10,6 +10,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -55,4 +57,12 @@ jobs:
         working-directory: webgui
         run: npm audit --registry=https://registry.npmjs.org/
       - name: Repository diff hygiene
-        run: git diff --check
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PR_BASE_SHA" ]; then
+            git diff --check "$PR_BASE_SHA" HEAD
+          else
+            git show --check --format= HEAD
+          fi
+          test -z "$(git ls-files webgui/public/local-brand/)"
