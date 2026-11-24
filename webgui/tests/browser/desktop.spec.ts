@@ -69,3 +69,24 @@ test('pointer dragging/resizing, stacking and layout reset', async ({ page }) =>
   expect((await status.boundingBox())!.x).toBe(original.x);
   await page.screenshot({ path: 'test-results/desktop.png' });
 });
+
+test('default desktop keeps icons unobstructed and full system report visible at 1280×800', async ({ page }) => {
+  await page.goto('/');
+  const status = page.getByRole('dialog', { name: 'System Status', exact: true });
+  await expect(status).toContainText('Sony Camera');
+  const icons = (await page.locator('.desktop-icons').boundingBox())!;
+  const window = (await status.boundingBox())!;
+  expect(window.x).toBeGreaterThanOrEqual(icons.x + icons.width);
+  const body = status.locator('.window-body');
+  expect(await body.evaluate(el => el.scrollHeight <= el.clientHeight)).toBe(true);
+  await page.screenshot({ path: 'test-results/audit-desktop.png' });
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.screenshot({ path: 'test-results/audit-start.png' });
+  await page.getByRole('menuitem', { name: 'ECU Library', exact: true }).click();
+  const ecu = page.getByRole('dialog', { name: 'ECU Library', exact: true });
+  await expect(ecu).toBeVisible();
+  await expect(status).toBeVisible();
+  await expect(ecu).toHaveClass(/active/);
+  await page.screenshot({ path: 'test-results/audit-multiple.png' });
+});

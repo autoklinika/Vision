@@ -42,4 +42,6 @@ The unmodified 98.css fonts are FontStructions by lou, licensed CC BY-SA 3.0; at
 
 ## Verification record
 
-In this isolated clone: `npm run typecheck`, `npm run lint`, `npm test` (6 tests), `npm run build`, and `PLAYWRIGHT_BROWSERS_PATH=.browser-cache npm run test:browser` (3 Chromium tests) passed. `npm audit` reported 0 vulnerabilities after tooling patch updates. The desktop screenshot was inspected. No backend or hardware acceptance is claimed.
+In this isolated clone: `npm run typecheck`, `npm run lint`, `npm test` (6 tests), `npm run build`, and `PLAYWRIGHT_BROWSERS_PATH=.browser-cache npm run test:browser` (4 Chromium tests after independent audit) passed. `npm audit` reported 0 vulnerabilities after tooling patch updates. The desktop screenshot was inspected. No backend or hardware acceptance is claimed.
+
+Independent acceptance and actual Chromium screenshots: [GUI-01 audit](docs/audit/GUI-01_AUDIT_2026-11-24.md).
