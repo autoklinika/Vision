@@ -3,6 +3,7 @@ from collections import deque
 from dataclasses import dataclass
 from threading import Lock
 import math
+import numbers
 import heapq
 from .ros2_messages import normalize_rgbd, image_layout, _time
 
@@ -100,7 +101,7 @@ class SnapshotCollector:
                 if any(len(getattr(message, k)) != n for k, n in (('k', 9), ('r', 9), ('p', 12))) or len(message.d) > 32: raise ValueError('invalid CameraInfo fields')
                 if not isinstance(message.distortion_model, str) or len(message.distortion_model) > 256: raise ValueError('invalid distortion model')
                 if any(type(x) is not int or not 0 <= x <= 2**32-1 for x in (message.binning_x, message.binning_y, message.roi.x_offset, message.roi.y_offset, message.roi.height, message.roi.width)): raise ValueError('invalid CameraInfo metadata')
-                if any(type(v) not in (int, float) or not math.isfinite(v) for k in ('k','d','r','p') for v in getattr(message, k)): raise ValueError('invalid CameraInfo values')
+                if any(isinstance(v, bool) or not isinstance(v, numbers.Real) or not math.isfinite(float(v)) for k in ('k','d','r','p') for v in getattr(message, k)): raise ValueError('invalid CameraInfo values')
                 if type(message.roi.do_rectify) is not bool: raise ValueError('invalid CameraInfo ROI')
             except (AttributeError, TypeError) as exc:
                 raise ValueError('invalid CameraInfo message') from exc
