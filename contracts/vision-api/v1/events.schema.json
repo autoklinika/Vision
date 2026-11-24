@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vision API-02 events report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "source",
+    "viewId",
+    "sessionId",
+    "capturedAt",
+    "throughSequence",
+    "afterSequence",
+    "nextAfterSequence",
+    "events"
+  ],
+  "properties": {
+    "schema": {
+      "const": "vision.api.events.v1"
+    },
+    "scope": {
+      "const": "SESSION_READ_ONLY"
+    },
+    "source": {
+      "enum": [
+        "SYNTHETIC_TEST",
+        "STATION"
+      ]
+    },
+    "viewId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "throughSequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "afterSequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "nextAfterSequence": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "stageId",
+          "kind",
+          "timestamp",
+          "state"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "stageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "OTHER",
+              "ack",
+              "archive_verified",
+              "capture_complete_verified",
+              "capture_verified",
+              "config_pinned",
+              "context_invalidated",
+              "denied",
+              "dispatch",
+              "localization_accepted",
+              "module_archive_verified",
+              "module_verified",
+              "motion_verified",
+              "planning_verified",
+              "preparation_verified",
+              "quality_verified",
+              "result_accepted",
+              "result_rejected",
+              "transition"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "BLOCKED",
+                  "CANCELLED",
+                  "FAILED",
+                  "PENDING",
+                  "READY",
+                  "RUNNING",
+                  "SUCCEEDED",
+                  "TIMED_OUT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Application validators also enforce calendar validity, unique stages including S01-S11, monotonic bounded sequences and matching read-view correlation. A capture timestamp denotes a point-in-time projection, never sensor freshness or station readiness."
+}

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vision API-02 session report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "source",
+    "viewId",
+    "sessionId",
+    "capturedAt",
+    "journalSequence",
+    "invalidated",
+    "stages"
+  ],
+  "properties": {
+    "schema": {
+      "const": "vision.api.session.v1"
+    },
+    "scope": {
+      "const": "SESSION_READ_ONLY"
+    },
+    "source": {
+      "enum": [
+        "SYNTHETIC_TEST",
+        "STATION"
+      ]
+    },
+    "viewId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "journalSequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "invalidated": {
+      "type": "boolean"
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state",
+          "historicalSuccess",
+          "lastTransitionSequence",
+          "lastAckSequence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "state": {
+            "enum": [
+              "BLOCKED",
+              "CANCELLED",
+              "FAILED",
+              "PENDING",
+              "READY",
+              "RUNNING",
+              "SUCCEEDED",
+              "TIMED_OUT"
+            ]
+          },
+          "historicalSuccess": {
+            "type": "boolean"
+          },
+          "lastTransitionSequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastAckSequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Application validators also enforce calendar validity, unique stages including S01-S11, monotonic bounded sequences and matching read-view correlation. A capture timestamp denotes a point-in-time projection, never sensor freshness or station readiness."
+}

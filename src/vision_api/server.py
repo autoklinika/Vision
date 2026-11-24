@@ -1,12 +1,17 @@
 """Minimal local LAB HTTP adapter; no Core construction or hardware access."""
 import argparse
 import json
+import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from .status import boot_status, validate_boot_status
+from .access import AccessDenied, Credentials, CursorRejected, ReportUnavailable
+from .reports import MAX_PROTECTED_BYTES, MAX_SEQUENCE, SessionReadService
 
 MAX_RESPONSE_BYTES = 4096
 PATH = "/api/v1/status"
+SESSION_PATH = "/api/v1/session"
+EVENTS_PATH = re.compile(r"/api/v1/events\?view=([0-9a-f]{32})&after=(0|[1-9][0-9]{0,15})&through=(0|[1-9][0-9]{0,15})", re.ASCII)
 LOOPBACK = "127.0.0.1"
 
 
@@ -29,10 +34,10 @@ class Handler(BaseHTTPRequestHandler):
         # No raw request paths, client addresses, or exception details in logs.
         return
 
-    def _json(self, status, value, *, allow=False):
+    def _json(self, status, value, *, allow=False, maximum=MAX_RESPONSE_BYTES):
         body = json.dumps(value, ensure_ascii=True, allow_nan=False,
                           separators=(",", ":")).encode("utf-8")
-        if len(body) > MAX_RESPONSE_BYTES:
+        if len(body) > maximum:
             raise ValueError("response bound exceeded")
         self.close_connection = True
         self.send_response(status)
@@ -85,7 +90,13 @@ class Handler(BaseHTTPRequestHandler):
         # BaseHTTPRequestHandler normalizes an initial //; require the raw
         # target as well so aliases, query strings, and absolute URLs fail.
         words = self.requestline.split()
-        if self.path != PATH or len(words) != 3 or words[1] != PATH:
+        if len(words) != 3 or words[1] != self.path or len(self.path) > 256:
+            self._error(404, "NOT_FOUND")
+            return
+        if self.path == SESSION_PATH or EVENTS_PATH.fullmatch(self.path):
+            self._protected()
+            return
+        if self.path != PATH:
             self._error(404, "NOT_FOUND")
             return
         try:
@@ -97,16 +108,52 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._json(200, value)
 
+    def _protected(self):
+        # Duplicate/oversized credential headers are rejected, never joined.
+        authorization = self.headers.get_all("Authorization") or []
+        cookies = self.headers.get_all("Cookie") or []
+        if (len(authorization) > 1 or len(cookies) > 1
+                or (authorization and len(authorization[0]) > 1024)
+                or (cookies and len(cookies[0]) > 4096)):
+            self._error(400, "BAD_REQUEST")
+            return
+        credentials = Credentials(authorization[0] if authorization else None,
+                                  cookies[0] if cookies else None)
+        try:
+            if self.path == SESSION_PATH:
+                value = self.server.read_service.session_report(credentials)
+            else:
+                match = EVENTS_PATH.fullmatch(self.path)
+                view, after, through = match.groups()
+                after, through = int(after), int(through)
+                if after > MAX_SEQUENCE or through > MAX_SEQUENCE or after > through:
+                    raise CursorRejected()
+                value = self.server.read_service.events_report(credentials, view=view, after=after, through=through)
+            self._json(200, value, maximum=MAX_PROTECTED_BYTES)
+        except AccessDenied:
+            self._error(401, "ACCESS_DENIED")
+        except CursorRejected:
+            self._error(409, "CURSOR_REJECTED")
+        except ReportUnavailable:
+            self._error(503, "REPORT_UNAVAILABLE")
+        except Exception:
+            self._error(503, "REPORT_UNAVAILABLE")
+
     def _deny_method(self):
         self._error(405, "METHOD_NOT_ALLOWED")
 
     do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = do_TRACE = do_CONNECT = _deny_method
 
 
-def make_server(port=18491):
+def make_server(port=18491, *, provider=None, authorizer=None):
     if type(port) is not int or not 0 <= port <= 65535:
         raise ValueError("invalid port")
-    return LabServer((LOOPBACK, port), Handler)
+    # Programmatic composition only. CLI intentionally has no auth bypass,
+    # token option, provider factory, file/journal path, or hardware endpoint.
+    read_service = SessionReadService(provider=provider, authorizer=authorizer)
+    server = LabServer((LOOPBACK, port), Handler)
+    server.read_service = read_service
+    return server
 
 
 def main():
