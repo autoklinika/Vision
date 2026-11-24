@@ -66,9 +66,10 @@ def _valid_ecu(p):
                  and all(valid_quaternion(q) for q in p.view_quaternions_xyzw))))
 
 
-def validate_profiles(profiles: Mapping[str, Profile], available_calibrations: Mapping[str, str], requirements: Mapping[str, frozenset[str]]) -> list[str]:
+def validate_profiles(profiles: Mapping[str, Profile], available_calibrations: Mapping[str, str], requirements: Mapping[str, frozenset[str]], *, extra_kinds=frozenset()) -> list[str]:
     errors = []
-    for kind in sorted(PROFILE_KINDS):
+    expected = PROFILE_KINDS | frozenset(extra_kinds)
+    for kind in sorted(expected):
         p = profiles.get(kind)
         if p is None:
             errors.append(f'{kind}: missing profile')
@@ -82,6 +83,6 @@ def validate_profiles(profiles: Mapping[str, Profile], available_calibrations: M
             errors.append(f'{kind}: missing capabilities {sorted(missing)}')
         if not p.calibration_dependencies or any(not name or not revision or available_calibrations.get(name) != revision for name, revision in p.calibration_dependencies.items()):
             errors.append(f'{kind}: missing or mismatched calibration')
-    if set(profiles) != PROFILE_KINDS or set(requirements) - PROFILE_KINDS:
+    if set(profiles) != expected or set(requirements) - expected:
         errors.append('unknown or missing profile kind')
     return errors

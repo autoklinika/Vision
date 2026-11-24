@@ -89,7 +89,7 @@ class PhotographySession:
                     raise ValueError('motion plan binding missing')
                 if not isinstance(plan, InspectionPlan) or plan.digest != workflow.accepted_plan_hash:
                     raise ValueError('accepted inspection plan required')
-                if self.views != photography_views(plan, workflow.context, workflow.profiles, workflow.calibrations, workflow.requirements, workflow.clock(), workflow.max_age):
+                if self.views != photography_views(plan, workflow.context, workflow.profiles, workflow.calibrations, workflow.requirements, workflow.clock(), workflow.max_age, extra_kinds=workflow.extra_kinds):
                     raise ValueError('views do not match accepted plan')
             if not views or len({v.view_id for v in views}) != len(views):
                 raise ValueError('empty or duplicate views')

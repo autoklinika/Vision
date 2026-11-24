@@ -12,7 +12,7 @@ from typing import Mapping
 from .models import Context, Evidence, GateError, State
 from .photography import CaptureBinding, CoverageProof, View
 from .profiles import PROFILE_KINDS, ECUProfile, valid_quaternion, validate_profiles
-from .workflow import CHECKS
+from .workflow import CHECKS, _canonical
 
 MAX_VIEWS = 128
 MAX_FOOTPRINTS = 128
@@ -95,7 +95,7 @@ def _plan_document(plan):
 
 def create_plan(context: Context, profiles: Mapping, calibrations: Mapping, requirements: Mapping,
                 observation: ObservedECU, now: float, max_age: float, *, min_coverage: float,
-                require_raw: bool) -> InspectionPlan:
+                require_raw: bool, extra_kinds=()) -> InspectionPlan:
     ecu = profiles.get('ecu')
     if isinstance(ecu, ECUProfile) and (not isinstance(ecu.view_targets, (tuple, list))
             or not isinstance(ecu.view_quaternions_xyzw, (tuple, list))
@@ -106,13 +106,14 @@ def create_plan(context: Context, profiles: Mapping, calibrations: Mapping, requ
             or len(ecu.view_quaternions_xyzw) != len(ecu.view_targets)
             or not all(valid_quaternion(q) for q in ecu.view_quaternions_xyzw)):
         raise GateError('NOT_READY: missing or invalid photography orientation')
-    errors = validate_profiles(profiles, calibrations, requirements)
+    expected_kinds = PROFILE_KINDS | frozenset(extra_kinds)
+    errors = validate_profiles(profiles, calibrations, requirements, extra_kinds=extra_kinds)
     if errors:
         raise GateError('; '.join(errors))
     ecu = profiles['ecu']
     if (not isinstance(ecu, ECUProfile) or not context.session_id or not context.scene_revision or not context.frame_id
-            or set(context.profile_revisions) != PROFILE_KINDS
-            or any(context.profile_revisions[k] != profiles[k].revision for k in PROFILE_KINDS)
+            or set(context.profile_revisions) != expected_kinds
+            or any(context.profile_revisions[k] != profiles[k].revision for k in expected_kinds)
             or observation.frame_id != context.frame_id or observation.scene_revision != context.scene_revision
             or observation.timestamp != context.observation_timestamp or observation.ecu_revision != ecu.revision
             or observation.declared_type != ecu.declared_type or observation.variant != ecu.variant
@@ -144,28 +145,30 @@ def create_plan(context: Context, profiles: Mapping, calibrations: Mapping, requ
     metadata = tuple((k, profiles[k].identifier, profiles[k].schema_version, profiles[k].revision,
                       tuple(sorted(profiles[k].capabilities)), tuple(sorted(profiles[k].required_capabilities)),
                       tuple(sorted(profiles[k].calibration_dependencies.items())),
-                      tuple(sorted(requirements.get(k, ())))) for k in sorted(PROFILE_KINDS))
+                      tuple(sorted(requirements.get(k, ())))) for k in sorted(expected_kinds))
     metadata += (('ecu_geometry', ecu.declared_type, ecu.variant, ecu.nominal_dimensions, ecu.max_height,
                   ecu.pcb_regions, ecu.view_targets, ecu.tolerances, ecu.view_quaternions_xyzw),)
+    if extra_kinds:
+        metadata += (('extra_profiles', _canonical({k: profiles[k] for k in sorted(extra_kinds)})),)
     plan = InspectionPlan('1', context, observation, metadata, tuple(targets), tuple(tuple(map(float, r)) for r in ecu.pcb_regions), require_raw, float(min_coverage), '')
     return InspectionPlan(**{**plan.__dict__, 'digest': _hash(_plan_document(plan))})
 
 
 def verify_plan(plan: InspectionPlan, context: Context, profiles: Mapping, calibrations: Mapping,
-                requirements: Mapping, now: float, max_age: float) -> None:
+                requirements: Mapping, now: float, max_age: float, *, extra_kinds=()) -> None:
     expected = create_plan(context, profiles, calibrations, requirements, plan.observation, now, max_age,
-                           min_coverage=plan.min_coverage, require_raw=plan.require_raw)
+                           min_coverage=plan.min_coverage, require_raw=plan.require_raw, extra_kinds=extra_kinds)
     if plan != expected or plan.digest != _hash(_plan_document(plan)):
         raise GateError('plan or current context mismatch')
 
 
-def photography_views(plan: InspectionPlan, context, profiles, calibrations, requirements, now, max_age):
-    verify_plan(plan, context, profiles, calibrations, requirements, now, max_age)
+def photography_views(plan: InspectionPlan, context, profiles, calibrations, requirements, now, max_age, *, extra_kinds=()):
+    verify_plan(plan, context, profiles, calibrations, requirements, now, max_age, extra_kinds=extra_kinds)
     return tuple(View(t.view_id, t.local_xyz_mm, plan.require_raw, t.local_quaternion) for t in plan.targets)
 
 
 def complete_s05(workflow, plan: InspectionPlan):
-    verify_plan(plan, workflow.context, workflow.profiles, workflow.calibrations, workflow.requirements, workflow.clock(), workflow.max_age)
+    verify_plan(plan, workflow.context, workflow.profiles, workflow.calibrations, workflow.requirements, workflow.clock(), workflow.max_age, extra_kinds=workflow.extra_kinds)
     if workflow.states['S05'] != State.RUNNING:
         raise GateError('S05 is not running')
     workflow.complete(Evidence(workflow.context.session_id, 'S05', workflow.requests['S05'], workflow.context,
@@ -219,12 +222,12 @@ def _areas(regions, footprints):
 
 
 def coverage_proof(plan: InspectionPlan, evidence: SpatialCoverageEvidence, request_id: str,
-                   context, profiles, calibrations, requirements, now, max_age):
+                   context, profiles, calibrations, requirements, now, max_age, *, extra_kinds=()):
     if (not isinstance(evidence.footprints, (tuple, list))
             or len(evidence.footprints) > MAX_FOOTPRINTS
             or any(not isinstance(f, SpatialFootprint) for f in evidence.footprints)):
         raise GateError('invalid or excessive footprints')
-    verify_plan(plan, context, profiles, calibrations, requirements, now, max_age)
+    verify_plan(plan, context, profiles, calibrations, requirements, now, max_age, extra_kinds=extra_kinds)
     ids = frozenset(t.view_id for t in plan.targets)
     if (not request_id or evidence.session_id != context.session_id or evidence.plan_hash != plan.digest
             or evidence.scene_revision != context.scene_revision or dict(evidence.profile_revisions) != dict(context.profile_revisions)
@@ -264,13 +267,13 @@ class RetryLedger:
 
     def decide(self, plan, context, profiles, calibrations, requirements, now, max_age, *, view_id,
                attempt, request_id, failure, approved, approval_reference, qa_reference, qa_verified,
-               coverage_evidence, max_attempts):
-        verify_plan(plan, context, profiles, calibrations, requirements, now, max_age)
+               coverage_evidence, max_attempts, extra_kinds=()):
+        verify_plan(plan, context, profiles, calibrations, requirements, now, max_age, extra_kinds=extra_kinds)
         if (view_id not in {t.view_id for t in plan.targets} or not isinstance(attempt, int) or isinstance(attempt, bool)
                 or not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or max_attempts < 1
                 or attempt < 1 or not isinstance(request_id, str) or not request_id.strip()):
             raise GateError('invalid retry identity or bound')
-        coverage_proof(plan, coverage_evidence, request_id, context, profiles, calibrations, requirements, now, max_age)
+        coverage_proof(plan, coverage_evidence, request_id, context, profiles, calibrations, requirements, now, max_age, extra_kinds=extra_kinds)
         record = {'session_id': context.session_id, 'plan_hash': plan.digest, 'view_id': view_id,
                   'attempt': attempt, 'request_id': request_id, 'failure': failure, 'approved': approved,
                   'approval_reference': approval_reference, 'qa_reference': qa_reference, 'qa_verified': qa_verified,
