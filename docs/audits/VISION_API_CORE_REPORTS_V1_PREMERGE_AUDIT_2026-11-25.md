@@ -22,6 +22,7 @@ Scope: issue #58, based on main `21c3229`. This source-audit record requires fin
 5. **Startup composition:** the first CI typecheck found that Startup also renders AppContent without desktop session controls. Controls are now optional; startup keeps its public boot report only. A browser regression verifies no protected controls or requests before entering the desktop and clicking Refresh session.
 6. **Fixture file API:** the private-file opener belongs to built-in `open()`, not `Path.open()`. An authenticated fixture smoke check verified successful HTTP projection, file mode 0600 and SIGTERM cleanup after correction.
 7. **Default report visibility:** native and CI browser regression found the expanded empty session summary caused default System Status to scroll. Its empty summary is now compact and the default height is 600 px, preserving icon clearance. The existing full-report visibility test remains unchanged.
+8. **Test-server teardown:** the first successful synthetic Core browser run left its private credential file because Playwright defaults to SIGKILL. The build run then correctly refused to overwrite it. The fixture process is now exec-launched with explicit SIGTERM/5s graceful shutdown, and CI checks credential-file removal after each integration run. Production API code and authorization rules are unchanged by this correction.
 
 ## Verification at source-audit time
 

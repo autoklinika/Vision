@@ -16,10 +16,13 @@ export default defineConfig({
   webServer: integration ? [
     {
       command: projection
-        ? 'cd .. && PYTHONPATH=src python3 -B tests/api/serve_projection_fixture.py --port 18491 --auth-file webgui/.api02-test-auth.json'
-        : 'cd .. && PYTHONPATH=src python3 -B -m vision_api.server --port 18491',
+        ? 'cd .. && exec env PYTHONPATH=src python3 -B tests/api/serve_projection_fixture.py --port 18491 --auth-file webgui/.api02-test-auth.json'
+        : 'cd .. && exec env PYTHONPATH=src python3 -B -m vision_api.server --port 18491',
       url: 'http://127.0.0.1:18491/api/v1/status',
       reuseExistingServer: false,
+      // Allow the synthetic harness to remove its private credential file.
+      // The default Playwright SIGKILL cannot run Python's finally cleanup.
+      gracefulShutdown: {signal: 'SIGTERM', timeout: 5000},
     },
     web,
   ] : web,
