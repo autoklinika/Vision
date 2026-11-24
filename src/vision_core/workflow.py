@@ -47,9 +47,12 @@ def _fingerprint(profiles, calibrations, requirements, max_age):
 
 
 class Workflow:
-    def __init__(self, journal: Journal, context: Context, profiles: Mapping[str, Profile], calibrations: Mapping[str, str], requirements: Mapping[str, frozenset[str]], max_age: float, clock: Callable[[], float] = time.time, *, scenario: ScenarioSpec | None = None, registry: ModuleRegistry | None = None):
+    def __init__(self, journal: Journal, context: Context, profiles: Mapping[str, Profile], calibrations: Mapping[str, str], requirements: Mapping[str, frozenset[str]], max_age: float, clock: Callable[[], float] = time.time, *, scenario: ScenarioSpec | None = None, registry: ModuleRegistry | None = None, strict_planning: bool = False):
         if not math.isfinite(max_age) or max_age <= 0:
             raise ValueError('a positive finite freshness limit is required')
+        if type(strict_planning) is not bool:
+            raise ValueError('strict_planning must be a bool')
+        self.strict_planning = strict_planning
         self.journal, self.context, self.profiles = journal, context, dict(profiles)
         self.calibrations, self.requirements, self.max_age, self.clock = dict(calibrations), dict(requirements), max_age, clock
         self.scenario = scenario
@@ -103,6 +106,8 @@ class Workflow:
         self.snapshots = {}
         self.dispatch_times = {}
         self.accepted_plan_hash = None
+        self.accepted_preparation_hash = None
+        self.accepted_motion_hash = None
         self.config_pin = None
         self._journal_uncertain = False
         self._initial_pin = self._pin() if self.scenario is not None else None
@@ -145,6 +150,17 @@ class Workflow:
                     not context.scene_revision and context.session_id == journal_context.session_id
                     and context.profile_revisions == journal_context.profile_revisions):
                 reasons.append('context differs from journal')
+            if self.strict_planning and not reasons:
+                try:
+                    replay_context = journal_context or self.context
+                    if self.states['S05'] == State.SUCCEEDED:
+                        preparation = self._accepted_planning_proof('S05', events, fresh=False, context=replay_context)
+                        self.accepted_preparation_hash = preparation.preparation_hash
+                    if self.states['S06'] == State.SUCCEEDED:
+                        motion = self._accepted_planning_proof('S06', events, fresh=False, context=replay_context)
+                        self.accepted_motion_hash = motion.motion_hash
+                except GateError as exc:
+                    reasons.append(str(exc))
             if reasons:
                 self.invalidate('; '.join(reasons))
         if journal_context is not None:
@@ -162,16 +178,25 @@ class Workflow:
         return result
 
     def _pin(self):
+        if type(self.strict_planning) is not bool:
+            raise GateError('strict_planning must be a bool')
         legacy = _fingerprint(self.profiles, self.calibrations, self.requirements, self.max_age)
-        if self.scenario is None:
+        if self.scenario is None and not self.strict_planning:
             return legacy
-        data = _canonical({'legacy': legacy, 'scenario': self.scenario, 'modules': self.modules, 'stages': self.stages, 'checks': self.checks, 'dependencies': self.dependencies})
+        data = {'legacy': legacy}
+        if self.scenario is not None:
+            data.update({'scenario': self.scenario, 'modules': self.modules, 'stages': self.stages, 'checks': self.checks, 'dependencies': self.dependencies})
+        if self.strict_planning:
+            data['strict_planning'] = True
+        data = _canonical(data)
         return hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
     def _poison(self) -> None:
         # A failed journal write/commit may have reached persistent storage.
         # This worker must never accept another result or dispatch another task.
         self._journal_uncertain = True
+        self.accepted_preparation_hash = None
+        self.accepted_motion_hash = None
         for stage in self.stages:
             self.states[stage] = State.BLOCKED
 
@@ -228,6 +253,79 @@ class Workflow:
                 or (contexts and contexts[-1] != self.context.to_dict())):
             raise GateError('durable state, request, context or configuration mismatch')
 
+    def _accepted_planning_proof(self, step, history, *, fresh=True, context=None):
+        """Recheck the complete durable binding, never an in-memory success flag."""
+        from .planning import PreparationProof, PlanningProof
+        cls, kind = ((PreparationProof, 'preparation_verified') if step == 'S05'
+                     else (PlanningProof, 'planning_verified'))
+        context = self.context if context is None else context
+        proofs = [e for e in history if e.step_id == step and e.kind == kind]
+        results = [e for e in history if e.step_id == step and e.kind == 'result_accepted']
+        dispatches = [e for e in history if e.step_id == step and e.kind == 'dispatch']
+        if (len(proofs) != 1 or len(results) != 1 or len(dispatches) != 1
+                or any(e.kind == 'context_invalidated' for e in history)):
+            raise GateError('unique durable preparation and motion proof required')
+        try:
+            data = dict(proofs[0].data)
+            pin = data.pop('configuration_pin')
+            data['context'] = Context(**data['context'])
+            proof = cls(**data)
+            evidence = results[0].data['evidence']
+            dispatch = dispatches[0]
+            if (pin != self.config_pin or pin != self._pin()
+                    or proof.context != context or proof.request_id != self.requests.get(step)
+                    or proofs[0].request_id != proof.request_id or results[0].request_id != proof.request_id
+                    or dispatch.request_id != proof.request_id
+                    or dispatch.data['context'] != context.to_dict()
+                    or not dispatch.sequence < proofs[0].sequence < results[0].sequence
+                    or proof.inspection_plan_hash != self.accepted_plan_hash
+                    or evidence.get('session_id') != context.session_id
+                    or evidence.get('step_id') != step or evidence.get('request_id') != proof.request_id
+                    or evidence.get('context') != context.to_dict()
+                    or evidence.get('plan_hash') != proof.inspection_plan_hash
+                    or evidence.get('timestamp') != proof.timestamp
+                    or evidence.get('reference') != proof.reference
+                    or evidence.get('quality') is not True or evidence.get('terminal_success') is not True
+                    or not self.checks[step] <= set(evidence.get('checks', ()))
+                    or type(dispatch.data['dispatch_time']) not in (int, float)
+                    or not math.isfinite(dispatch.data['dispatch_time'])
+                    or proof.timestamp < dispatch.data['dispatch_time']):
+                raise GateError('durable planning proof binding mismatch')
+            if fresh:
+                now = self.clock()
+                if type(now) not in (int, float) or not math.isfinite(now) or not 0 <= now - proof.timestamp <= self.max_age:
+                    raise GateError('durable planning proof is stale')
+            if step == 'S06':
+                preparation = self._accepted_planning_proof('S05', history, fresh=fresh, context=context)
+                if (proof.preparation_hash != preparation.preparation_hash
+                        or proof.preparation_hash != self.accepted_preparation_hash
+                        or proof.timestamp < preparation.timestamp):
+                    raise GateError('motion preparation binding mismatch')
+            return proof
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            raise GateError('invalid durable planning proof: ' + str(exc)) from exc
+
+    def _verify_planning_input(self, step, proof, evidence):
+        from .planning import PreparationProof, PlanningProof
+        cls, kind = ((PreparationProof, 'preparation_verified') if step == 'S05'
+                     else (PlanningProof, 'planning_verified'))
+        if type(proof) is not cls:
+            raise GateError('typed verified preparation or motion proof required')
+        # Revalidate dataclass fields as well as their current correlation.
+        cls(**{f.name: getattr(proof, f.name) for f in fields(cls)})
+        history = self.journal.replay(self.context.session_id)
+        if (proof.context != self.context or proof.request_id != self.requests.get(step)
+                or proof.inspection_plan_hash != evidence.plan_hash
+                or proof.timestamp != evidence.timestamp or proof.reference != evidence.reference
+                or any(e.step_id == step and e.kind == kind for e in history)):
+            raise GateError('preparation or motion proof binding mismatch')
+        if step == 'S06':
+            preparation = self._accepted_planning_proof('S05', history)
+            if (proof.preparation_hash != preparation.preparation_hash
+                    or proof.preparation_hash != self.accepted_preparation_hash
+                    or proof.timestamp < preparation.timestamp):
+                raise GateError('motion preparation binding mismatch')
+
     def invalidate(self, reason: str) -> None:
         self._require_usable()
         error = None
@@ -251,6 +349,8 @@ class Workflow:
         # Historical SUCCEEDED transitions stay in the journal, while all
         # effective stage states for the invalidated context become BLOCKED.
         self.states.update({s: State.BLOCKED for s in self.stages})
+        self.accepted_preparation_hash = None
+        self.accepted_motion_hash = None
 
     def update_context(self, context: Context) -> None:
         self._require_usable()
@@ -330,6 +430,10 @@ class Workflow:
                     raise GateError('durable predecessors not verified')
                 if any(e.step_id == step and e.kind == 'dispatch' for e in history):
                     raise GateError('stage already dispatched')
+                if self.strict_planning and step == 'S07':
+                    proof = self._accepted_planning_proof('S06', history)
+                    if proof.motion_hash != self.accepted_motion_hash:
+                        raise GateError('accepted motion binding mismatch')
                 self.journal.db.execute('INSERT INTO stage_claims(session_id,step_id) VALUES (?,?)', (self.context.session_id, step))
                 pins = [e.data['sha256'] for e in history if e.kind == 'config_pinned']
                 if pins and (len(set(pins)) != 1 or pins[0] != pin):
@@ -393,7 +497,7 @@ class Workflow:
     def _repeatable(self):
         return bool(getattr(self.profiles.get('ecu'), 'view_quaternions_xyzw', ()))
 
-    def complete(self, evidence: Evidence, *, _verified_plan=None) -> None:
+    def complete(self, evidence: Evidence, *, _verified_plan=None, _verified_preparation=None, _verified_motion=None) -> None:
         self._require_usable()
         error = None
         try:
@@ -413,7 +517,9 @@ class Workflow:
                     error = exc
                 else:
                     try:
-                        self._complete_locked(evidence, _verified_plan=_verified_plan)
+                        self._complete_locked(evidence, _verified_plan=_verified_plan,
+                                              _verified_preparation=_verified_preparation,
+                                              _verified_motion=_verified_motion)
                     except GateError as exc:
                         error = exc
         except BaseException:
@@ -422,7 +528,7 @@ class Workflow:
         if error:
             raise error
 
-    def _complete_locked(self, evidence: Evidence, *, _verified_plan=None) -> None:
+    def _complete_locked(self, evidence: Evidence, *, _verified_plan=None, _verified_preparation=None, _verified_motion=None) -> None:
         step = evidence.step_id
         reasons = []
         if self.states.get(step) != State.RUNNING or self.requests.get(step) != evidence.request_id or not evidence.request_id:
@@ -437,7 +543,7 @@ class Workflow:
             if evidence.context != self.context:
                 reasons.append('context mismatch')
             reasons.extend(self._context_errors(self.context, observation=step not in ('S01', 'S02'), fresh=step not in ('S10', 'S11')))
-        if step == 'S05' and (self._repeatable() or evidence.plan_hash is not None):
+        if step == 'S05' and (self.strict_planning or self._repeatable() or evidence.plan_hash is not None):
             try:
                 from .repeatability import InspectionPlan, verify_plan
                 if not isinstance(_verified_plan, InspectionPlan) or evidence.plan_hash != _verified_plan.digest:
@@ -445,6 +551,14 @@ class Workflow:
                 verify_plan(_verified_plan, self.context, self.profiles, self.calibrations, self.requirements, self.clock(), self.max_age, extra_kinds=self.extra_kinds)
             except (GateError, ValueError, TypeError, AttributeError):
                 reasons.append('verified inspection plan required')
+        if self.strict_planning and step in ('S05', 'S06'):
+            try:
+                self._verify_planning_input(step, _verified_preparation if step == 'S05' else _verified_motion, evidence)
+            except (ValueError, TypeError, AttributeError) as exc:
+                reasons.append(str(exc))
+        if (_verified_preparation is not None and (not self.strict_planning or step != 'S05')) or (
+                _verified_motion is not None and (not self.strict_planning or step != 'S06')):
+            reasons.append('planning proof requires its strict planning stage')
         if step in ('S06', 'S07', 'S08') and (self._repeatable() or self.accepted_plan_hash):
             if not self.accepted_plan_hash or evidence.plan_hash != self.accepted_plan_hash:
                 reasons.append('inspection plan binding mismatch')
@@ -527,10 +641,18 @@ class Workflow:
             self.context = evidence.context
             self.states[step] = State.SUCCEEDED
         else:
+            if self.strict_planning and step in ('S05', 'S06'):
+                proof = _verified_preparation if step == 'S05' else _verified_motion
+                kind = 'preparation_verified' if step == 'S05' else 'planning_verified'
+                self._record(step, kind, {**_canonical(proof), 'configuration_pin': self._pin()}, evidence.request_id)
             self._record(step, 'result_accepted', {'evidence': serialized}, evidence.request_id)
             self._transition(step, State.SUCCEEDED, 'terminal evidence verified')
             if step == 'S05':
                 self.accepted_plan_hash = evidence.plan_hash
+                if self.strict_planning:
+                    self.accepted_preparation_hash = _verified_preparation.preparation_hash
+            if step == 'S06' and self.strict_planning:
+                self.accepted_motion_hash = _verified_motion.motion_hash
 
     def stop(self, step: str, state: State, reason: str) -> None:
         self._require_usable()
