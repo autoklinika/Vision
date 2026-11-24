@@ -8,6 +8,14 @@
 - PR musi opisywać zakres, ryzyka sprzętowe, testy, zgodność z Ubuntu/ARM64 i rollback.
 - Obrazy produkcyjne, dane surowe i duże modele trzymamy poza Git (w przyszłości: dedykowana retencja/archiwizacja).
 
+## Rozdzielenie środowisk — decyzja właściciela 24.11.2026
+
+- **VENTUNO Q (Vision)** jest jedynym lokalnym komputerem do programowania, budowania i testowania projektu Vision, w tym WebGUI. Prace prowadzić w izolowanym worktree od aktualnego `origin/main`, na NVMe, bez zmiany aktywnego środowiska stanowiskowego.
+- **GitHub** pozostaje kanonicznym repozytorium, miejscem PR i CI; dopuszczalne jest tworzenie kodu backendu w środowisku Codex połączonym z GitHub.
+- **AI Platform** jest oddzielnym projektem i komputerem przeznaczonym do zadań AI. Nie wolno tam klonować repozytorium Vision w celu programowania, uruchamiać Codexa dla Vision, budować GUI ani przechowywać lokalnych worktree/katalogów roboczych Vision. Odrębne zadania analizy danych AI wymagają osobnego uzgodnienia i nie zmieniają tej zasady.
+- Przed każdą operacją lokalną potwierdzić tożsamość urządzenia i właściwy katalog NVMe. Gdy VENTUNO jest niedostępny, nie przenosić prac automatycznie na AI Platform; zgłosić blokadę lub skorzystać z odpowiedniego środowiska GitHub.
+- Kod WebGUI pozostaje wyłącznie klientem Vision. Prywatne assety, pomiary i archiwa pozostają poza publicznym Git. Nie uruchamiać sprzętu przy zwykłych testach oprogramowania.
+
 ## Etapy weryfikacji
 
 1. Odczyt i udokumentowanie stanu urządzenia.
