@@ -145,3 +145,19 @@ or exclude transient concurrent changes. The coordinator still requires its
 separate trusted scene lease and full Runtime observation binding. The measured
 ETC3 profile, absolute station transform and physical S03–S04 acceptance remain
 separate prerequisites for a real inspection.
+
+## Final-audit offline revalidation
+
+After the normalized-quaternion correction, the final audited implementation
+revalidated this exact retained JSON archive, checked its SHA-256, reconstructed
+the typed configuration/snapshots/trajectory receipts and ran the current
+`validate_snapshot` and `validate_segment` functions. Both five-point segments,
+their digests, scene identity and chained seeds passed unchanged. Historical
+freshness was evaluated against the recorded receive times; this does not make
+the old state a current observation.
+
+The revalidation ran in the existing ARM64 audit container without network,
+devices or writable repository mounts. No ROS module was imported, no ROS
+process was started and no execution request was sent. The result supports
+compatibility of the stricter numerical checks with the saved successful
+simulation; it does not add a new physical measurement.

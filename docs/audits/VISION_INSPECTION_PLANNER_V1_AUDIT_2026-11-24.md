@@ -4,6 +4,11 @@ Date: 2026-11-24. Scope: isolated development of S05/S06 above Runtime PR #50.
 Status: implementation reviewed and offline tests passed; isolated MoveIt
 simulation passed. This is not physical ETC3 or production execution acceptance.
 
+This report records the initial implementation checks. The subsequent
+[final integration audit](VISION_RUNTIME_PLANNER_FINAL_AUDIT_2026-11-24.md)
+adds Runtime authentication fixes, normalized rotation checks and concurrency/
+recovery regressions, with final totals of 631 Core and 110 planner executions.
+
 ## Implemented scope
 
 - S05 uses the released record/reference and accepted Runtime observation to

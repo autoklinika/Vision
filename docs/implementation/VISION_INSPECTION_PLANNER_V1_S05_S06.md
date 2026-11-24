@@ -1,8 +1,9 @@
 # Vision Inspection Planner V1 — S05–S06
 
-Status: implemented on an isolated feature branch; review required before merge
-or station deployment. This module extends the existing Core and Runtime. It
-does not complete the outstanding physical ETC3 S03/S04 acceptance.
+Status: final software integration audit passed; see the
+[final audit](../audits/VISION_RUNTIME_PLANNER_FINAL_AUDIT_2026-11-24.md).
+Station deployment remains separate. This module extends the existing Core and
+Runtime. It does not complete the outstanding physical ETC3 S03/S04 acceptance.
 
 ## Purpose and dependency
 
@@ -126,6 +127,12 @@ Positions cross the ROS boundary in metres; the Vision API and profile geometry
 remain in millimetres. Quaternions are xyzw and joint positions are radians.
 The camera frame is never assumed to coincide with link7 or another tool link.
 
+Quaternions within the accepted numerical unit-norm tolerance are normalized in
+owned computation copies before rotating translations or comparing orientations.
+The angle check uses the normalized relative quaternion and `atan2`, preserving
+small resolvable rotations and treating antipodal quaternions as equivalent.
+Raw receipt values remain unchanged in their authenticated digests.
+
 Each segment must contain the requested start state, a reachable IK goal, a
 successful timed trajectory, a matching final FK pose, and the exact scene and
 configuration hashes. Joint bounds are checked explicitly; a generic state
@@ -227,6 +234,13 @@ Generic check labels cannot complete strict S05/S06. Replays restore both hashes
 a strict-mode downgrade or uncertain write/commit prevents further dispatch.
 Strict S07 checks unique durable S05/S06 proofs, their ordering, freshness and
 configuration again. Planning success leaves S07 pending; no action is sent.
+
+This is a planning gate, not an execution adapter. S07 `MotionResult` retains its
+existing external `goal_verified` trust boundary and inspection context. A later
+execution integration must load the exact `accepted_motion_hash`, authenticate
+its retained trajectory, verify the current scene/state, and bind execution and
+feedback to that accepted artifact. This PR does not implement those device-side
+checks or claim that an existing generic S07 result proves their completion.
 
 The full `PreparedInspection` and `MotionPlan` artifacts belong in the private
 session archive of the integrating application. Core persists their hashes and

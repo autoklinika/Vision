@@ -26,7 +26,7 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 - [Implementacja i kontrakty](docs/implementation/VISION_INSPECTION_PLANNER_V1_S05_S06.md): recepta ECU, oddzielna kalibracja optyki Sony, konserwatywna ocena przewidywanego pokrycia PCB i adapter usług MoveIt do planowania wymaganych widoków.
 - Opcjonalny `strict_planning=True` wiąże S05 z pełnym przygotowaniem optycznym, a S06 z konkretnymi trajektoriami, sceną, stanem robota i rewizjami konfiguracji. Dowody są zapisywane atomowo przez istniejący Core.
 - [Audyt implementacji](docs/audits/VISION_INSPECTION_PLANNER_V1_AUDIT_2026-11-24.md) i [próba usług MoveIt na modelu NERO](docs/audits/VISION_INSPECTION_PLANNER_MOVEIT_SIMULATION_2026-11-24.md) opisują testy oraz granice odbioru.
-- To gałąź rozwojowa oparta na Runtime PR #50. Odbiór rzeczywistego ETC3 S03/S04 i wdrożenie stanowiskowe pozostają osobnymi krokami. Moduł nie wykonuje ruchu ani zdjęć.
+- [Końcowy audyt integracji Runtime + Planner](docs/audits/VISION_RUNTIME_PLANNER_FINAL_AUDIT_2026-11-24.md): 631 wykonań Core + 110 testów Plannera PASS lokalnie i na ARM64, poprawione uwierzytelnianie obserwacji i obliczenia obrotów, sprawdzone scalenie oraz wycofanie zmian. Odbiór rzeczywistego ETC3 S03/S04 i wdrożenie stanowiskowe pozostają osobnymi krokami. Moduł nie wykonuje ruchu ani zdjęć.
 
 ## ECU Profiles V1 — katalog profili i ETC3 PoC (24.11.2026)
 
