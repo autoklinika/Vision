@@ -1,0 +1,68 @@
+name: Vision API and WebGUI V1
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  api-webgui-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: webgui/package-lock.json
+      - name: API wire contract and loopback tests
+        run: PYTHONPATH=src python -B -m unittest discover -s tests/api -v
+      - name: Install locked frontend dependencies
+        working-directory: webgui
+        run: npm ci --no-audit --no-fund
+      - name: Install Chromium on ephemeral CI runner
+        working-directory: webgui
+        run: npx playwright install --with-deps chromium
+      - name: TypeScript, ESLint and shared contract unit tests
+        working-directory: webgui
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          python3 -B tests/test_prepare_brand.py
+      - name: Chromium DEV regression
+        working-directory: webgui
+        run: npm run test:browser
+      - name: Build and verify private brand exclusion
+        working-directory: webgui
+        run: |
+          npm run build
+          test ! -e dist/local-brand
+          test -f dist/THIRD_PARTY_NOTICES.txt
+      - name: Chromium production-build regression
+        working-directory: webgui
+        run: GUI_BUILD_SMOKE=1 npm run test:browser
+      - name: Actual loopback Python API and Chromium DEV
+        working-directory: webgui
+        run: VISION_API_INTEGRATION=1 npm run test:browser -- --grep 'actual API:'
+      - name: Actual loopback Python API and Chromium build
+        working-directory: webgui
+        run: VISION_API_INTEGRATION=1 GUI_BUILD_SMOKE=1 npm run test:browser -- --grep 'actual API:'
+      - name: Dependency audit
+        working-directory: webgui
+        run: npm audit --registry=https://registry.npmjs.org/
+      - name: Repository diff hygiene
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PR_BASE_SHA" ]; then
+            git diff --check "$PR_BASE_SHA" HEAD
+          else
+            git show --check --format= HEAD
+          fi
+          test -z "$(git ls-files webgui/public/local-brand/)"

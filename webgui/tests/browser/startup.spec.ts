@@ -61,6 +61,7 @@ for (const mode of ['demo', 'real', 'invalid']) {
     await page.route('**/local-brand/**', route => route.fulfill({ status: 404, body: '' }));
     await page.goto(`/?mode=${mode}`);
     await expect(page.getByRole('dialog')).toContainText('Original intro unavailable or corrupt');
+    if (mode !== 'demo') await expect(page.getByRole('dialog')).toContainText('Real adapter unavailable');
     if (mode === 'real') await page.screenshot({ path: 'test-results/startup-no-brand.png', animations: 'disabled' });
     await expect(page.getByRole('dialog')).toContainText('UNKNOWN');
     await enterDesktop(page);
@@ -70,6 +71,7 @@ for (const mode of ['demo', 'real', 'invalid']) {
       expect(requests.some(url => /\/demo\/|\/adapter-/.test(url))).toBe(false);
     }
     expect(requests.filter(url => !url.startsWith('http://127.0.0.1:4173/'))).toEqual([]);
+    expect(requests.filter(url => new URL(url).pathname === '/api/v1/status')).toHaveLength(mode === 'real' ? 1 : 0);
   });
 }
 
