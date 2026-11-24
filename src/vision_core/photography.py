@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import math
 import hashlib
 import json
+import re
 from .archive import Archive, digest, _name
 from .models import Context, Evidence, GateError, State
 from .workflow import CHECKS, Workflow
@@ -265,13 +266,54 @@ class PhotographySession:
                     self.archive.verify(f['name'], f['sha256'])
             for record in self.records:
                 self.archive.verify(record['derived']['name'], record['derived']['sha256'])
+            if w.scenario is not None:
+                history, durable_states = w._durable()
+                for stage in w.scenario.stages:
+                    module = w.modules.get(stage.module_id)
+                    if module is None or not module.archive_required:
+                        continue
+                    receipts = [e for e in history if e.kind == 'module_verified' and e.step_id == stage.stage_id]
+                    if len(receipts) != 1 or durable_states.get(stage.stage_id) != State.SUCCEEDED:
+                        raise ValueError('successful module receipt required for archive')
+                    receipt = receipts[0]
+                    data = receipt.data
+                    if (receipt.request_id != w.requests.get(stage.stage_id)
+                            or data.get('request_id') != receipt.request_id
+                            or data.get('session_id') != w.context.session_id
+                            or data.get('step_id') != stage.stage_id
+                            or data.get('module_id') != module.module_id
+                            or data.get('module_version') != module.version
+                            or data.get('context') != w.context.to_dict()
+                            or data.get('profile_revision') != w.profiles[module.profile_kind].revision
+                            or data.get('terminal_success') is not True):
+                        raise ValueError('module receipt identity mismatch')
+                    ref, sha = data.get('reference'), data.get('payload_sha256')
+                    if not isinstance(sha, str) or not re.fullmatch(r'[0-9a-f]{64}', sha):
+                        raise ValueError('invalid module payload hash')
+                    self.archive.verify(ref, sha)
+                    payload = json.loads(self.archive._read(ref))
+                    entries = payload.get('archive_entries') if isinstance(payload, dict) else None
+                    if not isinstance(entries, list) or not 1 <= len(entries) <= 64:
+                        raise ValueError('module archive entries required')
+                    for entry in entries:
+                        if (not isinstance(entry, dict) or set(entry) != {'name', 'sha256'}
+                                or not isinstance(entry['name'], str)
+                                or not isinstance(entry['sha256'], str)
+                                or not re.fullmatch(r'[0-9a-f]{64}', entry['sha256'])):
+                            raise ValueError('invalid module archive entry')
+                        self.archive.verify(entry['name'], entry['sha256'])
+                    w._record('S10', 'module_archive_verified',
+                              {'stage_id': stage.stage_id, 'reference': ref, 'payload_sha256': sha})
             events = [{'sequence': e.sequence, 'step_id': e.step_id, 'request_id': e.request_id, 'kind': e.kind, 'data': e.data, 'timestamp': e.timestamp} for e in w.journal.replay(w.context.session_id)]
             document = {'schema_version': 1, 'context': w.context.to_dict(), 'request_id': w.requests['S07'], 'views': self.records, 'coverage': self.coverage, 'events': events, 'status': 'prepared'}
             name, hash_value = self.archive.manifest(document)
             self.archive.verify(name, hash_value)
             w._record('S10', 'archive_verified', {'manifest': name, 'sha256': hash_value})
             self._complete('S10', name + ':' + hash_value)
-        except (ValueError, TypeError, OSError, AttributeError) as exc:
+        except Exception as exc:
+            # Unexpected archive/manifests errors are also terminal. Durable
+            # module receipts alone must never leave an active S10 that can be
+            # manually marked successful without a published manifest.
             if w.states['S10'] == State.RUNNING:
-                w.stop('S10', State.FAILED, str(exc))
-            raise GateError(str(exc)) from exc
+                w.stop('S10', State.FAILED, str(exc) or type(exc).__name__)
+            raise GateError(str(exc) or type(exc).__name__) from exc
