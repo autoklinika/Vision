@@ -49,6 +49,13 @@ def _quat(value):
     return q
 
 
+def _unit_quat(value):
+    """Use a normalized copy for geometry, retaining received bytes in receipts."""
+    q = _quat(value)
+    norm = math.hypot(*q)
+    return tuple(v / norm for v in q)
+
+
 def _hash(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'),
                                     allow_nan=False).encode()).hexdigest()
@@ -61,24 +68,31 @@ def _qmul(a, b):
             w*Z + x*Y - y*X + z*W, w*W - x*X - y*Y - z*Z)
 
 
+def _orientation_error(a, b):
+    """Shortest quaternion angle, stable even when acos(dot) would round to 0."""
+    a, b = _unit_quat(a), _unit_quat(b)
+    relative = _qmul((-a[0], -a[1], -a[2], a[3]), b)
+    return 2 * math.atan2(math.hypot(*relative[:3]), abs(relative[3]))
+
+
 def _rotate(q, xyz):
     return _qmul(_qmul(q, (*xyz, 0.0)), (-q[0], -q[1], -q[2], q[3]))[:3]
 
 
 def camera_to_link(camera_xyz_mm, camera_quaternion, link_camera_xyz_mm, link_camera_quaternion):
     """T_scene_link = T_scene_camera @ inverse(T_link_camera)."""
-    p, q = _vector(camera_xyz_mm, 3, 'camera position'), _quat(camera_quaternion)
-    t, r = _vector(link_camera_xyz_mm, 3, 'tool translation'), _quat(link_camera_quaternion)
-    link_q = _qmul(q, (-r[0], -r[1], -r[2], r[3]))
+    p, q = _vector(camera_xyz_mm, 3, 'camera position'), _unit_quat(camera_quaternion)
+    t, r = _vector(link_camera_xyz_mm, 3, 'tool translation'), _unit_quat(link_camera_quaternion)
+    link_q = _unit_quat(_qmul(q, (-r[0], -r[1], -r[2], r[3])))
     offset = _rotate(link_q, t)
     return tuple(p[i] - offset[i] for i in range(3)), link_q
 
 
 def link_to_camera(link_xyz_mm, link_quaternion, link_camera_xyz_mm, link_camera_quaternion):
-    p, q = _vector(link_xyz_mm, 3, 'link position'), _quat(link_quaternion)
-    t, r = _vector(link_camera_xyz_mm, 3, 'tool translation'), _quat(link_camera_quaternion)
+    p, q = _vector(link_xyz_mm, 3, 'link position'), _unit_quat(link_quaternion)
+    t, r = _vector(link_camera_xyz_mm, 3, 'tool translation'), _unit_quat(link_camera_quaternion)
     offset = _rotate(q, t)
-    return tuple(p[i] + offset[i] for i in range(3)), _qmul(q, r)
+    return tuple(p[i] + offset[i] for i in range(3)), _unit_quat(_qmul(q, r))
 
 
 @dataclass(frozen=True)
@@ -308,8 +322,7 @@ def validate_segment(segment, config):
     if any(abs(v)>config.start_velocity_tolerance_rad_s for v in segment.points[0].velocities) or any(abs(v)>1e-6 for v in segment.points[-1].velocities):
         raise GateError('photography trajectory start or end velocity exceeds tolerance')
     actual_p, actual_q = _vector(segment.fk_camera_xyz_mm,3,'FK position'), _quat(segment.fk_camera_quaternion)
-    dot = min(1.0,abs(sum(x*y for x,y in zip(actual_q,q))))
-    if math.dist(actual_p,xyz) > config.position_tolerance_mm or 2*math.acos(dot) > config.orientation_tolerance_rad:
+    if math.dist(actual_p,xyz) > config.position_tolerance_mm or _orientation_error(actual_q,q) > config.orientation_tolerance_rad:
         raise GateError('segment FK target mismatch')
     # Serialize only after all public fields have bounded, immutable shapes.
     verify_segment_digest(segment)
@@ -574,8 +587,7 @@ class MoveItAdapter:
     def _check_pose(self, actual, expected):
         p, q = actual
         P, Q = expected
-        dot = min(1.0, max(-1.0, abs(sum(x*y for x, y in zip(q, Q)))))
-        if math.dist(p, P) > self.config.position_tolerance_mm or 2*math.acos(dot) > self.config.orientation_tolerance_rad:
+        if math.dist(p, P) > self.config.position_tolerance_mm or _orientation_error(q,Q) > self.config.orientation_tolerance_rad:
             raise GateError('FK camera pose misses target')
 
     def _trajectory(self, response, start, goal):
