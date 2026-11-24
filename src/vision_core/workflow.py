@@ -133,17 +133,21 @@ class Workflow:
             # expose its old S11 success as a CURRENT successful outcome.
             for step in self.stages:
                 self.states[step] = State.BLOCKED
-        if invalidation is None and events and self.requests and self.config_pin is None:
-            self.invalidate('journal has no pinned configuration')
-        elif invalidation is None and self.config_pin is not None and self.config_pin != self._pin():
-            self.invalidate('pinned configuration changed')
-        # An interrupted action is ambiguous. Never redispatch it or its dependents.
-        if any(self.states[step] in (State.READY, State.RUNNING) for step in self.stages):
-            self.invalidate('restart requires external reconciliation')
+        reasons = []
+        if invalidation is None:
+            if events and self.requests and self.config_pin is None:
+                reasons.append('journal has no pinned configuration')
+            elif self.config_pin is not None and self.config_pin != self._pin():
+                reasons.append('pinned configuration changed')
+            if any(self.states[step] in (State.READY, State.RUNNING) for step in self.stages):
+                reasons.append('restart requires external reconciliation')
+            if journal_context is not None and context != journal_context and not (
+                    not context.scene_revision and context.session_id == journal_context.session_id
+                    and context.profile_revisions == journal_context.profile_revisions):
+                reasons.append('context differs from journal')
+            if reasons:
+                self.invalidate('; '.join(reasons))
         if journal_context is not None:
-            # An initial unlocalized context is a valid restart input after promotion.
-            if context != journal_context and not (not context.scene_revision and context.session_id == journal_context.session_id and context.profile_revisions == journal_context.profile_revisions):
-                self.invalidate('context differs from journal')
             self.context = journal_context
 
     @staticmethod
@@ -169,8 +173,7 @@ class Workflow:
         # This worker must never accept another result or dispatch another task.
         self._journal_uncertain = True
         for stage in self.stages:
-            if self.states[stage] in (State.PENDING, State.READY, State.RUNNING):
-                self.states[stage] = State.BLOCKED
+            self.states[stage] = State.BLOCKED
 
     def _require_usable(self) -> None:
         if self._journal_uncertain:
@@ -228,17 +231,21 @@ class Workflow:
     def invalidate(self, reason: str) -> None:
         self._require_usable()
         error = None
-        with self.journal.transaction():
-            history, states = self._durable()
-            if any(e.kind == 'context_invalidated' for e in history) or self.states != states:
-                self.states.update(states)
-                error = GateError('stale or duplicate invalidation')
-                self._record('', 'denied', {'reason': str(error)})
-            else:
-                self._record('', 'context_invalidated', {'reason': reason})
-                for step in self.stages:
-                    if self.states[step] in (State.PENDING, State.READY, State.RUNNING):
-                        self._transition(step, State.BLOCKED, reason)
+        try:
+            with self.journal.transaction():
+                history, states = self._durable()
+                if any(e.kind == 'context_invalidated' for e in history) or self.states != states:
+                    self.states.update(states)
+                    error = GateError('stale or duplicate invalidation')
+                    self._record('', 'denied', {'reason': str(error)})
+                else:
+                    self._record('', 'context_invalidated', {'reason': reason})
+                    for step in self.stages:
+                        if self.states[step] in (State.PENDING, State.READY, State.RUNNING):
+                            self._transition(step, State.BLOCKED, reason)
+        except BaseException:
+            self._poison()
+            raise
         if error:
             raise error
         # Historical SUCCEEDED transitions stay in the journal, while all
@@ -466,6 +473,44 @@ class Workflow:
                     or verified[0].data.get('profile_revision') != self.profiles[self.modules[spec.module_id].profile_kind].revision
                     or not 0 <= now - verified[0].data.get('timestamp', float('-inf')) <= self.max_age):
                     reasons.append('fresh verified module receipt required')
+        if step == 'S10' and self.scenario is not None:
+            history = self.journal.replay(self.context.session_id)
+            for spec in self.scenario.stages:
+                module = self.modules.get(spec.module_id)
+                if module is None or not module.archive_required:
+                    continue
+                receipts = [e for e in history if e.kind == 'module_verified' and e.step_id == spec.stage_id]
+                proofs = [e for e in history if e.kind == 'module_archive_verified' and e.step_id == 'S10'
+                          and e.request_id == evidence.request_id and e.data.get('stage_id') == spec.stage_id]
+                if (len(receipts) != 1 or len(proofs) != 1 or self._durable()[1].get(spec.stage_id) != State.SUCCEEDED
+                        or receipts[0].request_id != self.requests.get(spec.stage_id)
+                        or receipts[0].data.get('request_id') != receipts[0].request_id
+                        or receipts[0].data.get('session_id') != self.context.session_id
+                        or receipts[0].data.get('step_id') != spec.stage_id
+                        or receipts[0].data.get('terminal_success') is not True
+                        or receipts[0].data.get('module_id') != module.module_id
+                        or receipts[0].data.get('module_version') != module.version
+                        or receipts[0].data.get('context') != self.context.to_dict()
+                        or receipts[0].data.get('profile_revision') != self.profiles[module.profile_kind].revision
+                        or proofs[0].data.get('reference') != receipts[0].data.get('reference')
+                        or proofs[0].data.get('payload_sha256') != receipts[0].data.get('payload_sha256')):
+                    reasons.append('module archive proof missing or mismatched')
+            required = any(self.modules.get(spec.module_id) is not None
+                           and self.modules[spec.module_id].archive_required
+                           for spec in self.scenario.stages)
+            if required:
+                published = [e for e in history if e.kind == 'archive_verified'
+                             and e.step_id == 'S10' and e.request_id == evidence.request_id]
+                if len(published) != 1:
+                    reasons.append('verified published manifest required')
+                else:
+                    details = published[0].data
+                    name, sha = details.get('manifest'), details.get('sha256')
+                    if (not isinstance(name, str) or not name or
+                            not isinstance(sha, str) or len(sha) != 64 or
+                            any(c not in '0123456789abcdef' for c in sha) or
+                            evidence.reference != name + ':' + sha):
+                        reasons.append('published manifest and S10 evidence mismatch')
         if reasons:
             self._record(step, 'result_rejected', {'reason': '; '.join(reasons)}, evidence.request_id)
             if self.states.get(step) == State.RUNNING:

@@ -15,7 +15,7 @@ from vision_core.workflow import STAGES, CHECKS
 CAPTURE = 'THERMAL_CAPTURE'
 QA = 'THERMAL_QA'
 MODULE = ModuleSpec('thermal-inspection', '1', 'thermal', {'thermal.frame'}, True,
-                    (CAPTURE, QA), (CAPTURE, QA))
+                    (CAPTURE, QA), (CAPTURE, QA), archive_required=True)
 CAPTURE_CHECKS = frozenset({'transfer', 'integrity', 'context', 'calibration'})
 QA_CHECKS = frozenset({'capture_integrity', 'quality', 'policy'})
 MAX_PIXELS = 2_000_000
@@ -87,6 +87,10 @@ def _number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def _identifier(value):
+    return isinstance(value, str) and 1 <= len(value) <= 128 and all(33 <= ord(c) <= 126 for c in value)
+
+
 def _sha(value):
     return isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) is not None
 
@@ -108,7 +112,8 @@ class ThermalInspectionSession:
         w = self.workflow
         p = w.profiles.get('thermal')
         if (not isinstance(p, ThermalProfile) or p.kind != 'thermal' or not p.approved
-                or p.mode not in MODES or not p.frame_id or not p.calibration_reference
+                or p.mode not in MODES or not _identifier(p.frame_id) or not _identifier(p.calibration_reference)
+                or (p.measurement_calibration != '' and not _identifier(p.measurement_calibration))
                 or p.calibration_reference not in p.calibration_dependencies
                 or 'thermal.frame' not in p.capabilities
                 or validate_profiles(w.profiles, w.calibrations, w.requirements, extra_kinds=w.extra_kinds)
@@ -138,7 +143,8 @@ class ThermalInspectionSession:
             if not isinstance(frame, ThermalFrame): raise GateError('typed frame required')
             now = w.clock()
             if (frame.context != w.context or frame.context != w.snapshots[CAPTURE]
-                or frame.request_id != w.requests[CAPTURE] or frame.scene_frame != w.context.frame_id
+                or frame.request_id != w.requests[CAPTURE] or not _identifier(frame.scene_frame)
+                or not _identifier(frame.frame_id) or frame.scene_frame != w.context.frame_id
                 or frame.frame_id != p.frame_id or frame.mode != p.mode
                 or not _sha(frame.plan_hash) or frame.plan_hash != w.accepted_plan_hash
                 or not _number(frame.timestamp) or not _number(now)
@@ -179,7 +185,9 @@ class ThermalInspectionSession:
                         'measurement_calibration': p.measurement_calibration,
                         'measurement_calibration_revision': p.calibration_dependencies.get(p.measurement_calibration),
                         'emissivity': frame.emissivity, 'reflected_temperature_k': frame.reflected_temperature_k,
-                        'shutter_ack': True, 'transfer_complete': True}
+                        'shutter_ack': True, 'transfer_complete': True,
+                        'archive_entries': [{'name': native, 'sha256': frame.native_sha256},
+                                            {'name': mapping, 'sha256': frame.map_sha256}]}
             payload = _json(document)
             self.archive.write(native, frame.native_original); self.archive.write(mapping, frame.thermal_map)
             self.archive.verify(native, frame.native_sha256); self.archive.verify(mapping, frame.map_sha256)
@@ -224,7 +232,8 @@ class ThermalInspectionSession:
             if not valid or invalid > policy.max_invalid_fraction: raise GateError('invalid pixels')
             if p.mode == MODES[0]:
                 saturation = sum(v in (0, 65535) for v in valid) / len(values)
-                if max(valid) - min(valid) < policy.min_dynamic_range: raise GateError('insufficient dynamic range')
+                unsaturated = [v for v in valid if 0 < v < 65535]
+                if len(unsaturated) < 2 or max(unsaturated) - min(unsaturated) < policy.min_dynamic_range: raise GateError('insufficient dynamic range')
             else:
                 saturation = sum(v < policy.min_kelvin or v > policy.max_kelvin for v in valid) / len(values)
             if saturation > policy.max_saturation_fraction: raise GateError('saturation or range exceeded')
@@ -238,7 +247,10 @@ class ThermalInspectionSession:
                       'reflected_temperature_k': capture['reflected_temperature_k'], 'mode': p.mode,
                       'policy': asdict(policy), 'min': min(valid), 'max': max(valid), 'mean': sum(valid)/len(valid),
                       'invalid_fraction': invalid, 'saturation_fraction': saturation,
-                      'interpretation': 'relative intensity' if p.mode == MODES[0] else 'adapter asserted Kelvin; physical accuracy unproven'}
+                      'interpretation': 'relative intensity' if p.mode == MODES[0] else 'adapter asserted Kelvin; physical accuracy unproven',
+                      'archive_entries': [{'name': ref, 'sha256': capture_sha},
+                                          {'name': capture['native_file'], 'sha256': capture['native_sha256']},
+                                          {'name': capture['map_file'], 'sha256': capture['map_sha256']}] }
             payload = _json(report); name = 'thermal-qa-' + digest(payload) + '.json'
             self.archive.write(name, payload); self.archive.verify(name, digest(payload))
             self._receipt(QA, now, payload, name, QA_CHECKS)

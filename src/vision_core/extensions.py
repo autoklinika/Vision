@@ -30,7 +30,10 @@ class ModuleSpec:
     stage_ids: tuple[str, ...]
     required_stage_ids: tuple[str, ...] = ()  # subset mandatory for selected module
 
+    archive_required: bool = False
+
     def __post_init__(self):
+        if type(self.archive_required) is not bool: raise ValueError('invalid archive requirement')
         for value in (self.module_id, self.version, self.profile_kind): _id(value)
         object.__setattr__(self, 'capabilities', frozenset(_ids(self.capabilities)))
         object.__setattr__(self, 'stage_ids', _ids(self.stage_ids))
@@ -66,6 +69,8 @@ class ScenarioSpec:
         _id(self.scenario_id); _id(self.version)
         object.__setattr__(self, 'stages', tuple(self.stages))
         object.__setattr__(self, 'required_module_ids', _ids(self.required_module_ids))
+        if len(self.stages) > 256:
+            raise ValueError('too many stages')
         if not self.stages or any(not isinstance(s, StageSpec) for s in self.stages):
             raise ValueError('stage specifications required')
         ids = [s.stage_id for s in self.stages]
