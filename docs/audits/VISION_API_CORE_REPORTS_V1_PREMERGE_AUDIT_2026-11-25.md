@@ -21,6 +21,7 @@ Scope: issue #58, based on main `21c3229`. This source-audit record requires fin
 4. **Fixture cleanup:** exclusive credential-file creation failure must not remove a pre-existing file. Cleanup now removes only a file this process created.
 5. **Startup composition:** the first CI typecheck found that Startup also renders AppContent without desktop session controls. Controls are now optional; startup keeps its public boot report only. A browser regression verifies no protected controls or requests before entering the desktop and clicking Refresh session.
 6. **Fixture file API:** the private-file opener belongs to built-in `open()`, not `Path.open()`. An authenticated fixture smoke check verified successful HTTP projection, file mode 0600 and SIGTERM cleanup after correction.
+7. **Default report visibility:** native and CI browser regression found the expanded empty session summary caused default System Status to scroll. Its empty summary is now compact and the default height is 600 px, preserving icon clearance. The existing full-report visibility test remains unchanged.
 
 ## Verification at source-audit time
 

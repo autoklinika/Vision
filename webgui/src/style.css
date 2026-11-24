@@ -8,3 +8,7 @@
 .session-table td { vertical-align: top; }
 .synthetic-label { background: #ffffcb; border: 1px solid #888; padding: 6px 8px; color: #4a3900; }
 .protected-read-status { min-height: 36px; }
+.session-summary { margin-top: 12px; padding-top: 10px; }
+.session-summary .session-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.session-summary h2 { font-size: 14px; margin: 0; }
+.session-summary .protected-read-status { min-height: 0; margin: 8px 0; }

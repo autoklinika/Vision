@@ -12,10 +12,14 @@ const messages = {
 export function SessionContent({section, controls}: {section: 'summary' | 'inspection' | 'events'; controls: SessionControls}) {
   const {view, refreshSession, nextEvents} = controls;
   const {session, events} = view;
-  return <section className="session-report" aria-label="Protected Core report">
-    <h2>{section === 'summary' ? 'Core / Runtime session' : section === 'inspection' ? 'Inspection session report' : 'Session event journal'}</h2>
-    <p className="protected-read-status" role="status">{messages[view.status]}</p>
-    <div className="app-actions"><button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING'}>Refresh session</button>{section === 'events' && <button onClick={nextEvents} disabled={!events || events.nextAfterSequence === null || view.status !== 'AVAILABLE'}>Load more events</button>}</div>
+  const summary = section === 'summary';
+  const message = summary && view.status === 'DISABLED' ? 'Protected reports are disabled in this client mode.' :
+    summary && view.status === 'NOT_REQUESTED' ? 'No report loaded. Refresh session reads the authorized Core report.' : messages[view.status];
+  const refresh = <button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING'}>Refresh session</button>;
+  return <section className={`session-report${summary ? ' session-summary' : ''}`} aria-label="Protected Core report">
+    <div className="session-heading"><h2>{summary ? 'Core / Runtime session' : section === 'inspection' ? 'Inspection session report' : 'Session event journal'}</h2>{summary && refresh}</div>
+    <p className="protected-read-status" role="status">{message}</p>
+    {!summary && <div className="app-actions">{refresh}{section === 'events' && <button onClick={nextEvents} disabled={!events || events.nextAfterSequence === null || view.status !== 'AVAILABLE'}>Load more events</button>}</div>}
     {session && <>
       {session.source === 'SYNTHETIC_TEST' && <p className="synthetic-label"><strong>SYNTHETIC TEST · no station session</strong></p>}
       <div className="report sunken-panel"><dl>
@@ -35,6 +39,6 @@ export function SessionContent({section, controls}: {section: 'summary' | 'inspe
         <p className="fine-print">One bounded page is kept in this browser. Refresh session returns to the first page of a new report.</p>
       </>}
     </>}
-    <p className="fine-print">This is a saved read result, not a live readiness signal. Session control and decisions belong to Vision.</p>
+    {session && <p className="fine-print">This is a saved read result, not a live readiness signal. Session control and decisions belong to Vision.</p>}
   </section>;
 }

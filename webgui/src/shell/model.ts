@@ -15,7 +15,7 @@ export type Rect = { x: number; y: number; width: number; height: number };
 export type WindowState = { id: AppId; rect: Rect; minimized: boolean; maximized: boolean };
 export type DesktopState = { windows: WindowState[]; active: AppId | null };
 export type Action = { type: 'open' | 'focus' | 'minimize' | 'maximize' | 'close'; id: AppId } | { type: 'rect'; id: AppId; rect: Rect } | { type: 'bounds' } | { type: 'reset' };
-export const initialState: DesktopState = { windows: [{ id: 'status', rect: { x: 220, y: 48, width: 610, height: 500 }, minimized: false, maximized: false }], active: 'status' };
+export const initialState: DesktopState = { windows: [{ id: 'status', rect: { x: 220, y: 48, width: 610, height: 600 }, minimized: false, maximized: false }], active: 'status' };
 export function clamp(rect: Rect, bounds: Bounds): Rect {
   const width = Math.min(Math.max(280, rect.width), bounds.width);
   const height = Math.min(Math.max(240, rect.height), bounds.height);
