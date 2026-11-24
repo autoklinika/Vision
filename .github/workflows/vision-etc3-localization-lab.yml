@@ -1,0 +1,19 @@
+name: Vision ETC3 RGB-D localization — offline laboratory checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-photography.txt
+      - run: PYTHONPATH=src python -m unittest discover -s tests/core -v
+      - run: python -m unittest discover -s tools/lab/etc3_localization -p 'test_localize_etc3.py' -v
+      - run: python -m compileall -q src tools/lab/etc3_localization tests/core
+      - run: git diff --check
