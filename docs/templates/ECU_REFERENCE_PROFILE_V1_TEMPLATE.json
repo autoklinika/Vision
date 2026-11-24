@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "kind": "ecu_reference_profile",
+    "schema_version": "V1-PROPOSED",
+    "template_only": true,
+    "profile_id": null,
+    "family_id": null,
+    "variant_id": null,
+    "profile_revision": null,
+    "display_name": null,
+    "status": "DRAFT",
+    "approval_scopes": [],
+    "content_sha256": null
+  },
+  "identity": {
+    "manufacturer": null,
+    "manufacturer_part_numbers": [],
+    "oem_part_numbers": [],
+    "aliases": [],
+    "variant_relations": [],
+    "distinguishing_features": [],
+    "known_indistinguishable_variants": [],
+    "declared_by_operator": true
+  },
+  "physical_states": [],
+  "coordinate_systems": {
+    "ecu_local": {
+      "origin_description": null,
+      "datum_reference": null,
+      "axis_definitions": null,
+      "handedness": "right",
+      "linear_unit": "mm",
+      "verified": false
+    },
+    "state_transforms": []
+  },
+  "geometry": {
+    "per_physical_state": [],
+    "collision_geometry_requires_verified_envelope": true
+  },
+  "connectors_landmarks": {
+    "connectors": [],
+    "landmarks": [],
+    "variant_disambiguation_uses_physical_features": true
+  },
+  "reference_assets": {
+    "storage_policy": "controlled_or_private",
+    "asset_manifest_revision": null,
+    "assets": []
+  },
+  "recognition_rules": {
+    "selected_variant_must_be_verified": true,
+    "features_to_check": [],
+    "required_sensor_capabilities": [],
+    "on_ambiguity": "BLOCK_AND_REQUIRE_OPERATOR_REVIEW",
+    "on_missing_required_evidence": "NOT_READY",
+    "accepted_policy_ref": null
+  },
+  "localization_rules": {
+    "required_features": [],
+    "required_sensor_capabilities": [],
+    "pose_output_frame": "ecu_local",
+    "requires_fresh_tf": true,
+    "requires_current_scene": true,
+    "pose_quality_policy_ref": null,
+    "methods": []
+  },
+  "pcb_definition": {
+    "boards": [],
+    "regions_of_interest": []
+  },
+  "photography_recipes": {
+    "recipes": [],
+    "quality_policy_refs": []
+  },
+  "thermal_recipes": {
+    "modality_optional_by_default": true,
+    "recipes": [],
+    "radiometric_requires_calibration": true
+  },
+  "inspection_workflows": {
+    "recipes": [],
+    "no_arbitrary_executable_code_in_profile": true,
+    "no_automatic_motion_after_failure": true
+  },
+  "validation_policies": {
+    "policies": [],
+    "readiness_by_scope_and_physical_state": [],
+    "missing_required_data": "NOT_READY",
+    "variant_not_unique": "AMBIGUOUS",
+    "automatic_variant_substitution": false
+  },
+  "provenance_release": {
+    "measurement_sources": [],
+    "calibration_dependencies": [],
+    "asset_hashes": [],
+    "release_approval": null,
+    "released_snapshot_sha256": null,
+    "supersedes": null
+  }
+}

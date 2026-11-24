@@ -10,6 +10,13 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 
 **Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
 
+## ECU Reference Profile V1 — zatwierdzony wzorzec wiedzy i instrukcji (24.11.2026)
+
+- [ADR — ECU Reference Profile V1: ACCEPTED](docs/decisions/ADR_VISION_ECU_REFERENCE_PROFILE_V1_2026-11-24.md) — profil jest nominalnym, wersjonowanym źródłem wiedzy o ECU i instrukcją dla całego Vision, nie plikiem komend robota.
+- [Pełna specyfikacja: 15 sekcji](docs/architecture/ECU_REFERENCE_PROFILE_V1_SPECIFICATION.md) i [szablon JSON](docs/templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json) — dokumentacja architektury, **nie** wykonywalny profil ETC3.
+- [Biblioteka ECU, wybór operatora i edytor — UX V1](docs/ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md) — zaakceptowany kierunek GUI; implementacja dopiero w kolejnym etapie.
+- Oddzielamy **Reference Profile**, wykonawczy **ECUProfile/ScenarioSpec** oraz **kartę badanej sztuki**. ETC3 pozostaje niezatwierdzonym DRAFT. Projekt katalogu: [PR #46](https://github.com/autoklinika/Vision/pull/46) (oddzielna, niescalona gałąź).
+
 ## Obowiązująca architektura Vision Core
 
 - [ADR-VISION-CORE-001 — Hardware Independence & Modular Architecture](docs/architecture/ADR_VISION_CORE_HARDWARE_INDEPENDENCE_2026-11-23.md) — **ACCEPTED (23.11.2026)**: Core jest niezależnym od sprzętu koordynatorem inspekcji. Aparat, obiektyw, RGB-D i robot są wymienne przez interfejsy, adaptery i profile. Nowe urządzenie wymaga odpowiedniej kalibracji i weryfikacji, lecz nie przepisywania scenariuszy ECU.
