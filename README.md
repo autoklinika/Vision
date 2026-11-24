@@ -21,6 +21,12 @@ Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q**
 
 - [ADR-VISION-CORE-001 — Hardware Independence & Modular Architecture](docs/architecture/ADR_VISION_CORE_HARDWARE_INDEPENDENCE_2026-11-23.md) — **ACCEPTED (23.11.2026)**: Core jest niezależnym od sprzętu koordynatorem inspekcji. Aparat, obiektyw, RGB-D i robot są wymienne przez interfejsy, adaptery i profile. Nowe urządzenie wymaga odpowiedniej kalibracji i weryfikacji, lecz nie przepisywania scenariuszy ECU.
 
+## ECU Profiles V1 — katalog profili i ETC3 PoC (24.11.2026)
+
+- [Kontrakt ECU Profiles V1](docs/implementation/VISION_ECU_PROFILES_V1.md) — niezależny od sprzętu katalog wersjonowanych danych ECU, weryfikacja operatora i obserwacji, kontrolowany odbiór i wydawanie profili.
+- [ETC3 PoC V1 — karta danych i lista pomiarów](docs/profiles/ETC3_POC_V1_PL.md) — **DRAFT / NOT_READY**; dwie czarne i jedna szara wtyczka, brak zatwierdzonej geometrii i ujęć. To nie jest aktywny profil robota.
+- [Audyt ECU Profiles V1](docs/audits/VISION_ECU_PROFILES_V1_AUDIT_2026-11-24.md) — testy i granice zaufania. Moduł nie uruchamia NERO ani Sony.
+
 ## ROS 2 i przenośność stanowiska (16.11.2026)
 
 - [Raport techniczny: ROS 2, NERO, MoveIt, Luxonis, ETC3 i przejście LAB → PROD](docs/architecture/VISION_ROS2_NERO_LAB_TO_PROD_TECHNICAL_REPORT_2026-11-16.md) — szczegółowe ustalenia, wymagania wejściowe, architektura i plan izolowanych testów; **DESIGN REPORT / PROPOSED**, bez wdrożenia na sprzęcie.
