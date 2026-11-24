@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vision API-01 error",
+  "title": "Vision API read error",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,10 @@
         "ORIGIN_REJECTED",
         "NOT_FOUND",
         "METHOD_NOT_ALLOWED",
-        "INTERNAL_ERROR"
+        "INTERNAL_ERROR",
+        "ACCESS_DENIED",
+        "REPORT_UNAVAILABLE",
+        "CURSOR_REJECTED"
       ]
     }
   }

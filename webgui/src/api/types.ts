@@ -1,3 +1,5 @@
+import type { ProtectedResult } from './protectedAdapter';
+import type { EventsReport, SessionReport } from './sessionContract';
 /** Client presentation boundary v1; NOT an agreed Vision wire/API contract. */
 export type Snapshot = Readonly<{
   schema: 'client-view-v1';
@@ -13,4 +15,6 @@ export interface ReadOnlyVisionClient {
   readonly mode: 'demo' | 'real';
   readonly canRefresh?: boolean;
   readSnapshot(): Promise<Snapshot>;
+  readonly readSession?: () => Promise<ProtectedResult<SessionReport>>;
+  readonly readEvents?: (session: SessionReport, after: number) => Promise<ProtectedResult<EventsReport>>;
 }

@@ -4,6 +4,8 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import fields, is_dataclass
+from contextlib import contextmanager
+from functools import wraps
 import time
 from typing import Callable, Mapping
 from .journal import Journal
@@ -46,8 +48,20 @@ def _fingerprint(profiles, calibrations, requirements, max_age):
     return hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
 
+def _serialized_mutation(method):
+    @wraps(method)
+    def serialized(self, *args, **kwargs):
+        with self.owner_operation():
+            return method(self, *args, **kwargs)
+    return serialized
+
+
 class Workflow:
     def __init__(self, journal: Journal, context: Context, profiles: Mapping[str, Profile], calibrations: Mapping[str, str], requirements: Mapping[str, frozenset[str]], max_age: float, clock: Callable[[], float] = time.time, *, scenario: ScenarioSpec | None = None, registry: ModuleRegistry | None = None, strict_planning: bool = False):
+        # Share the journal's owner lock: journal transactions, all mutations,
+        # and post-commit memory updates use one serialization boundary.
+        self._owner_lock = journal._lock
+        self._mutation_depth = 0
         if not math.isfinite(max_age) or max_age <= 0:
             raise ValueError('a positive finite freshness limit is required')
         if type(strict_planning) is not bool:
@@ -166,6 +180,26 @@ class Workflow:
         if journal_context is not None:
             self.context = journal_context
 
+    @contextmanager
+    def owner_operation(self):
+        """Serialize a Runtime operation with this engine's immutable reads."""
+        with self._owner_lock:
+            self._mutation_depth += 1
+            try:
+                yield
+            finally:
+                self._mutation_depth -= 1
+
+    def read_snapshot(self):
+        """Read current authority; never construct, replay or advance an engine."""
+        from .read_model import read_snapshot
+        return read_snapshot(self)
+
+    def read_events(self, *, after_sequence=0, limit=50, through_sequence=None):
+        from .read_model import read_events
+        return read_events(self, after_sequence=after_sequence, limit=limit,
+                           through_sequence=through_sequence)
+
     @staticmethod
     def _ancestors(stage, specs):
         result = set()
@@ -191,6 +225,7 @@ class Workflow:
         data = _canonical(data)
         return hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
+    @_serialized_mutation
     def _poison(self) -> None:
         # A failed journal write/commit may have reached persistent storage.
         # This worker must never accept another result or dispatch another task.
@@ -204,6 +239,7 @@ class Workflow:
         if self._journal_uncertain:
             raise GateError('journal persistence uncertain; external reconciliation required')
 
+    @_serialized_mutation
     def _record(self, step: str, kind: str, data: dict, request: str = '') -> None:
         try:
             self.journal.append(self.context.session_id, step, request or self.requests.get(step, ''), kind, data)
@@ -215,6 +251,7 @@ class Workflow:
         self._record(step, 'denied', {'reason': reason})
         raise GateError(reason)
 
+    @_serialized_mutation
     def _transition(self, step: str, target: State, reason: str) -> None:
         old = self.states[step]
         if target not in ALLOWED.get(old, set()):
@@ -222,6 +259,7 @@ class Workflow:
         self._record(step, 'transition', {'from': old.value, 'to': target.value, 'reason': reason})
         self.states[step] = target
 
+    @_serialized_mutation
     def _block_after(self, step: str, reason: str) -> None:
         for later in self.stages:
             if step not in self.ancestors[later]:
@@ -326,6 +364,7 @@ class Workflow:
                     or proof.timestamp < preparation.timestamp):
                 raise GateError('motion preparation binding mismatch')
 
+    @_serialized_mutation
     def invalidate(self, reason: str) -> None:
         self._require_usable()
         error = None
@@ -352,6 +391,7 @@ class Workflow:
         self.accepted_preparation_hash = None
         self.accepted_motion_hash = None
 
+    @_serialized_mutation
     def update_context(self, context: Context) -> None:
         self._require_usable()
         if context != self.context:
@@ -382,6 +422,7 @@ class Workflow:
                 errors.append('observation stale or in future')
         return errors
 
+    @_serialized_mutation
     def start(self, step: str, request_id: str) -> None:
         self._require_usable()
         if self.scenario is not None and self._initial_pin != self._pin():
@@ -456,6 +497,7 @@ class Workflow:
         self.dispatch_times[step] = dispatch_time
         self.states[step] = State.RUNNING
 
+    @_serialized_mutation
     def verify_module_receipt(self, receipt: ModuleReceipt, payload: bytes) -> None:
         """Record a trusted adapter's correlated result after checking payload integrity."""
         self._require_usable()
@@ -488,6 +530,7 @@ class Workflow:
             self._poison()
             raise
 
+    @_serialized_mutation
     def ack(self, step: str, request_id: str) -> None:
         self._require_usable()
         if self.states.get(step) != State.RUNNING or self.requests.get(step) != request_id:
@@ -497,6 +540,7 @@ class Workflow:
     def _repeatable(self):
         return bool(getattr(self.profiles.get('ecu'), 'view_quaternions_xyzw', ()))
 
+    @_serialized_mutation
     def complete(self, evidence: Evidence, *, _verified_plan=None, _verified_preparation=None, _verified_motion=None) -> None:
         self._require_usable()
         error = None
@@ -528,6 +572,7 @@ class Workflow:
         if error:
             raise error
 
+    @_serialized_mutation
     def _complete_locked(self, evidence: Evidence, *, _verified_plan=None, _verified_preparation=None, _verified_motion=None) -> None:
         step = evidence.step_id
         reasons = []
@@ -654,6 +699,7 @@ class Workflow:
             if step == 'S06' and self.strict_planning:
                 self.accepted_motion_hash = _verified_motion.motion_hash
 
+    @_serialized_mutation
     def stop(self, step: str, state: State, reason: str) -> None:
         self._require_usable()
         if state not in (State.FAILED, State.CANCELLED, State.TIMED_OUT) or not reason or step not in self.states:

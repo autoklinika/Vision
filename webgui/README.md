@@ -1,4 +1,14 @@
-# Vision Startup & Desktop V1 (GUI-02 + API-01)
+# Vision Startup & Desktop V1 (GUI-02 + API-01 / API-02)
+
+## API-02 protected reports
+
+System Status, Inspection Manager and Event Viewer share a read-only Core/Runtime view. In real mode, **Refresh session** requests a server-authorized session and first bounded journal page; **Load more events** reads the next page of the same pinned prefix. Source, capture time, current state, historical success and ACK are separate. Failures clear protected data; DEMO never fetches it.
+
+The ordinary LAB server defaults to denial: production authentication and the active station provider are not connected by this package. The browser fixture uses a real Workflow/Journal with synthetic evidence and a random test-only HttpOnly cookie, visibly labelled SYNTHETIC TEST and excluded from the build. See [API-02 specification](../docs/implementation/VISION_API_CORE_REPORTS_V1.md) for contracts, limits and tests.
+
+WebGUI remains only a client of Vision. No session-control, hardware or workflow decision logic is added.
+
+## Original GUI-02 / API-01 scope
 
 WebGUI is **only a client of the entire Vision system**. This isolated React / TypeScript / Vite / 98.css package implements presentation. API-01 adds a read-only same-origin HTTP client for the API-only boot report. No authentication, hardware/ROS/MoveIt access, workflow or operational commands.
 

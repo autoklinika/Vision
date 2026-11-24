@@ -1,4 +1,5 @@
 node_modules/
+.api02-test-auth.json
 dist/
 test-results/
 playwright-report/

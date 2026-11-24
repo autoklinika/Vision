@@ -53,6 +53,16 @@ jobs:
       - name: Actual loopback Python API and Chromium build
         working-directory: webgui
         run: VISION_API_INTEGRATION=1 GUI_BUILD_SMOKE=1 npm run test:browser -- --grep 'actual API:'
+      - name: Actual synthetic Core and protected Chromium DEV
+        working-directory: webgui
+        run: |
+          VISION_PROJECTION_INTEGRATION=1 npm run test:browser -- --grep 'actual Core:'
+          test ! -e .api02-test-auth.json
+      - name: Actual synthetic Core and protected Chromium build
+        working-directory: webgui
+        run: |
+          VISION_PROJECTION_INTEGRATION=1 GUI_BUILD_SMOKE=1 npm run test:browser -- --grep 'actual Core:'
+          test ! -e .api02-test-auth.json
       - name: Dependency audit
         working-directory: webgui
         run: npm audit --registry=https://registry.npmjs.org/

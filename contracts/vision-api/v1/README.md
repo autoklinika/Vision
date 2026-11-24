@@ -1,4 +1,14 @@
-# Vision API V1 — API-01 foundation
+# Vision API V1 — boot status and protected Core reports
+
+## API-02 protected read reports
+
+`GET /api/v1/session` and `GET /api/v1/events?view=…&after=…&through=…` return the closed [session](session.schema.json) and [events](events.schema.json) contracts. They require per-request server authorization scoped to the fixed provider's session. The ordinary LAB CLI has no provider or authorizer, so protected reads are denied. The explicit synthetic test composition is outside production packages.
+
+The [implementation specification](../../../docs/implementation/VISION_API_CORE_REPORTS_V1.md) defines synchronization, immutable extraction, exact cursors, authorization, redaction, freshness and deployment gates. [Shared fixtures](session-fixtures.json) are synthetic. Protected responses are bounded to 131072 bytes, at most 256 stages and 50 events per page. Additional errors: 401 ACCESS_DENIED, 409 CURSOR_REJECTED, 503 REPORT_UNAVAILABLE.
+
+**Public boot status remains unchanged after API-02:** no session data, Core readiness always UNKNOWN. CORE_REPORT_NOT_CONNECTED describes this public API-only report, not whether a separate protected provider exists. API availability never establishes Vision readiness.
+
+## API-01 foundation (historical scope)
 
 Status: implementation candidate, isolated LAB only. Authority: [WebGUI client-only ADR](../../../docs/decisions/ADR_VISION_WEBGUI_CLIENT_ONLY_2026-11-24.md).
 

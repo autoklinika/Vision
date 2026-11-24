@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ReadOnlyVisionClient, Snapshot } from '../api/types';
 import { AppContent } from '../apps/AppContent';
+import { useSessionView } from '../api/useSessionView';
 import { modeLabel, modeDescription, connectionLabel } from '../api/presentation';
 import { apps, clamp, decodeLayout, encodeLayout, reduce, storageKey } from './model';
 import type { Action, AppId, Bounds, Rect, WindowState } from './model';
@@ -12,6 +13,7 @@ export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
   return <svg className={small ? 'app-icon small' : 'app-icon'} viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges"><path d="M3 5h23v3h3v21H3z" fill="#000"/><path d="M4 6h21v3h3v19H4z" fill="#fff"/><path d="M6 9h19v16H6z" fill={['#008080','#b59c42','#487a48','#367ca5','#756198','#a65d5d','#488b8b','#777','#b38b45'][index]}/><path d="M6 9h19v3H6z" fill="#000080"/><text x="16" y="23" textAnchor="middle" fontSize="15" fill="white">{apps[index].glyph}</text><path d="M2 29h27v2H2z" fill="#004747"/></svg>;
 }
 export function Desktop({ client, snapshot, refresh }: { client: ReadOnlyVisionClient; snapshot: Snapshot | null; refresh: () => void }) {
+  const sessionControls = useSessionView(client);
   const [size, setSize] = useState(bounds);
   const [state, setState] = useState(() => { try { return decodeLayout(localStorage.getItem(storageKey), bounds()); } catch { return decodeLayout(null, bounds()); } });
   const [persistence, setPersistence] = useState('Layout preferences are local to this browser.');
@@ -61,7 +63,7 @@ export function Desktop({ client, snapshot, refresh }: { client: ReadOnlyVisionC
     dispatch({ type: 'reset' });
   }
   return <main className="desktop" onKeyDown={e => { if (e.key === 'Escape' && start) { setStart(false); startRef.current?.focus(); } }}>
-    <header className="mode-banner"><strong>{modeLabel(client.mode, snapshot)}</strong><span>{modeDescription(client.mode, snapshot)}</span><span className="shell-version">VISION / API-01</span></header>
+    <header className="mode-banner"><strong>{modeLabel(client.mode, snapshot)}</strong><span>{modeDescription(client.mode, snapshot)}</span><span className="shell-version">VISION / API-02</span></header>
     <div className="workspace" style={{ height: size.height }}>
       <nav className="desktop-icons" aria-label="Desktop applications">{apps.map(app => <button className="desktop-shortcut" key={app.id} onClick={() => launch(app.id)} title={app.description}><Icon id={app.id}/><span>{app.title}</span></button>)}</nav>
       <div className="desktop-watermark" aria-hidden="true"><strong>VISION</strong><span>DESKTOP SHELL / V1</span><small>Client of the Vision system</small></div>
@@ -73,7 +75,7 @@ export function Desktop({ client, snapshot, refresh }: { client: ReadOnlyVisionC
             <div className="title-bar-text" id={`title-${win.id}`}><Icon id={win.id} small/>{app.title}</div><div className="title-bar-controls"><button aria-label={`Minimize ${app.title}`} onClick={() => dispatch({ type: 'minimize', id: win.id })}/><button aria-label={`${win.maximized ? 'Restore' : 'Maximize'} ${app.title}`} className={win.maximized ? 'restore-button' : 'maximize-button'} onClick={() => dispatch({ type: 'maximize', id: win.id })}/><button aria-label={`Close ${app.title}`} onClick={() => dispatch({ type: 'close', id: win.id })}/></div>
           </div>
           <div className="window-menubar"><span>Vision client</span><span>{modeLabel(client.mode, snapshot)}</span><span>Read only</span></div>
-          <div className="window-body"><AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={persistence} refresh={client.canRefresh ? refresh : undefined}/></div>
+          <div className="window-body"><AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={persistence} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls}/></div>
           <footer className="status-bar"><p className="status-bar-field">{win.id === 'control' ? 'Local UI preferences' : 'No operational commands'}</p><p className="status-bar-field">{connectionLabel(snapshot)}</p>{!win.maximized && <button className="resize-handle" aria-label={`Resize ${app.title} with arrow keys`} onKeyDown={e => keyboard(e, win, 'resize')} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); gesture.current = { id: win.id, kind: 'resize', x: e.clientX, y: e.clientY, rect: win.rect }; }} onPointerMove={move} onPointerUp={() => { gesture.current = null; }} onPointerCancel={() => { gesture.current = null; }}>◢</button>}</footer>
         </section>;
       })}
