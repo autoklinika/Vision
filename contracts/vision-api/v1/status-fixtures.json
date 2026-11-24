@@ -1,0 +1,115 @@
+{
+  "valid": {
+    "schema": "vision.api.status.v1",
+    "scope": "LAB_API_ONLY",
+    "api": "AVAILABLE",
+    "reportTime": "2026-01-01T12:00:00Z",
+    "coreReadiness": "UNKNOWN",
+    "observedAt": null,
+    "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+    "components": []
+  },
+  "invalid": [
+    {
+      "name": "fake ready",
+      "value": {
+        "schema": "vision.api.status.v1",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-01-01T12:00:00Z",
+        "coreReadiness": "READY",
+        "observedAt": null,
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": []
+      }
+    },
+    {
+      "name": "fabricated component",
+      "value": {
+        "schema": "vision.api.status.v1",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-01-01T12:00:00Z",
+        "coreReadiness": "UNKNOWN",
+        "observedAt": null,
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": [
+          {
+            "name": "NERO",
+            "status": "READY"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invented observation",
+      "value": {
+        "schema": "vision.api.status.v1",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-01-01T12:00:00Z",
+        "coreReadiness": "UNKNOWN",
+        "observedAt": "2026-01-01T12:00:00Z",
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": []
+      }
+    },
+    {
+      "name": "wrong version",
+      "value": {
+        "schema": "vision.api.status.v2",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-01-01T12:00:00Z",
+        "coreReadiness": "UNKNOWN",
+        "observedAt": null,
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": []
+      }
+    },
+    {
+      "name": "extra field",
+      "value": {
+        "schema": "vision.api.status.v1",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-01-01T12:00:00Z",
+        "coreReadiness": "UNKNOWN",
+        "observedAt": null,
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": [],
+        "extra": "not allowed"
+      }
+    },
+    {
+      "name": "invalid calendar date",
+      "value": {
+        "schema": "vision.api.status.v1",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-02-30T12:00:00Z",
+        "coreReadiness": "UNKNOWN",
+        "observedAt": null,
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": []
+      }
+    },
+    {
+      "name": "wrong timestamp format",
+      "value": {
+        "schema": "vision.api.status.v1",
+        "scope": "LAB_API_ONLY",
+        "api": "AVAILABLE",
+        "reportTime": "2026-01-01T12:00:00+00:00",
+        "coreReadiness": "UNKNOWN",
+        "observedAt": null,
+        "reasonCode": "CORE_REPORT_NOT_CONNECTED",
+        "components": []
+      }
+    },
+    {
+      "name": "not an object",
+      "value": null
+    }
+  ]
+}
