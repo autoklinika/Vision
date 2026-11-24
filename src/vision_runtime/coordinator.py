@@ -92,7 +92,10 @@ class VisionRuntimeCoordinator:
             return RuntimeResult(stage, 'FAILED', (str(exc),))
 
     def _trusted(self, kind, receipt):
-        if self.trust_verifier(kind, receipt) is not True: raise ValueError('independent source verification failed')
+        before = self._ref(receipt)
+        accepted = self.trust_verifier(kind, receipt)
+        if self._ref(receipt) != before: raise ValueError('runtime payload changed during independent verification')
+        if accepted is not True: raise ValueError('independent source verification failed')
         if receipt.source == self.declaration.operator_id: raise ValueError('source must be independent of operator')
 
     def _ref(self, value):
@@ -105,6 +108,7 @@ class VisionRuntimeCoordinator:
             if not {'rgb','depth','camera_info','tf'} <= receipt.capabilities or not receipt.capabilities <= self.capabilities: raise ValueError('capability mismatch')
             _hash_reference(receipt.reference); _hash_reference(receipt.device_state_reference)
             self._trusted('readiness', receipt)
+            validate_readiness(receipt, self.engine.context, self.calibrations, now=self.clock(), max_age=self.max_age)
             return self.engine.context, receipt.timestamp, self._ref(receipt), {}
         return self._run('S01', request, check)
 
@@ -116,13 +120,18 @@ class VisionRuntimeCoordinator:
         return self._run('S02', request, check)
 
     def _validate_observation(self, receipt, request_id=None):
-        validate_observation(receipt, self.engine.context, self.calibrations, now=self.clock(), max_age=self.max_age, max_skew=self.max_skew, sensor_frame=self.sensor_frame, scene_frame=self.scene_frame, known_transforms=self.known_transforms, capabilities=self.capabilities)
+        def structure():
+            validate_observation(receipt, self.engine.context, self.calibrations, now=self.clock(), max_age=self.max_age, max_skew=self.max_skew, sensor_frame=self.sensor_frame, scene_frame=self.scene_frame, known_transforms=self.known_transforms, capabilities=self.capabilities)
+        structure()
         stamps = (receipt.rgb, receipt.depth, receipt.camera_info, receipt.tf) + tuple(s for s in (receipt.depth_camera_info, receipt.depth_to_rgb_tf) if s is not None)
         if request_id is not None and (receipt.request_id != request_id or min(s.timestamp for s in stamps) < self.engine.dispatch_times['S03']): raise ValueError('observation request or dispatch mismatch')
         for ref in (receipt.reference, *(s.reference for s in stamps), *(c.reference for c in receipt.connectors), *receipt.pcb_references, *receipt.obstacle_references): _hash_reference(ref)
         for ref in (receipt.geometry_reference, receipt.source_proof, receipt.binding_reference):
             _hash_reference(ref)
         self._trusted('observation', receipt)
+        # A slow verifier may expire an older depth/TF sample while the RGB
+        # timestamp used by Core remains fresh. Recheck every source timestamp.
+        structure()
         expected = self.record.envelope
         if expected is None or expected.provenance.uncertainty_mm is None or not 1e-9 <= receipt.envelope_uncertainty_mm <= expected.provenance.uncertainty_mm or any(abs(a-b) > expected.provenance.uncertainty_mm for a,b in zip(expected.values, receipt.envelope_mm)): raise ValueError('envelope mismatch')
         expected_connectors = {c.connector_id:c for c in self.record.connectors}
@@ -151,6 +160,10 @@ class VisionRuntimeCoordinator:
             self._validate_observation(receipt)
             ctx = self.engine.context
             if (receipt.scene_revision, receipt.frame_id, receipt.rgb.timestamp) != (ctx.scene_revision, ctx.frame_id, ctx.observation_timestamp): raise ValueError('scene mismatch')
+            accepted = [e for e in self.engine.journal.replay(ctx.session_id)
+                        if e.step_id == 'S03' and e.kind == 'localization_accepted']
+            if len(accepted) != 1 or accepted[0].data['evidence']['reference'] != self._ref(receipt):
+                raise ValueError('localization receipt differs from accepted S03 evidence')
             obs = ECUObservation(receipt.source, receipt.reference, receipt.frame_id, receipt.session_id, receipt.scene_revision, self.record.revision, receipt.rgb.timestamp, tuple(ObservedConnector(c.connector_id,c.color,c.position_mm) for c in receipt.connectors), receipt.quality, True)
             result = verify_declared_ecu(self.record, self.declaration, obs, session_id=ctx.session_id, frame_id=ctx.frame_id, scene_revision=ctx.scene_revision, now=self.clock(), max_age=self.max_age, calibrations=self.calibrations, catalog=self.catalog)
             if result.status != 'ACCEPTED': raise ValueError(result.status + ': ' + '; '.join(result.reasons))
