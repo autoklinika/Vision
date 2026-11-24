@@ -20,3 +20,21 @@ During the read-only test, CameraInfo K/R/P arrived as NumPy arrays containing n
 The owned adapter stamp is not a generated ROS builtin_interfaces.msg.Time object. For a caller-managed tf2 buffer, convert it explicitly using rclpy.time.Time(seconds=stamp.sec, nanoseconds=stamp.nanosec), then call buffer.lookup_transform(target, source, query_time). The test probe originally used Time.from_msg on an owned stamp, which is invalid.
 
 The live camera's RGB and aligned Depth frames were both oak_rgb_camera_optical_frame. Its camera-local TF was available from oak_parent_frame, but there was no verified active world-to-camera transform. PointCloud2 was received independently with RELIABLE QoS; it is not included in the Runtime RGBDFramePacket and does not establish ECU pose.
+
+## Verifier payload contract
+
+`SensorObservationBuilder` calls `verifier(kind, payload) -> bool` and requires
+the result to be exactly `True`. For `kind == "binding"`, `payload` is the complete
+`MeasurementBinding`. Its digest is checked before and after authentication and
+again after constructing the observation receipt. Profile and calibration maps
+are copied before constructing the binding, so the receipt uses the same snapshot
+that was authenticated. Mutation of geometry or binding fields during verification
+produces `NOT_READY`.
+
+For `kind == "readiness"`, `payload` is now the complete typed `ReadinessReceipt`,
+including session, request, both revision maps, timestamp, source, proof, quality,
+capabilities and device-state reference. This intentionally replaces the former
+four-item tuple before V1 is merged; integrations must authenticate the full
+receipt. The builder checks its digest across the callback. The coordinator then
+checks readiness freshness and the configured context again after authentication.
+Callbacks authenticate evidence; they must not modify their input.

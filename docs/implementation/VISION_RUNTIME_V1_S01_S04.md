@@ -11,3 +11,17 @@ Timestamps must be at or after dispatch and within the configured freshness limi
 Stage C1 evaluates required selected-state reference features against the approved ECU record and externally verified local measurements. Only `rgbd_landmark` rules with controlled connector IDs, matching colors, verified metric reference sources and bounded uncertainties are supported; other required methods and unsupported feature correspondences fail closed. Identity and pose quality policies must be present and verified. The ECU catalog ambiguity check remains mandatory. Envelope and connector uncertainties cannot expand the approved geometry limits.
 
 The ROS observation builder requires an external estimator and a single independent `binding` verification over the exact RGBD packet, geometry, source proof, session, request, scene and calibration context. Its receipt includes a binding reference, geometry reference and source proof; the coordinator's external trust verifier must retrieve and cross-check that retained binding against the complete receipt and current context. A raw image receipt is not measurement authorization. Full automated visual feature detection is not implemented. A read-only ROS2 live camera and adapter test passed on 2026-11-24, but it was not a physical S03/S04 ECU-localization success; see the dedicated live acceptance report. Permissive verifier callbacks in tests are synthetic test doubles only.
+
+## Final audit: authentication and durable observation identity
+
+Independent verification must leave its input unchanged. The coordinator compares
+the full selection/receipt digest before and after the callback, and revalidates
+readiness or every observation source timestamp after it returns. A slow callback
+cannot keep an expired depth or TF sample valid merely because RGB is still fresh.
+S04 requires the current complete receipt digest to equal the unique durable S03
+`localization_accepted` evidence reference; matching scene, frame and RGB time
+alone is insufficient. These checks do not replace the external verifier's duty
+to authenticate retained source data and the actual station configuration.
+
+See the [final Runtime audit](../audits/VISION_RUNTIME_V1_FINAL_AUDIT_2026-11-24.md)
+for the reproduced defects and regression results.
