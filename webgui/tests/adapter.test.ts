@@ -108,7 +108,7 @@ it('cancels a rejected response before reading its body', async () => {
       },
     });
     Object.defineProperty(r, 'url', {value: kind === 'url' ? 'https://untrusted.test/api/v1/status' : statusUrl});
-    const network = vi.fn((_url: URL, _init: RequestInit) => Promise.resolve(r));
+    const network = vi.fn<(url: URL, init: RequestInit) => Promise<Response>>().mockResolvedValue(r);
     vi.stubGlobal('fetch', network);
     const s = await realAdapter.readSnapshot();
     expect(s).toMatchObject({connection:'UNAVAILABLE',readiness:'UNKNOWN',reportTime:null});
@@ -126,7 +126,7 @@ it('rejects an oversized streamed body with no declared content length', async (
   });
   const r = new Response(stream, {headers:{'Content-Type':'application/json; charset=utf-8'}});
   Object.defineProperty(r, 'url', {value:statusUrl});
-  const network = vi.fn((_url: URL, _init: RequestInit) => Promise.resolve(r));
+  const network = vi.fn<(url: URL, init: RequestInit) => Promise<Response>>().mockResolvedValue(r);
   vi.stubGlobal('fetch', network);
   expect(await realAdapter.readSnapshot()).toMatchObject({connection:'UNAVAILABLE',reportTime:null});
   expect(cancel).toHaveBeenCalledTimes(1);
