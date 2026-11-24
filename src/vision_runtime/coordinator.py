@@ -39,7 +39,7 @@ class VisionRuntimeCoordinator:
                  declaration, record, catalog, release_store, reference_profile,
                  physical_state, recipe, capabilities, asset_store, reference_release_store,
                  trust_verifier, sensor_frame, scene_frame, known_transforms, max_skew,
-                 clock, library=None):
+                 clock, library=None, strict_planning=False):
         if not isinstance(declaration, Declaration) or not isinstance(catalog, ECUCatalog) or not isinstance(release_store, ReleaseStore):
             raise ValueError('typed declaration, catalog and release store required')
         if not callable(trust_verifier): raise ValueError('external trust verifier required')
@@ -54,7 +54,8 @@ class VisionRuntimeCoordinator:
         self._selection_check()
         self.bundle = self._compile()
         if profiles.get('ecu') != self.bundle.core_profile: raise ValueError('Core ECU profile must match compiled selection')
-        self.engine = Workflow(journal, context, profiles, calibrations, requirements, max_age, clock)
+        self.engine = Workflow(journal, context, profiles, calibrations, requirements, max_age, clock,
+                               strict_planning=strict_planning)
         self._observation = None
         history = journal.replay(context.session_id)
         selections = [e for e in history if e.step_id == 'S02' and e.kind == 'result_accepted']
