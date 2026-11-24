@@ -19,6 +19,8 @@ Scope: issue #58, based on main `21c3229`. This source-audit record requires fin
 2. **Session validator parity:** the client initially lacked Python's invalidation/current-state and success/history checks. Both now reject invalidated reports containing non-BLOCKED states and SUCCEEDED without historical success; regressions cover both.
 3. **ACK/event semantics:** a malformed `ack` could carry SUCCEEDED. Both validators now permit state only for transitions or accepted localization (fixed SUCCEEDED). All other kinds require null.
 4. **Fixture cleanup:** exclusive credential-file creation failure must not remove a pre-existing file. Cleanup now removes only a file this process created.
+5. **Startup composition:** the first CI typecheck found that Startup also renders AppContent without desktop session controls. Controls are now optional; startup keeps its public boot report only. A browser regression verifies no protected controls or requests before entering the desktop and clicking Refresh session.
+6. **Fixture file API:** the private-file opener belongs to built-in `open()`, not `Path.open()`. An authenticated fixture smoke check verified successful HTTP projection, file mode 0600 and SIGTERM cleanup after correction.
 
 ## Verification at source-audit time
 

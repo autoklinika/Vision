@@ -21,7 +21,12 @@ test('Core report windows share one read view, preserve ACK meaning, page and cl
     reads.push(route.request().url());
     return route.fulfill({contentType: type, body: JSON.stringify(eventsFixture(session, Number(new URL(route.request().url()).searchParams.get('after'))))});
   });
-  await page.goto('/?mode=real'); await enterDesktop(page);
+  await page.goto('/?mode=real');
+  const startup = page.getByRole('dialog', {name: 'Vision Workstation Startup'});
+  await expect(startup).toContainText('API AVAILABLE (last report)');
+  await expect(startup.getByRole('button', {name: 'Refresh session'})).toHaveCount(0);
+  expect(reads).toHaveLength(0);
+  await enterDesktop(page);
   expect(reads).toHaveLength(0);
   const status = page.getByRole('dialog', {name: 'System Status', exact: true});
   await status.getByRole('button', {name: 'Refresh session', exact: true}).click();

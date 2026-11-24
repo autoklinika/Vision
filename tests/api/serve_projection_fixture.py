@@ -40,7 +40,7 @@ def main():
     # This is a test-only fixed filename; refuse existing files/symlinks.
     created = False
     try:
-        with args.auth_file.open("x", opener=lambda name, flags: os.open(name, flags, 0o600)) as auth:
+        with open(args.auth_file, "x", opener=lambda name, flags: os.open(name, flags, 0o600)) as auth:
             created = True
             json.dump({"cookieName": cookie_name, "cookieValue": cookie_value}, auth)
         with make_server(args.port, provider=CoreReportProvider(engine, source="SYNTHETIC_TEST"), authorizer=authorize) as server:
