@@ -74,3 +74,5 @@ Kod eksperymentalny, testy urządzeń i niezatwierdzone konfiguracje **nie są s
 Historia wcześniejszych testów: [weryfikacja VENTUNO Q](docs/hardware/VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md), [weryfikacja Sony A6100](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md), [proces rozwoju](docs/process/DEVELOPMENT.md).
 
 ECU reference profile V1 usage and release gates: [implementation guide](docs/implementation/VISION_ECU_REFERENCE_PROFILE_V1_IMPLEMENTATION.md).
+
+- [ECU library backend V1](docs/implementation/VISION_ECU_LIBRARY_BACKEND_V1.md) — offline catalog and reference-profile draft editing service.
