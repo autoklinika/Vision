@@ -1,0 +1,21 @@
+.startup { min-height: 100dvh; display: flex; flex-direction: column; background: #008080; }
+.startup .mode-banner { position: relative; z-index: 1; }
+.intro-stage { background: white; }
+.intro-content { min-height: calc(100dvh - 34px); display: grid; place-items: center; position: relative; }
+.intro-logo { display: block; width: min(800px, 90vw); height: auto; }
+.intro-actions { position: absolute; bottom: 24px; text-align: center; padding: 12px; font-size: 12px; }
+.startup-dialog { width: min(700px, calc(100% - 24px)); margin: auto; animation: client-arrival 160ms ease-out; }
+.startup-dialog .window-body { max-height: calc(100dvh - 120px); }
+.startup-dialog h1 { margin: 0; }
+.hold-logo { display: block; width: min(400px, 100%); height: auto; margin: 0 auto 16px; background: white; }
+.startup-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.startup-actions button { min-height: 30px; }
+.login-fields { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; align-items: center; margin: 24px 0; }
+@keyframes client-arrival { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .startup-dialog { animation: none; } }
+@media (max-width: 600px) { .startup-dialog { margin: auto; } }
+
+.report-progress { height: 20px; border: 2px inset #fff; overflow: hidden; background: #c0c0c0; }
+.report-progress span { display: block; width: 72px; height: 100%; background: repeating-linear-gradient(to right, #000080 0 10px, transparent 10px 12px); animation: report-wait 1.6s linear infinite alternate; }
+@keyframes report-wait { from { margin-left: 0; } to { margin-left: calc(100% - 72px); } }
+@media (prefers-reduced-motion: reduce) { .report-progress span { animation: none; } }

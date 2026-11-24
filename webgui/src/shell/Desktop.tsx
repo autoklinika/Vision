@@ -10,10 +10,9 @@ export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
   // Original geometric SVG artwork; no imported OS icons or branding.
   return <svg className={small ? 'app-icon small' : 'app-icon'} viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges"><path d="M3 5h23v3h3v21H3z" fill="#000"/><path d="M4 6h21v3h3v19H4z" fill="#fff"/><path d="M6 9h19v16H6z" fill={['#008080','#b59c42','#487a48','#367ca5','#756198','#a65d5d','#488b8b','#777','#b38b45'][index]}/><path d="M6 9h19v3H6z" fill="#000080"/><text x="16" y="23" textAnchor="middle" fontSize="15" fill="white">{apps[index].glyph}</text><path d="M2 29h27v2H2z" fill="#004747"/></svg>;
 }
-export function Desktop({ client }: { client: ReadOnlyVisionClient }) {
+export function Desktop({ client, snapshot }: { client: ReadOnlyVisionClient; snapshot: Snapshot | null }) {
   const [size, setSize] = useState(bounds);
   const [state, setState] = useState(() => { try { return decodeLayout(localStorage.getItem(storageKey), bounds()); } catch { return decodeLayout(null, bounds()); } });
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [persistence, setPersistence] = useState('Layout preferences are local to this browser.');
   const [start, setStart] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -21,7 +20,6 @@ export function Desktop({ client }: { client: ReadOnlyVisionClient }) {
   const windowsRef = useRef(new Map<AppId, HTMLElement>());
   const gesture = useRef<{ id: AppId; kind: 'move' | 'resize'; x: number; y: number; rect: Rect } | null>(null);
   const dispatch = (action: Action) => setState(s => reduce(s, action, bounds()));
-  useEffect(() => { let alive = true; client.readSnapshot().then(s => { if (alive) setSnapshot(s); }); return () => { alive = false; }; }, [client]);
   useEffect(() => { const update = () => { setSize(bounds()); setState(s => reduce(s, { type: 'bounds' }, bounds())); }; window.addEventListener('resize', update); return () => window.removeEventListener('resize', update); }, []);
   useEffect(() => { try { localStorage.setItem(storageKey, encodeLayout(state)); } catch { /* Browser storage is optional; the desktop remains usable. */ } }, [state]);
   useEffect(() => {
@@ -62,7 +60,7 @@ export function Desktop({ client }: { client: ReadOnlyVisionClient }) {
     dispatch({ type: 'reset' });
   }
   return <main className="desktop" onKeyDown={e => { if (e.key === 'Escape' && start) { setStart(false); startRef.current?.focus(); } }}>
-    <header className="mode-banner"><strong>{client.mode === 'demo' ? 'DEMO' : 'UNAVAILABLE'}</strong><span>{client.mode === 'demo' ? 'Synthetic fixtures only · No connection to Vision or hardware' : 'Real adapter not integrated · No system connection'}</span><span className="shell-version">VISION / GUI-01</span></header>
+    <header className="mode-banner"><strong>{client.mode === 'demo' ? 'DEMO' : 'UNAVAILABLE'}</strong><span>{client.mode === 'demo' ? 'Synthetic fixtures only · No connection to Vision or hardware' : 'Real adapter not integrated · No system connection'}</span><span className="shell-version">VISION / GUI-02</span></header>
     <div className="workspace" style={{ height: size.height }}>
       <nav className="desktop-icons" aria-label="Desktop applications">{apps.map(app => <button className="desktop-shortcut" key={app.id} onClick={() => launch(app.id)} title={app.description}><Icon id={app.id}/><span>{app.title}</span></button>)}</nav>
       <div className="desktop-watermark" aria-hidden="true"><strong>VISION</strong><span>DESKTOP SHELL / V1</span><small>Client of the Vision system</small></div>

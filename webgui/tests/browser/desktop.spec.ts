@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { enterDesktop } from './helpers';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/local-brand/**', route => route.fulfill({ status: 404, body: '' }));
+});
 test('desktop lifecycle, keyboard, geometry, persistence and no external traffic', async ({ page }) => {
   const external: string[] = [];
   page.on('request', r => { if (!r.url().startsWith('http://127.0.0.1:4173/')) external.push(r.url()); });
-  await page.goto('/');
+  await page.goto('/'); await enterDesktop(page);
   await expect(page.locator('.mode-banner')).toContainText('DEMO');
   const status = page.getByRole('dialog', { name: 'System Status', exact: true });
   await expect(status).toContainText('UNKNOWN');
@@ -25,22 +29,24 @@ test('desktop lifecycle, keyboard, geometry, persistence and no external traffic
   await ecu.getByRole('button', { name: 'Minimize ECU Library', exact: true }).click();
   await expect(ecu).toBeHidden();
   await page.locator('.task-buttons').getByRole('button', { name: 'ECU Library' }).click();
-  await page.reload(); await expect(ecu).toBeVisible();
+  await page.reload(); await enterDesktop(page); await expect(ecu).toBeVisible();
   await page.setViewportSize({ width: 360, height: 640 });
-  const box = (await ecu.boundingBox())!;
-  expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(360);
+  await expect.poll(async () => {
+    const box = (await ecu.boundingBox())!;
+    return box.x >= 0 && box.x + box.width <= 360;
+  }).toBe(true);
   await ecu.getByRole('button', { name: 'Close ECU Library', exact: true }).click();
   await expect(ecu).toHaveCount(0);
   expect(external).toEqual([]);
 });
 test('real mode stays unavailable, corrupt layout and blocked storage recover', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vision.desktop.layout.v1', '{corrupt'));
-  await page.goto('/?mode=real');
+  await page.goto('/?mode=real'); await enterDesktop(page);
   await expect(page.locator('.mode-banner')).toContainText('UNAVAILABLE');
   await expect(page.getByRole('dialog')).toContainText('Real adapter unavailable');
   await expect(page.getByRole('dialog')).not.toContainText('Synthetic');
   await page.addInitScript(() => { Storage.prototype.setItem = () => { throw Error('disabled'); }; });
-  await page.reload();
+  await page.reload(); await enterDesktop(page);
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.keyboard.press('Escape');
@@ -48,7 +54,7 @@ test('real mode stays unavailable, corrupt layout and blocked storage recover', 
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeFocused();
 });
 test('pointer dragging/resizing, stacking and layout reset', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/'); await enterDesktop(page);
   const status = page.getByRole('dialog', { name: 'System Status', exact: true });
   const original = (await status.boundingBox())!;
   const title = status.getByLabel('Move System Status with arrow keys');
@@ -71,7 +77,7 @@ test('pointer dragging/resizing, stacking and layout reset', async ({ page }) =>
 });
 
 test('default desktop keeps icons unobstructed and full system report visible at 1280×800', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/'); await enterDesktop(page);
   const status = page.getByRole('dialog', { name: 'System Status', exact: true });
   await expect(status).toContainText('Sony Camera');
   const icons = (await page.locator('.desktop-icons').boundingBox())!;

@@ -5,3 +5,6 @@ playwright-report/
 .browser-cache/
 
 .npm-cache/
+# Private brand derivatives and manifest; distribution rights unverified.
+public/local-brand/
+__pycache__/

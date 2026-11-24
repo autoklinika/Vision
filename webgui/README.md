@@ -1,47 +1,74 @@
-# Vision Desktop Shell V1 (GUI-01)
+# Vision Startup & Desktop V1 (GUI-02)
 
-WebGUI is only a client of the entire Vision system. This standalone React / TypeScript / Vite / 98.css package implements desktop presentation only. It does not implement Core, Runtime, Planner, workflow, ROS 2, MoveIt, device access or business state.
+WebGUI is **only a client of the entire Vision system**. This isolated React / TypeScript / Vite / 98.css package implements presentation. No backend, transport, authentication, hardware/ROS/MoveIt access, workflow or operational commands.
 
 ## Run and verify
 
-Use Node 22.12+ (verified with Node 26.8.1) and npm. From `webgui/`:
+Use Node 22.12+ and npm. From `webgui/`:
 
 ```sh
+export NPM_CONFIG_CACHE="$PWD/.npm-cache"
+export PLAYWRIGHT_BROWSERS_PATH="$PWD/.browser-cache"
 npm ci --registry=https://registry.npmjs.org/
+npx playwright install chromium
 npm run dev
-npm run lint
+# In another terminal, with the same package-local environment:
 npm run typecheck
+npm run lint
 npm test
+python3 -B tests/test_prepare_brand.py
+npm run test:browser
 npm run build
-# Browser binaries stay inside this isolated package:
-PLAYWRIGHT_BROWSERS_PATH=.browser-cache npx playwright install chromium
-PLAYWRIGHT_BROWSERS_PATH=.browser-cache npm run test:browser
+GUI_BUILD_SMOKE=1 npm run test:browser
+npm audit --registry=https://registry.npmjs.org/
 ```
 
-npm uses the official registry and package-local cache. No global installation, backend, hardware or external services are required. Dev and test servers bind only to loopback. Browser installation downloads test tooling; the application itself makes no API or hardware requests.
+No global installation or sudo. Servers bind to loopback. Browser installation downloads tooling. Runtime requests are limited to same-origin app resources and optional local brand files, never Vision or external services. Known ESLint 9 deprecation warning remains; dependencies were not migrated.
 
-## Implemented
+## Sequence and client boundaries
 
-- Teal desktop, gray beveled controls, navy active title bars, original geometric SVG icons, Start menu and taskbar.
-- Single instance per application, independent movable/resizable windows, focus stacking, minimize/maximize/restore/close. Title bars support arrow-key movement; resize handles support arrow-key resizing (Shift for larger steps). Start supports arrows, Home/End and Escape. All actions have native keyboard controls.
-- Versioned, size-limited and validated local layout preferences; malformed/unknown data resets safely, blocked storage does not prevent use. Control Panel resets layout. Bounds are clamped after viewport changes, including small screens.
-- System Status reads only the selected adapter. Distinct unavailable placeholders: ECU Library, Inspection Manager, Luxonis, NERO, Sony, Images, Event Viewer. Control Panel changes only local layout.
-- Deterministic reducer/adapter tests and browser tests for lifecycle, keyboard, persistence, bounds, no external requests and fail-closed real mode.
+A. Optional original intro plays once for **3490 ms**, including the original black fade, centered on white with responsive scale. Skip is always available. Reduced motion displays the static original hold without mounting the GIF and disables the calm 160 ms dialog appearance transition.
 
-## Architecture and adapter boundary
+B. `readClientReport()` starts the selected adapter read **before React mounts**, independently of asset loading/animation. Report shows source, connection, UNKNOWN readiness, observation availability and adapter reasons. Pending means no system status received; an accessible Win98 segmented indeterminate indicator has no numeric value. Reduced motion stops its movement. Completion ends only the client read, never establishes system initialization or readiness. Rejected/throwing reads or source mismatch produce UNKNOWN / UNAVAILABLE and an explicit client failure explanation. No percentages, simulated initialization or timer-derived readiness. The 2 s optional asset timeout affects presentation only. Read-only diagnostics remain accessible when the snapshot fails or never resolves.
 
-`src/shell/model.ts` is a pure presentation reducer; `Desktop.tsx` owns input/focus/rendering. `src/apps/` contains presentation views. `src/api/types.ts` defines a **client-side presentation interface**, not an approved backend wire contract. `readSnapshot()` is the only adapter operation; there are no command methods.
+C. Win98 login is presentation only: user/password inputs are disabled, outside any form; no credentials are collected, submitted or stored. **Continue to DEMO desktop** / **Open read-only disconnected view** are not authentication. Back returns to the report. Direct diagnostics can bypass the login presentation.
 
-The default mode is explicitly `demo`. It loads `src/demo/adapter.ts` in a separate dynamic chunk and shows a persistent DEMO banner. Fixtures contain no production records, timestamps or fabricated readiness: readiness remains UNKNOWN. `?mode=real` (and every unrecognized mode) selects `src/api/realAdapter.ts`, which reports UNAVAILABLE without transport, endpoints or demo fallback. No local preferences select the adapter or store system data. All displayed system status comes from the adapter; no timer produces readiness.
+D. GUI-01 desktop retains window lifecycle, keyboard/pointer controls, layout persistence, Start and read-only apps. It receives the same report without another read. Only local window layout is persisted. Closing/reloading cannot issue system commands.
 
-## Limitations and proposed follow-up (not implemented)
+Default remains explicitly `demo` for this isolated package, with a separate synthetic chunk and persistent DEMO banner. `?mode=real` and invalid modes select the disconnected real adapter, never demo fallback. Mode stays visible throughout. `src/api/types.ts` is the unchanged client presentation interface, **not a backend wire contract**. `readSnapshot()` is the only adapter operation.
 
-GUI-02: approved original intro asset and login/startup presentation. GUI-03–06: profile editor (existing 15-section UX), inspection and media applications. GUI-07–08: reviewed shared API contracts, runtime payload validation, authorization, freshness/event continuity, reconnect, kiosk and system requests. There is no real transport, login, readiness assessment, device control, event journal, business-state persistence or production integration in GUI-01. Disabled controls are intentionally unavailable. Reset/close/reload only affect this client.
+## Optional private original preparation
 
-The unmodified 98.css fonts are FontStructions by lou, licensed CC BY-SA 3.0; attribution and upstream notices ship in `public/THIRD_PARTY_NOTICES.txt` and the build. No proprietary OS icons, logos or startup assets were copied. All application SVG icons were drawn in this package. Dependencies and their exact resolutions are recorded in `package-lock.json`; upstream license notices remain in installed packages (98.css MIT, React MIT, Vite MIT, TypeScript Apache-2.0). Hardware acceptance and production readiness are outside this change.
+Distribution rights are **not verified**. Original/derived brand bytes and manifest must not enter Git, public GitHub, screenshots/traces or published artifacts. `public/local-brand/` is explicitly ignored. Standard builds exclude private public assets even after preparation; only third-party notices are copied from `public/`. Build smoke uses missing assets and rejects intercepted synthetic substitutions. No publishing is authorized.
 
-## Verification record
+From `webgui/`, manually supply the authorized original (relative example for this isolated clone):
 
-In this isolated clone: `npm run typecheck`, `npm run lint`, `npm test` (6 tests), `npm run build`, and `PLAYWRIGHT_BROWSERS_PATH=.browser-cache npm run test:browser` (4 Chromium tests after independent audit) passed. `npm audit` reported 0 vulnerabilities after tooling patch updates. The desktop screenshot was inspected. No backend or hardware acceptance is claimed.
+```sh
+python3 scripts/prepare-brand.py ../../private-assets/VISION-handwriting-intro-PREVIEW.gif
+# Explicit local verification, without screenshots/video/traces:
+GUI_PRIVATE_ORIGINAL=1 npm run test:browser -- --grep 'private original'
+```
 
-Independent acceptance and actual Chromium screenshots: [GUI-01 audit](docs/audit/GUI-01_AUDIT_2026-11-24.md).
+Required original: SHA-256 `e18f9695ad38df61a4f8fdf4104e7d9b8b60456a2f454404cf9c819590f16adb`, 29462 bytes, 800×100, 29 encoded frames (supplied 47-frame original sequence), 3490 ms encoded duration.
+
+Importer invalidates stale outputs, verifies exact checksum/size and decoded dimensions/count/duration, parses GIF blocks and removes only NETSCAPE/ANIMEXTS loop application extensions. No GIF re-encoding. All 29 decoded frames and individual delays are compared with the original. Frame 12 is the complete white-background hold (990 ms); its composited pixels become the PNG logo, without recreation. Outputs: `intro.gif`, `logo.png`, `manifest.json` under ignored `public/local-brand/`. Manifest records checksums/timing, never source paths. Browser uses fixed same-origin URLs, rejects redirects, bounds streamed manifest/asset reads to 2048/300000 bytes, and verifies both derivatives against trusted `src/startup/brand-reference.json`, independently of manifest claims, before creating blob URLs. The importer uses the same reference. The GIF is pinned byte-for-byte. PNG uses RGB8, filter 0, deterministic stored DEFLATE blocks and no metadata; encoding does not depend on Pillow or zlib compressor versions. Its new SHA-256 is `65f1e7f2f909691467d7e4752b909b53676953043555c99e30a09cd6a2a4f7ea`; this deliberately replaces the earlier compressed PNG encoding while preserving frame 12 pixels.
+
+Python 3/Pillow are optional for preparation only. Check: `python3 -c "from PIL import Image; print(Image.__version__)"`. If missing, skip preparation; the package and CI work without Pillow or original. Optionally use a private virtual environment; never install globally. No imitation is shipped as a production logo.
+
+Missing/corrupt assets, invalid manifest/hash, decode failure or timeout show an explicit explanation and permit report/login/diagnostics/desktop. Failed import leaves no stale manifest. Delete `public/local-brand/` to remove derivatives locally; never force-add it.
+
+## Tests and limitations
+
+`src/startup/` separates report acquisition, asset verification and presentation. CI uses independent 8×8 geometric GIF/PNG fixtures only to prove substitution is rejected, never as authentic branding. Snapshot injection is confined to Playwright interception of dev modules (skipped in build smoke); there is no production verification bypass. Coverage includes sequence, duration, skip, reduced motion, missing/corrupt assets, failed/pending snapshot, disabled credentials, demo/real/invalid boundaries, no external requests and GUI-01 desktop regressions. Python parser tests use only the standard library. Private-original tests are explicit opt-in and verify full-duration rendering, dimensions, skip, reduced motion and one-byte mutation rejection without screenshots, video or traces.
+
+No hardware/VENTUNO, API, auth, kiosk or production acceptance is claimed. Operational app windows remain unavailable placeholders. GUI-07/08 require agreed contracts. No new dependencies or wire schemas.
+
+98.css fonts are FontStructions by lou, CC BY-SA 3.0; notices ship in `public/THIRD_PARTY_NOTICES.txt` and the build. GUI-01 SVG icons remain original geometric artwork. No proprietary OS icons/fonts added.
+
+Historical baseline: [GUI-01 audit](docs/audit/GUI-01_AUDIT_2026-11-24.md). Historical implementation results: [GUI-02 audit](docs/audit/GUI-02_AUDIT_2026-11-24.md). Remediation evidence: [G02-R01–R03](docs/audit/GUI-02_REMEDIATION_2026-11-24.md).
+
+## Secure context and release blocker
+
+Remote clients require **HTTPS**; local verification may use trustworthy loopback (`localhost`/`127.0.0.1`). On insecure remote HTTP the client displays an accessible secure-context explanation before any brand fetch or digest; report and diagnostics remain available. There is no insecure fallback. Browser tests use a genuine non-local HTTP origin intercepted to the local test server, without relaxing Chromium security. TLS deployment and host configuration are outside this change.
+
+Private brand distribution remains a **release blocker** pending rights and an approved delivery procedure. Standard builds deliberately exclude all private assets. This remediation is not independent acceptance, merge approval, or production/hardware acceptance. Real API schema validation, freshness and reconnect remain GUI-07 work; the existing local stub contract is unchanged.
