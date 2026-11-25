@@ -310,19 +310,7 @@ test('an unconfirmed password change requests explicit sign-in and never retries
 });
 
 
-test('TEST actual station: readiness blockers are reported and reader cannot issue inspection commands', async ({page}) => {
-  const credentials = JSON.parse(readFileSync('../.station-test-auth.json', 'utf8'));
-  await page.goto('/');
-  await login(page, credentials.username, credentials.password);
-  const section = page.getByRole('region', {name:'Inspection orchestration'});
-  await expect(section).toContainText('Trusted Runtime composition is not configured.');
-  await expect(section).toContainText('No approved ECU inspection recipe is available.');
-  await expect(section).toContainText('Required device readiness is not verified.');
-  await expect(section.getByRole('table').locator('tbody tr')).toHaveCount(4);
-  await expect(section.getByRole('button', {name:'Start inspection session'})).toHaveCount(0);
-});
-
-test('TEST actual station: own password change revokes both clients and leaves Core running', async ({page, browser, context}) => {
+test('TEST actual station: inspection blockers and password rotation preserve Core ownership', async ({page, browser, context}) => {
   const credentials = JSON.parse(readFileSync('../.station-test-auth.json', 'utf8'));
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -333,6 +321,14 @@ test('TEST actual station: own password change revokes both clients and leaves C
   }
   await page.goto('/?mode=demo');
   await login(page, credentials.username, credentials.password);
+  // Reuse this real login: the shared fixture enforces the production limit
+  // of five client login attempts per minute, including the password checks.
+  const section = page.getByRole('region', {name: 'Inspection orchestration'});
+  await expect(section).toContainText('Trusted Runtime composition is not configured.');
+  await expect(section).toContainText('No approved ECU inspection recipe is available.');
+  await expect(section).toContainText('Required device readiness is not verified.');
+  await expect(section.getByRole('table').locator('tbody tr')).toHaveCount(4);
+  await expect(section.getByRole('button', {name: 'Start inspection session'})).toHaveCount(0);
   const status = page.getByRole('dialog', {name: 'System Status', exact: true});
   await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
   const core = await (await page.request.get('/api/v1/station')).json();

@@ -91,3 +91,31 @@ rollback appear successful. Existing reader-only account files remain valid;
 operator-bearing account files need an explicitly reviewed compatibility
 procedure if downgrading to the old reader-only release. Do not mutate live
 accounts as part of this software-only package.
+
+
+## Local browser validation (2026-11-25)
+
+The isolated station browser suite passed on VENTUNO Q / Ubuntu ARM64:
+10 Chromium tests and 10 Firefox tests, plus TypeScript and ESLint checks.
+The real fixture checks inspection blockers, the reader command boundary,
+authentication/password rotation, independent clients and unchanged Core
+ownership. Other scenarios use deterministic API fixtures. This is software
+validation, not commissioned device readiness or physical workflow acceptance.
+
+Playwright 1.65.1 uses Chromium revision 1255 and Firefox revision 1572. Both
+were already installed in a previous NVMe development worktree; absence from
+the remote agent's default cache did not mean absence from the host. Set
+PLAYWRIGHT_BROWSERS_PATH to the existing NVMe browser cache when running both
+commands from webgui (with a station build and the test Python environment):
+
+```sh
+npm run test:station -- --browser=chromium
+npm run test:station -- --browser=firefox
+```
+
+Inspection assertions reuse the real password-rotation test's first login.
+A separate login would exceed the shared fixture's production limit of five
+client login attempts per minute. The test retains all readiness and password
+assertions; production authentication limits and application behavior are
+unchanged. The fixture uses its own Core process, temporary accounts/data and
+port 18491, separate from the operational station.
