@@ -48,10 +48,10 @@ test('B → C → D: report, disabled credentials, no external requests', async 
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog', { name: 'Welcome to Vision' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue to DEMO desktop' }).click();
-  await expect(page.getByRole('dialog', { name: 'System Status', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'System Status', exact: true, includeHidden: true})).toBeVisible();
   expect(external).toEqual([]);
   expect(writes).toEqual([]);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['vision.desktop.layout.v1']);
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['vision.workspace.v2']);
 });
 
 for (const mode of ['demo', 'real', 'invalid']) {
@@ -65,9 +65,9 @@ for (const mode of ['demo', 'real', 'invalid']) {
     if (mode === 'real') await page.screenshot({ path: 'test-results/startup-no-brand.png', animations: 'disabled' });
     await expect(page.getByRole('dialog')).toContainText('UNKNOWN');
     await enterDesktop(page);
-    await expect(page.locator('.mode-banner')).toContainText(mode === 'demo' ? 'DEMO' : 'UNAVAILABLE');
+    await expect(page.locator('.app-header')).toContainText(mode === 'demo' ? 'DEMO' : 'UNAVAILABLE');
     if (mode !== 'demo') {
-      await expect(page.getByRole('dialog')).toContainText('Real adapter unavailable');
+      await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).toContainText('Real adapter unavailable');
       expect(requests.some(url => /\/demo\/|\/adapter-/.test(url))).toBe(false);
     }
     expect(requests.filter(url => !url.startsWith('http://127.0.0.1:4173/'))).toEqual([]);
@@ -91,9 +91,9 @@ test('snapshot rejection remains UNKNOWN through login and desktop', async ({ pa
   await expect(page.getByRole('progressbar')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toContainText('Client report read finished');
   await enterDesktop(page);
-  await expect(page.getByRole('dialog')).toContainText('selected adapter failed');
-  await expect(page.getByRole('dialog')).toContainText('UNKNOWN');
-  await expect(page.getByRole('dialog')).not.toContainText('Synthetic');
+  await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).toContainText('selected adapter failed');
+  await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).toContainText('UNKNOWN');
+  await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).not.toContainText('Synthetic');
 });
 
 test('pending snapshot never blocks diagnostic navigation', async ({ page }) => {
@@ -113,7 +113,7 @@ test('pending snapshot never blocks diagnostic navigation', async ({ page }) => 
   expect(calls).toEqual(['snapshot-read-started']);
   await expect(page.getByRole('dialog')).toContainText('No system status has been received');
   await page.getByRole('button', { name: 'Open read-only diagnostics' }).click();
-  await expect(page.getByRole('dialog')).toContainText('UNKNOWN');
+  await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).toContainText('UNKNOWN');
   expect(calls).toHaveLength(1);
 });
 
@@ -161,7 +161,7 @@ test('genuine remote HTTP is insecure and never requests brand files', async ({ 
   await expect(page.getByRole('status').filter({ hasText: 'secure context' })).toBeVisible();
   expect(brandRequests).toEqual([]);
   await enterDesktop(page);
-  await expect(page.getByRole('dialog')).toContainText('UNKNOWN');
+  await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).toContainText('UNKNOWN');
 });
 
 test('one-byte corrupt asset with trusted manifest is rejected', async ({ page }) => {

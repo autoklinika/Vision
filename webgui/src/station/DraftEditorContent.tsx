@@ -149,14 +149,14 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
         <label htmlFor="draft-name">Display name</label><input id="draft-name" value={displayName} maxLength={160} onChange={e=>{setDisplayName(e.target.value);setDirty(true);}} disabled={!writable}/>
       </div>
       <p className="fine-print">A new reference is not a registered or approved ECU catalog record. No measurements are prefilled.</p>
-      <button disabled={!writable||!canCreate} onClick={()=>{void execute(fromCatalog?'create':'create_empty');}}>Create draft</button>
+      <button className="button-primary" disabled={!writable||!canCreate} onClick={()=>{void execute(fromCatalog?'create':'create_empty');}}>Create draft</button>
       {uncertain&&<button disabled={!editable||busy||!uncertainKey} onClick={()=>{void execute('open');}}>Check requested draft</button>}
     </fieldset>:<p><button disabled={!editable||busy} onClick={()=>{void execute('open');}}>Load draft {entry.profileId}</button></p>)}
     {report&&document&&<>
       <div className="editor-summary"><strong>{String(row(document.metadata).display_name||report.key)}</strong><span>{report.key} · revision {String(row(document.metadata).profile_revision)} · ETag {report.etag.slice(1,13)}…</span><span role="status">{dirty?'Unsaved changes ('+changedSections.length+' sections)':'Saved generation'}</span></div>
       <p className="fine-print">Save complete rows in any order. Sections can remain empty until their measurements are available. An unfinished required field must be completed or its row removed before saving.</p>
       <div className="editor-toolbar">
-        <button disabled={!writable||!dirty} onClick={()=>{void execute('save');}}>Save draft generation</button>
+        <button className="button-primary" disabled={!writable||!dirty} onClick={()=>{void execute('save');}}>Save draft generation</button>
         <button disabled={!editable||busy} onClick={()=>{void execute('validate_structure');}}>Check structure</button>
         <button disabled={!editable||busy} onClick={()=>{void execute('open');}}>{uncertainKey&&uncertainKey!==report.key?'Check requested revision':'Reload latest'}</button>
       </div>

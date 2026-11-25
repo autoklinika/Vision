@@ -1,17 +1,35 @@
-.station-login { width: min(480px, calc(100vw - 24px)); margin: 0; position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); }
-.station-login h1 { font-size: 12px; margin: 0; }
-.station-login .window-body { padding: 20px; }
-.station-login-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-.station-login-heading > span { font: bold italic 34px Arial; padding: 2px 10px; background: #000080; color: white; border: 2px solid white; }
-.station-login-heading h2 { margin: 0; }
-.station-login-heading p { margin: 3px 0; color: #444; }
-.station-login-message { min-height: 36px; }
+/* Production sign-in and account settings. */
+.station-login {
+  width: min(480px, calc(100% - 32px));
+  max-width: 100%;
+  margin: auto;
+}
+.station-login .title-bar { padding-bottom: 0; border-bottom: 0; }
+.station-login h1 { margin: 0; font-size: 1.625rem; }
+.station-login .window-body { padding-top: 22px; }
+.station-login-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.station-login-heading > span { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 11px; color: #fff; background: var(--color-primary); font-size: 1.5rem; font-weight: 750; }
+.station-login-heading h2 { margin: 0; font-size: 1.0625rem; font-weight: 650; }
+.station-login-heading p { margin: 4px 0 0; color: var(--color-muted); font-size: .875rem; }
+.station-login-message { min-height: 24px; color: var(--color-muted); font-size: .9375rem; line-height: 1.6; }
 .station-login input { width: 100%; min-width: 0; }
-.station-login .fine-print { margin-top: 20px; }
-.station-account { padding: 6px 8px; border-bottom: 1px solid #888; color: #444; overflow-wrap: anywhere; font-size: 11px; }
-.settings-content fieldset { margin-top: 14px; }
-.password-fields { display: grid; grid-template-columns: 145px minmax(0, 1fr); align-items: center; gap: 12px 10px; margin: 20px 0 14px; }
+.station-login .startup-actions { margin-top: 12px; }
+.station-login .startup-actions button { flex: 1; }
+.station-login button[type="submit"]:enabled { color: #fff; border-color: var(--color-primary); background: var(--color-primary); }
+.station-login button[type="submit"]:hover:enabled { border-color: var(--color-primary-hover); background: var(--color-primary-hover); }
+.station-login .fine-print { margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.station-account { padding: 14px; border-bottom: 1px solid var(--color-border); color: var(--color-muted); overflow-wrap: anywhere; font-size: .875rem; }
+.settings-content { max-width: 780px; }
+.settings-content fieldset { margin-top: 24px; }
+.password-fields { display: grid; grid-template-columns: minmax(140px, 190px) minmax(0, 1fr); align-items: center; gap: 16px 20px; margin: 24px 0 18px; }
 .password-fields input { width: 100%; min-width: 0; }
-.password-message { min-height: 32px; }
+.password-fields label { font-size: .9375rem; }
+.password-message { min-height: 32px; color: var(--color-muted); }
 .settings-content .app-actions { flex-wrap: wrap; }
-@media (max-width: 500px) { .password-fields { grid-template-columns: 1fr; gap: 5px; } .password-fields input { margin-bottom: 9px; } }
+@media (max-width: 600px) {
+  .station-login { width: calc(100% - 24px); }
+  .station-login h1 { font-size: 1.5rem; }
+  .station-login-heading { gap: 12px; }
+  .password-fields { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .password-fields input { margin-bottom: 12px; }
+}

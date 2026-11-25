@@ -63,7 +63,7 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, authUnava
   // and the API's synthetic outage instance only invalidate live projections.
   const owner = `${identity.username}:${identity.role}:${observation.coreOwner ?? 'unconnected'}`;
   return <>{!available && connectionPanel}<div hidden={!available}>
-    <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout, accountBusy: accountBusy || authUnavailable, changePassword}}/>
+    <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} interactive={available} station={{identity, report, refresh, logout, accountBusy: accountBusy || authUnavailable, changePassword}}/>
   </div></>;
 }
 
@@ -185,7 +185,7 @@ export function StationStartup() {
     <section className="window station-login" role="dialog" aria-labelledby="station-login-title">
       <div className="title-bar"><h1 className="title-bar-text" id="station-login-title">{pendingLogout ? 'Vision sign out' : 'Welcome to Vision'}</h1></div>
       <div className="window-body">
-        <div className="station-login-heading"><span aria-hidden="true">V</span><div><h2>Vision Workstation</h2><p>Read-only access to VENTUNO</p></div></div>
+        <div className="station-login-heading"><span aria-hidden="true">V</span><div><h2>Vision Workstation</h2><p>Sign in to your workstation</p></div></div>
         <p role="status" className="station-login-message">{globalThis.isSecureContext ? auth.message : 'A secure connection is required. Open the station HTTPS address.'}</p>
         {!pendingLogout && <form onSubmit={event => { event.preventDefault(); if (!busy) void login(); }}>
           <div className="login-fields">

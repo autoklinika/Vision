@@ -1,6 +1,5 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import '98.css';
 import './style.css';
 const root = createRoot(document.getElementById('root')!);
 if (import.meta.env.VITE_VISION_DEPLOYMENT === 'station') {

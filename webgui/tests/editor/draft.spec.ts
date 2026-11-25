@@ -12,13 +12,11 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await page.getByLabel('User name',{exact:true}).fill(credentials.username);
   await page.getByLabel('Password',{exact:true}).fill(credentials.password);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
-  await expect(page.getByRole('dialog',{name:'System Status',exact:true})).toBeVisible();
+  await expect(page.getByRole('region', {name:'System Status',exact:true, includeHidden: true})).toBeVisible();
   const identity=await (await page.request.get('/api/v1/auth/session')).json();
   expect(identity.role).toBe('operator');
-  await page.locator('.desktop-icons').getByRole('button',{name:'ECU Library',exact:true}).click();
-  const library=page.getByRole('dialog',{name:'ECU Library',exact:true});
-  const maximize=library.getByRole('button',{name:'Maximize ECU Library',exact:true});
-  if(await maximize.isVisible())await maximize.click();
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button',{name:'ECU Library',exact:true}).click();
+  const library=page.getByRole('region', {name:'ECU Library',exact:true, includeHidden: true});
   await library.getByRole('button',{name:'New profile',exact:true}).click();
   const editor=library.getByRole('region',{name:'ECU reference editor'});
   const button=(name:string)=>editor.getByRole('button',{name,exact:true});
@@ -38,6 +36,14 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
 
   await section('identity');
   await label('Manufacturer (optional)').fill('Synthetic browser manufacturer');
+  const desktopViewport=page.viewportSize()!;
+  await page.setViewportSize({width:360,height:780});
+  await expect(label('Manufacturer (optional)')).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+  expect((await label('Manufacturer (optional)').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(await label('Manufacturer (optional)').evaluate(element=>parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(16);
+  await page.screenshot({path:'test-results/editor-mobile.png',fullPage:true});
+  await page.setViewportSize(desktopViewport);
   await section('provenance_release');
   await button('Add source').click();
   const source=editor.getByRole('group',{name:'source 1',exact:true});
@@ -73,9 +79,9 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await section('identity');
   await expect(label('Manufacturer (optional)')).toHaveValue('Synthetic browser manufacturer');
 
-  // Cancellation of the window-close prompt must preserve unsaved fields.
+  // Cancelling the editor-close prompt preserves the current working copy.
   page.once('dialog',dialog=>dialog.dismiss());
-  await library.getByRole('button',{name:'Close ECU Library',exact:true}).click();
+  await button('Close editor').click();
   await expect(editor).toBeVisible();
   await expect(label('Manufacturer (optional)')).toHaveValue('Synthetic browser manufacturer');
   await button('Save draft generation').click();

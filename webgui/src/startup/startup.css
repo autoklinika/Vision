@@ -1,21 +1,70 @@
-.startup { min-height: 100dvh; display: flex; flex-direction: column; background: #008080; }
-.startup .mode-banner { position: relative; z-index: 1; }
-.intro-stage { background: white; }
-.intro-content { min-height: calc(100dvh - 34px); display: grid; place-items: center; position: relative; }
-.intro-logo { display: block; width: min(800px, 90vw); height: auto; }
-.intro-actions { position: absolute; bottom: 24px; text-align: center; padding: 12px; font-size: 12px; }
-.startup-dialog { width: min(700px, calc(100% - 24px)); margin: auto; animation: client-arrival 160ms ease-out; }
-.startup-dialog .window-body { max-height: calc(100dvh - 120px); }
+/* Authentication and diagnostic entry screens share the workspace type scale. */
+.startup {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 32px;
+  background: var(--color-bg);
+}
+.mode-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  min-height: var(--header-height);
+  padding: 20px 32px;
+  background: #fff;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+  font-size: .9375rem;
+  line-height: 1.5;
+}
+.mode-banner strong {
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+}
+.startup .mode-banner { position: relative; z-index: 1; flex-shrink: 0; }
+.startup .window { padding: 0; border: 1px solid var(--color-border); border-radius: 14px; background: #fff; box-shadow: 0 10px 32px #2038580a; }
+.startup .title-bar { padding: 24px 28px 20px; color: var(--color-text); background: transparent; border-bottom: 1px solid var(--color-border); }
+.startup .title-bar-text { margin: 0; font-size: 1.5rem; font-weight: 650; line-height: 1.3; letter-spacing: -.025em; }
+.startup .window-body { padding: 24px 28px 28px; min-width: 0; }
+.startup:not(.station-startup) { height: 100dvh; }
+.startup-dialog .title-bar { flex-shrink: 0; }
+.startup-dialog .window-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.startup-dialog { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; width: min(820px, calc(100% - 40px)); margin: auto; overflow: hidden; animation: client-arrival .16s ease-out; }
 .startup-dialog h1 { margin: 0; }
-.hold-logo { display: block; width: min(400px, 100%); height: auto; margin: 0 auto 16px; background: white; }
-.startup-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.startup-actions button { min-height: 30px; }
-.login-fields { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; align-items: center; margin: 24px 0; }
+.startup-dialog .app-heading h2 { font-size: 1.25rem; }
+.startup-dialog .startup-actions > button:last-child:enabled { color: #fff; border-color: var(--color-primary); background: var(--color-primary); }
+.startup-dialog .startup-actions > button:last-child:hover:enabled { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.startup-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.startup-actions button { min-height: 44px; }
+.startup-footer { flex-shrink: 0; margin: 0; padding: 18px 28px; border-top: 1px solid var(--color-border); background: #fff; }
+.login-fields { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 8px; margin: 24px 0; }
+.login-fields input { width: 100%; min-width: 0; margin-bottom: 12px; }
+.login-fields label { font-size: .9375rem; font-weight: 600; }
+.intro-stage { background: #fff; gap: 0; padding-bottom: 0; }
+.intro-content { flex: 1; min-height: calc(100dvh - var(--header-height)); display: grid; place-items: center; position: relative; padding-bottom: 160px; }
+.intro-logo { display: block; width: min(800px, 90vw); height: auto; }
+.intro-actions { position: absolute; bottom: 24px; max-width: 720px; width: 100%; text-align: center; padding: 16px 24px; color: var(--color-muted); font-size: .9375rem; }
+.hold-logo { display: block; width: min(400px, 100%); height: auto; margin: 0 auto 24px; background: #fff; }
+.report-progress { height: 6px; margin: 16px 0 24px; border-radius: 10px; overflow: hidden; background: #e4ecf8; }
+.report-progress span { display: block; width: 30%; height: 100%; border-radius: inherit; background: var(--color-primary); animation: report-wait 1.5s ease-in-out infinite alternate; }
 @keyframes client-arrival { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .startup-dialog { animation: none; } }
-@media (max-width: 600px) { .startup-dialog { margin: auto; } }
-
-.report-progress { height: 20px; border: 2px inset #fff; overflow: hidden; background: #c0c0c0; }
-.report-progress span { display: block; width: 72px; height: 100%; background: repeating-linear-gradient(to right, #000080 0 10px, transparent 10px 12px); animation: report-wait 1.6s linear infinite alternate; }
-@keyframes report-wait { from { margin-left: 0; } to { margin-left: calc(100% - 72px); } }
-@media (prefers-reduced-motion: reduce) { .report-progress span { animation: none; } }
+@keyframes report-wait { from { margin-left: 0; } to { margin-left: 70%; } }
+@media (max-width: 600px) {
+  .startup { gap: 24px; padding-bottom: 24px; }
+  .mode-banner { min-height: 68px; padding: 16px 20px; gap: 5px 14px; font-size: .875rem; }
+  .startup-dialog { width: calc(100% - 24px); }
+  .startup .title-bar { padding: 22px 20px 18px; }
+  .startup .title-bar-text { font-size: 1.375rem; }
+  .startup .window-body { padding: 20px; }
+  .startup-footer { padding: 16px 20px; }
+  .startup-actions > button { flex: 1 1 180px; }
+  .intro-stage { gap: 0; padding-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .startup-dialog, .report-progress span { animation: none; }
+}

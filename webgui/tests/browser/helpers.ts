@@ -6,6 +6,17 @@ export async function enterDesktop(page: Page) {
   await page.getByRole('button', { name: /Continue to DEMO desktop|Open read-only view/ }).click();
 }
 
+/** Workspaces retain their working copy while only the selected page is shown. */
+export function appPanel(page: Page, name: string) {
+  return page.getByRole('region', {name, exact: true, includeHidden: true});
+}
+export async function openApp(page: Page, name: string) {
+  const openNavigation = page.getByRole('button', {name: 'Open navigation', exact: true});
+  if (await openNavigation.isVisible()) await openNavigation.click();
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name, exact: true}).click();
+  await expect(appPanel(page, name)).toBeVisible();
+}
+
 /** Test-only credentials must be inaccessible through every Vite serving path. */
 export async function assertPrivateFixtureFile(page: Page, filename: '.api02-test-auth.json' | '.api03-test-auth.json', cookieValue: string) {
   const absolute = resolve(filename);

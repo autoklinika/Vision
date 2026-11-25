@@ -8,7 +8,7 @@ const type = 'application/json; charset=utf-8';
 const boot = JSON.parse(readFileSync(new URL('../../../contracts/vision-api/v1/status-fixtures.json', import.meta.url), 'utf8')).valid;
 test.beforeEach(async ({page}) => { await page.route('**/local-brand/**', route => route.fulfill({status: 404, body: ''})); });
 
-test('Core report windows share one read view, preserve ACK meaning, page and clear on denial', async ({page}) => {
+test('Core report pages share one read view, preserve ACK meaning, page and clear on denial', async ({page}) => {
   let session = sessionFixture();
   let denied = false;
   const reads: string[] = [];
@@ -28,21 +28,21 @@ test('Core report windows share one read view, preserve ACK meaning, page and cl
   expect(reads).toHaveLength(0);
   await enterDesktop(page);
   expect(reads).toHaveLength(0);
-  const status = page.getByRole('dialog', {name: 'System Status', exact: true});
+  const status = page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true});
   await status.getByRole('button', {name: 'Refresh session', exact: true}).click();
   await expect(status).toContainText('SYNTHETIC TEST · no station session');
   await expect(status).toContainText(session.sessionId);
   expect(reads).toHaveLength(2);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Inspection Manager', exact: true}).click();
-  const inspection = page.getByRole('dialog', {name: 'Inspection Manager', exact: true});
-  const stages = inspection.getByRole('table', {name: 'Reported inspection stages'});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'Inspection Manager', exact: true}).click();
+  const inspection = page.getByRole('region', {name: 'Inspection Manager', exact: true, includeHidden: true});
+  const stages = inspection.getByRole('table', {name: 'Reported inspection stages', includeHidden: true});
   await expect(stages.locator('tbody tr')).toHaveCount(11);
   const s02 = stages.getByRole('row').filter({has: page.getByRole('cell', {name: 'S02', exact: true})});
   await expect(s02).toContainText('RUNNING');
   await expect(s02).toContainText('70');
   expect(reads).toHaveLength(2);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Event Viewer', exact: true}).click();
-  const journal = page.getByRole('dialog', {name: 'Event Viewer', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'Event Viewer', exact: true}).click();
+  const journal = page.getByRole('region', {name: 'Event Viewer', exact: true, includeHidden: true});
   await expect(journal.getByRole('table', {name: 'Reported session events'}).locator('tbody tr')).toHaveCount(50);
   await journal.getByRole('button', {name: 'Load more events'}).click();
   await expect(journal.getByRole('table', {name: 'Reported session events'}).locator('tbody tr')).toHaveCount(20);
@@ -51,10 +51,12 @@ test('Core report windows share one read view, preserve ACK meaning, page and cl
   session = {...session, invalidated: true, stages: session.stages.map(stage => ({...stage, state: 'BLOCKED' as const}))};
   await journal.getByRole('button', {name: 'Refresh session'}).click();
   await expect(journal).toContainText('INVALIDATED');
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'Inspection Manager', exact: true}).click();
   const s01 = stages.getByRole('row').filter({has: page.getByRole('cell', {name: 'S01', exact: true})});
   await expect(s01).toContainText('BLOCKED');
   await expect(s01).toContainText('Recorded');
   denied = true;
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'Event Viewer', exact: true}).click();
   await journal.getByRole('button', {name: 'Refresh session'}).click();
   await expect(journal).toContainText('Access denied');
   for (const dialog of [status, inspection, journal]) {
@@ -76,7 +78,7 @@ test('protected disconnect and provider mismatch clear old data and a fresh repo
     return route.fulfill({contentType: type, body: JSON.stringify(failure === 'owner' ? {...report, viewId: 'b'.repeat(32)} : report)});
   });
   await page.goto('/?mode=real'); await enterDesktop(page);
-  const status = page.getByRole('dialog', {name: 'System Status', exact: true});
+  const status = page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true});
   for (const next of ['none', 'disconnect', 'owner', 'none'] as const) {
     failure = next;
     await status.getByRole('button', {name: 'Refresh session'}).click();
@@ -85,14 +87,14 @@ test('protected disconnect and provider mismatch clear old data and a fresh repo
   }
 });
 
-test('demo and invalid modes cannot request protected reports from desktop windows', async ({page}) => {
+test('demo and invalid modes cannot request protected reports from workspace pages', async ({page}) => {
   const protectedReads: string[] = [];
   await page.route('**/api/v1/**', route => { protectedReads.push(route.request().url()); return route.fulfill({status: 500}); });
   for (const mode of ['demo', 'invalid']) {
     await page.goto('/?mode=' + mode); await enterDesktop(page);
     for (const name of ['System Status', 'Inspection Manager', 'Event Viewer']) {
-      await page.locator('.desktop-icons').getByRole('button', {name, exact: true}).click();
-      await expect(page.getByRole('dialog', {name, exact: true}).getByRole('button', {name: 'Refresh session'})).toBeDisabled();
+      await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name, exact: true}).click();
+      await expect(page.getByRole('region', {name, exact: true, includeHidden: true}).getByRole('button', {name: 'Refresh session'})).toBeDisabled();
     }
   }
   expect(protectedReads).toEqual([]);
@@ -105,7 +107,7 @@ test('actual Core: authorized synthetic Workflow projection, pinned journal and 
   page.on('pageerror', e => errors.push(e.message));
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/v1/')) methods.push(request.method()); });
   await page.goto('/?mode=real'); await enterDesktop(page);
-  const status = page.getByRole('dialog', {name: 'System Status', exact: true});
+  const status = page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true});
   const deniedResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/session');
   await status.getByRole('button', {name: 'Refresh session'}).click();
   expect((await deniedResponse).status()).toBe(401);
@@ -123,14 +125,14 @@ test('actual Core: authorized synthetic Workflow projection, pinned journal and 
   if (!isSessionReport(session)) throw new Error('Invalid test fixture session');
   expect(session.source).toBe('SYNTHETIC_TEST');
   await expect(status).toContainText('SYNTHETIC TEST · no station session');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Inspection Manager', exact: true}).click();
-  const inspection = page.getByRole('dialog', {name: 'Inspection Manager', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'Inspection Manager', exact: true}).click();
+  const inspection = page.getByRole('region', {name: 'Inspection Manager', exact: true, includeHidden: true});
   const table = inspection.getByRole('table', {name: 'Reported inspection stages'});
   await expect(table.getByRole('row').filter({has: page.getByRole('cell', {name: 'S01', exact: true})})).toContainText('SUCCEEDED');
   await expect(table.getByRole('row').filter({has: page.getByRole('cell', {name: 'S02', exact: true})})).toContainText('RUNNING');
   await expect(inspection.getByRole('button', {name: 'Start inspection'})).toHaveCount(0);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Event Viewer', exact: true}).click();
-  const journal = page.getByRole('dialog', {name: 'Event Viewer', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'Event Viewer', exact: true}).click();
+  const journal = page.getByRole('region', {name: 'Event Viewer', exact: true, includeHidden: true});
   await expect(journal.getByRole('table', {name: 'Reported session events'}).locator('tbody tr')).toHaveCount(50);
   const pageResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/events');
   await journal.getByRole('button', {name: 'Load more events'}).click();
@@ -140,7 +142,7 @@ test('actual Core: authorized synthetic Workflow projection, pinned journal and 
   expect(matchesSession(second, session, second.afterSequence)).toBe(true);
   await expect(journal.getByRole('table', {name: 'Reported session events'}).locator('tbody tr')).toHaveCount(second.events.length);
   await page.reload(); await enterDesktop(page);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'System Status', exact: true}).click();
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'System Status', exact: true}).click();
   const reloadedResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/session');
   await status.getByRole('button', {name: 'Refresh session'}).click();
   const reloaded = await (await reloadedResponse).json();

@@ -1,5 +1,7 @@
 # VISION WebGUI V1 — specyfikacja klienta operatorskiego
 
+> **Aktualizacja UI, 25.11.2026:** [Workspace V2](VISION_WORKSPACE_V2.md) zastępuje styl Windows 98, menu Start, zarządzanie oknami i zapis ich geometrii. Poniższe opisy tego wyglądu są historyczne. Zasady odpowiedzialności Core, uwierzytelniania, raportów i prywatności pozostają obowiązujące. Status wdrożenia jest odrębny od implementacji.
+
 - **Data:** 2026-11-24.
 - **Status:** DESIGN BASELINE — zasady i kierunek UX zaakceptowane; szczegóły oznaczone PROPOSED są wymaganiami do przeglądu, nie dowodem wdrożenia.
 - **Nadrzędny ADR:** [ADR-VISION-WEBGUI-001](../decisions/ADR_VISION_WEBGUI_CLIENT_ONLY_2026-11-24.md).

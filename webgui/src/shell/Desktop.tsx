@@ -1,20 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { ReadOnlyVisionClient, Snapshot } from '../api/types';
 import { AppContent } from '../apps/AppContent';
 import { useSessionView } from '../api/useSessionView';
 import { useLibraryView } from '../api/useLibraryView';
 import type { StationPresentation } from '../station/client';
 import { modeLabel, modeDescription, connectionLabel } from '../api/presentation';
-import { apps, clamp, decodeLayout, encodeLayout, reduce, storageKey } from './model';
-import type { Action, AppId, Bounds, Rect, WindowState } from './model';
-function bounds(): Bounds { return { width: Math.max(1, window.innerWidth), height: Math.max(1, window.innerHeight - 72) }; }
-export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
-  const index = apps.findIndex(a => a.id === id);
-  // Original geometric SVG artwork; no imported OS icons or branding.
-  return <svg className={small ? 'app-icon small' : 'app-icon'} viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges"><path d="M3 5h23v3h3v21H3z" fill="#000"/><path d="M4 6h21v3h3v19H4z" fill="#fff"/><path d="M6 9h19v16H6z" fill={['#008080','#b59c42','#487a48','#367ca5','#756198','#a65d5d','#488b8b','#777','#b38b45','#6a7484'][index]}/><path d="M6 9h19v3H6z" fill="#000080"/><text x="16" y="23" textAnchor="middle" fontSize="15" fill="white">{apps[index].glyph}</text><path d="M2 29h27v2H2z" fill="#004747"/></svg>;
+import { apps, navigationGroups, readActiveApp, encodeActiveApp, storageKey } from './model';
+import type { AppId } from './model';
+
+const iconShapes: Record<AppId, ReactNode> = {
+  status: <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
+  ecu: <><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4"/><rect x="9" y="9" width="6" height="6" rx="1"/></>,
+  inspection: <><path d="M9 4H6a2 2 0 0 0-2 2v14h16V6a2 2 0 0 0-2-2h-3"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m8 13 3 3 5-6"/></>,
+  images: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 18 5-5 4 4 5-7 4 5"/></>,
+  events: <><path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/></>,
+  luxonis: <><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/></>,
+  nero: <><path d="M4 21h16M8 21v-5l5-4-3-6M13 12l5 3 3-3M6 3l4 3 4-3"/><circle cx="10" cy="6" r="2"/><circle cx="13" cy="12" r="2"/></>,
+  sony: <><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M7 6V3h5v3"/><circle cx="13" cy="13" r="4"/></>,
+  control: <><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="3" fill="currentColor" stroke="none"/></>,
+  settings: <><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></>,
+};
+
+export function Icon({id, small = false}: {id: AppId; small?: boolean}) {
+  return <svg className={small ? 'app-icon small' : 'app-icon'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconShapes[id]}</svg>;
 }
-export function Desktop({ client, snapshot, refresh, station }: { client: ReadOnlyVisionClient; snapshot: Snapshot | null; refresh: () => void; station?: StationPresentation }) {
+
+function initialApp(): AppId {
+  try { return readActiveApp(localStorage.getItem(storageKey)); } catch { return 'status'; }
+}
+
+export function Desktop({client, snapshot, refresh, station, interactive = true}: {client: ReadOnlyVisionClient; snapshot: Snapshot | null; refresh: () => void; station?: StationPresentation; interactive?: boolean}) {
   const projectionOwner = station ? [station.report.instanceId, station.report.coreConnection,
     station.report.state, station.report.sessionId, station.report.sessionViewId].join(':') : '';
   const sessionRead = useSessionView(client, station?.report.state === 'SESSION_ACTIVE' ? 5000 : 0, projectionOwner);
@@ -24,85 +40,143 @@ export function Desktop({ client, snapshot, refresh, station }: { client: ReadOn
   const libraryRead = useLibraryView(client, station ? 15000 : 0, projectionOwner);
   const libraryControls = station?.report.coreConnection === 'NOT_CONNECTED'
     ? {...libraryRead, view: {status: 'UNAVAILABLE' as const, library: null, detail: null, history: null}} : libraryRead;
-  const mode = station ? 'CONNECTED · VENTUNO' : modeLabel(client.mode, snapshot);
-  const connection = station ? 'Connected' : connectionLabel(snapshot);
-  const description = station ? `${station.identity.username} · ${station.report.coreConnection === 'CONNECTED' ? 'Core connected' : 'Core not connected'} · ${station.identity.role==='operator'?'Operator':'Read only'}` : modeDescription(client.mode, snapshot);
-  const [size, setSize] = useState(bounds);
-  const [state, setState] = useState(() => { try { return decodeLayout(localStorage.getItem(storageKey), bounds()); } catch { return decodeLayout(null, bounds()); } });
-  const [persistence, setPersistence] = useState('Layout preferences are local to this browser.');
-  const [start, setStart] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const startRef = useRef<HTMLButtonElement>(null);
-  const windowsRef = useRef(new Map<AppId, HTMLElement>());
-  const gesture = useRef<{ id: AppId; kind: 'move' | 'resize'; x: number; y: number; rect: Rect } | null>(null);
-  const dispatch = (action: Action) => setState(s => reduce(s, action, bounds()));
-  useEffect(() => { const update = () => { setSize(bounds()); setState(s => reduce(s, { type: 'bounds' }, bounds())); }; window.addEventListener('resize', update); return () => window.removeEventListener('resize', update); }, []);
-  useEffect(() => { try { localStorage.setItem(storageKey, encodeLayout(state)); } catch { /* Browser storage is optional; the desktop remains usable. */ } }, [state]);
+
+  const [activeApp, setActiveApp] = useState<AppId>(initialApp);
+  const [visited, setVisited] = useState<AppId[]>(() => [activeApp]);
+  const [persistence, setPersistence] = useState('Only the last open section is remembered in this browser.');
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const active = apps.find(app => app.id === activeApp)!;
+
   useEffect(() => {
-    if (state.active) {
-      const target = windowsRef.current.get(state.active);
-      if (!target?.contains(document.activeElement)) target?.focus({ preventScroll: true });
-    }
-  }, [state.active]);
+    try { localStorage.setItem(storageKey, encodeActiveApp(activeApp)); } catch { /* Navigation works without browser storage. */ }
+  }, [activeApp]);
+
   useEffect(() => {
-    if (!start) return;
-    menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
-    const dismiss = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node) && !startRef.current?.contains(event.target as Node)) setStart(false); };
-    document.addEventListener('pointerdown', dismiss);
-    return () => document.removeEventListener('pointerdown', dismiss);
-  }, [start]);
-  function launch(id: AppId) { dispatch({ type: 'open', id }); setStart(false); requestAnimationFrame(() => windowsRef.current.get(id)?.focus()); }
-  function begin(event: ReactPointerEvent, win: WindowState, kind: 'move' | 'resize') {
-    if (event.button !== 0 || win.maximized || (event.target as HTMLElement).closest('button')) return;
-    dispatch({ type: 'focus', id: win.id });
-    gesture.current = { id: win.id, kind, x: event.clientX, y: event.clientY, rect: win.rect };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const query = window.matchMedia('(max-width: 900px)');
+    const changed = (event: MediaQueryListEvent) => {
+      setMobile(event.matches);
+      if (!event.matches) setNavigationOpen(false);
+    };
+    query.addEventListener('change', changed);
+    return () => query.removeEventListener('change', changed);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!interactive || !mobile || !navigationOpen) return;
+    const frame = requestAnimationFrame(() => sidebarRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus());
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setNavigationOpen(false);
+        menuButtonRef.current?.focus();
+      } else if (event.key === 'Tab') {
+        const controls = Array.from(sidebarRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+        const first = controls[0], last = controls.at(-1);
+        if (!first || !last) return;
+        if (event.shiftKey && (document.activeElement === first || !sidebarRef.current?.contains(document.activeElement))) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !sidebarRef.current?.contains(document.activeElement))) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('keydown', handleKey); };
+  }, [interactive, mobile, navigationOpen]);
+
+  function focusWorkspace() {
+    requestAnimationFrame(() => {
+      headingRef.current?.focus({preventScroll: true});
+      mainRef.current?.scrollTo({top: 0});
+      window.scrollTo({top: 0});
+    });
   }
-  function move(event: ReactPointerEvent) {
-    const g = gesture.current;
-    if (!g) return;
-    const dx = event.clientX - g.x, dy = event.clientY - g.y;
-    dispatch({ type: 'rect', id: g.id, rect: g.kind === 'move' ? { ...g.rect, x: g.rect.x + dx, y: g.rect.y + dy } : { ...g.rect, width: g.rect.width + dx, height: g.rect.height + dy } });
+
+  function openApp(id: AppId) {
+    setVisited(previous => previous.includes(id) ? previous : [...previous, id]);
+    setActiveApp(id);
+    setNavigationOpen(false);
+    focusWorkspace();
   }
-  function keyboard(event: ReactKeyboardEvent, win: WindowState, kind: 'move' | 'resize') {
-    if (event.target !== event.currentTarget || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) return;
-    event.preventDefault(); const step = event.shiftKey ? 32 : 8;
-    const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
-    const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
-    dispatch({ type: 'rect', id: win.id, rect: kind === 'move' ? { ...win.rect, x: win.rect.x + dx, y: win.rect.y + dy } : { ...win.rect, width: win.rect.width + dx, height: win.rect.height + dy } });
+
+  function closeNavigation() {
+    setNavigationOpen(false);
+    menuButtonRef.current?.focus();
   }
-  function allowEditorExit(id?:AppId) {
-    const root=id?windowsRef.current.get(id):document;
-    if(root?.querySelector('[data-editor-busy="true"]')) {
+
+  function allowEditorExit() {
+    if (shellRef.current?.querySelector('[data-editor-busy="true"]')) {
       window.alert('A Core editor request is pending. Wait for its outcome before closing the editor.');
       return false;
     }
-    return !root?.querySelector('[data-editor-dirty="true"]')||window.confirm('Discard unsaved ECU draft changes?');
+    return !shellRef.current?.querySelector('[data-editor-dirty="true"]') || window.confirm('Discard unsaved ECU draft changes?');
   }
+
   function reset() {
-    if(!allowEditorExit())return;
-    try { localStorage.removeItem(storageKey); setPersistence('Layout reset. Only desktop preferences were affected.'); } catch { setPersistence('Browser storage unavailable. Layout reset for this tab.'); }
-    dispatch({ type: 'reset' });
+    if (!allowEditorExit()) return;
+    try {
+      localStorage.removeItem(storageKey);
+      setPersistence('Workspace reset. Your station data is unchanged.');
+    } catch {
+      setPersistence('Browser storage unavailable. Workspace reset for this tab.');
+    }
+    setVisited(['status']);
+    setActiveApp('status');
+    setNavigationOpen(false);
+    focusWorkspace();
   }
-  return <main className="desktop" onKeyDown={e => { if (e.key === 'Escape' && start) { setStart(false); startRef.current?.focus(); } }}>
-    <header className="mode-banner"><strong>{mode}</strong><span>{description}</span><span className="shell-version">{station ? 'VISION WORKSTATION' : 'VISION / API-03'}</span></header>
-    <div className="workspace" style={{ height: size.height }}>
-      <nav className="desktop-icons" aria-label="Desktop applications">{apps.map(app => <button className="desktop-shortcut" key={app.id} onClick={() => launch(app.id)} title={app.description}><Icon id={app.id}/><span>{app.title}</span></button>)}</nav>
-      <div className="desktop-watermark" aria-hidden="true"><strong>VISION</strong><span>DESKTOP SHELL / V1</span><small>Client of the Vision system</small></div>
-      {state.windows.map((win, z) => {
-        const app = apps.find(a => a.id === win.id)!;
-        const rect = win.maximized ? { x: 0, y: 0, ...size } : clamp(win.rect, size);
-        return <section role="dialog" aria-modal="false" aria-labelledby={`title-${win.id}`} tabIndex={-1} ref={node => { if (node) windowsRef.current.set(win.id, node); else windowsRef.current.delete(win.id); }} className={`window app-window ${state.active === win.id ? 'active' : ''}`} key={win.id} hidden={win.minimized} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, zIndex: z + 1 }} onPointerDown={() => { if (state.active !== win.id) dispatch({ type: 'focus', id: win.id }); }} onFocus={() => { if (state.active !== win.id) dispatch({ type: 'focus', id: win.id }); }}>
-          <div className={`title-bar ${state.active !== win.id ? 'inactive' : ''}`} tabIndex={0} aria-label={`Move ${app.title} with arrow keys`} onKeyDown={e => keyboard(e, win, 'move')} onPointerDown={e => begin(e, win, 'move')} onPointerMove={move} onPointerUp={() => { gesture.current = null; }} onPointerCancel={() => { gesture.current = null; }} onDoubleClick={e => { if (!(e.target as HTMLElement).closest('button')) dispatch({ type: 'maximize', id: win.id }); }}>
-            <div className="title-bar-text" id={`title-${win.id}`}><Icon id={win.id} small/>{app.title}</div><div className="title-bar-controls"><button aria-label={`Minimize ${app.title}`} onClick={() => dispatch({ type: 'minimize', id: win.id })}/><button aria-label={`${win.maximized ? 'Restore' : 'Maximize'} ${app.title}`} className={win.maximized ? 'restore-button' : 'maximize-button'} onClick={() => dispatch({ type: 'maximize', id: win.id })}/><button aria-label={`Close ${app.title}`} onClick={() => {if(allowEditorExit(win.id))dispatch({type:'close',id:win.id});}}/></div>
-          </div>
-          <div className="window-menubar"><span>Vision client</span><span>{mode}</span><span>{win.id === 'settings' ? 'Account settings' : win.id==='ecu'&&station?.identity.role==='operator'?'Draft editor':'Read only'}</span></div>
-          <div className="window-body"><AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={persistence} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls} libraryControls={libraryControls} station={station}/></div>
-          <footer className="status-bar"><p className="status-bar-field">{win.id === 'control' ? 'Local UI preferences' : win.id === 'settings' ? 'Your account security' : 'No operational commands'}</p><p className="status-bar-field">{connection}</p>{!win.maximized && <button className="resize-handle" aria-label={`Resize ${app.title} with arrow keys`} onKeyDown={e => keyboard(e, win, 'resize')} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); gesture.current = { id: win.id, kind: 'resize', x: e.clientX, y: e.clientY, rect: win.rect }; }} onPointerMove={move} onPointerUp={() => { gesture.current = null; }} onPointerCancel={() => { gesture.current = null; }}>◢</button>}</footer>
-        </section>;
-      })}
+
+  const coreConnected = station?.report.coreConnection === 'CONNECTED';
+  const connection = station ? (coreConnected ? 'Core connected' : 'Core not connected') : connectionLabel(snapshot);
+  const connectionState = station ? (coreConnected ? 'connected' : 'disconnected') : snapshot?.connection === 'API_AVAILABLE' ? 'connected' : 'preview';
+  const sessionLabel = station ? (!coreConnected ? 'Session status unavailable' : station.report.state === 'SESSION_ACTIVE' ? 'Session active' : 'No active session') : modeLabel(client.mode, snapshot);
+
+  return <div className="app-shell" ref={shellRef} inert={!interactive}>
+    <a className="skip-link" href="#workspace-main">Skip to content</a>
+    <header className="app-header">
+      <button className="app-menu-toggle button-quiet" ref={menuButtonRef} aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-controls="workspace-navigation" aria-expanded={navigationOpen} onClick={() => navigationOpen ? closeNavigation() : setNavigationOpen(true)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div className="app-brand"><span className="app-brand-mark" aria-hidden="true">V</span><div><strong>VISION</strong><span>{station ? 'Workstation' : 'Lab preview'}</span></div></div>
+      <div className="app-header-status" title={station ? undefined : modeDescription(client.mode, snapshot)}>
+        <span className="connection-badge" data-state={connectionState}>{connection}</span>
+        <span className="app-session-state">{sessionLabel}</span>
+      </div>
+      {station && <div className="app-header-actions">
+        <span className="app-identity"><strong>{station.identity.username}</strong><span>{station.identity.role === 'operator' ? 'Operator' : 'Read only'}</span></span>
+        <button className="button-quiet" disabled={station.accountBusy} onClick={() => { if (allowEditorExit()) station.logout(); }}>Sign out</button>
+      </div>}
+    </header>
+    <div className="app-body">
+      {mobile && navigationOpen && <button className="nav-backdrop" aria-label="Close navigation overlay" tabIndex={-1} onClick={closeNavigation}/>}
+      <aside id="workspace-navigation" ref={sidebarRef} className={navigationOpen ? 'app-sidebar is-open' : 'app-sidebar'} role={mobile ? 'dialog' : undefined} aria-modal={mobile && navigationOpen ? true : undefined} aria-label="Workspace navigation" aria-hidden={mobile && !navigationOpen ? true : undefined} inert={mobile && !navigationOpen}>
+        <div className="app-sidebar-heading"><span>Navigation</span><button className="app-nav-close button-quiet" aria-label="Close menu" onClick={closeNavigation}>×</button></div>
+        <nav aria-label="Main navigation">
+          {navigationGroups.map(group => <div className="app-nav-group" key={group.id}>
+            <h2 className="app-nav-group-label">{group.title}</h2>
+            {apps.filter(app => app.group === group.id).map(app => <button key={app.id} className="app-nav-item" aria-current={activeApp === app.id ? 'page' : undefined} onClick={() => openApp(app.id)}><Icon id={app.id}/><span>{app.title}</span></button>)}
+          </div>)}
+        </nav>
+        {station && <div className="app-account"><strong>{station.identity.username}</strong><small>{station.identity.role === 'operator' ? 'Operator' : 'Read only'}</small></div>}
+      </aside>
+      <main id="workspace-main" className="app-main" ref={mainRef} tabIndex={-1} inert={mobile && navigationOpen}>
+        <div className="workspace-heading"><h1 ref={headingRef} tabIndex={-1}>{active.title}</h1><p>{active.description}</p></div>
+        {visited.map(id => {
+          // Keep a working reference in memory while navigating. Password fields
+          // deliberately unmount on departure; pending auth stays with its owner.
+          if (id === 'settings' && id !== activeApp) return null;
+          const app = apps.find(item => item.id === id)!;
+          return <section key={id} className="workspace-panel" role="region" aria-label={app.title} data-app-id={id} hidden={id !== activeApp}>
+            <AppContent id={id} snapshot={snapshot} reset={reset} persistence={persistence} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls} libraryControls={libraryControls} station={station}/>
+          </section>;
+        })}
+      </main>
     </div>
-    {start && <div className="start-menu window" ref={menuRef} role="menu" aria-label="Start applications" onKeyDown={e => { const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')); const i = items.indexOf(document.activeElement as HTMLButtonElement); if (['ArrowDown','ArrowUp','Home','End'].includes(e.key)) { e.preventDefault(); items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); } }}><div className="start-brand">VISION <b>Desktop</b></div><div className="start-items">{station && <div className="station-account">Signed in as {station.identity.username}</div>}{apps.map(app => <button role="menuitem" key={app.id} onClick={() => launch(app.id)}><Icon id={app.id} small/>{app.title}</button>)}<hr/>{station ? <button role="menuitem" disabled={station.accountBusy} onClick={() => { if(allowEditorExit()){setStart(false);station.logout();} }}>Sign out</button> : <button role="menuitem" disabled>Log in… · unavailable</button>}<button role="menuitem" disabled>Restart system… · unavailable</button><button role="menuitem" disabled>Shut down system… · unavailable</button></div></div>}
-    <footer className="taskbar"><button className={`start-button ${start ? 'pressed' : ''}`} ref={startRef} aria-expanded={start} aria-haspopup="menu" onClick={() => setStart(!start)}><span className="start-symbol" aria-hidden="true">V</span>Start</button><span className="taskbar-divider"/><div className="task-buttons">{state.windows.map(win => <button key={win.id} className={state.active === win.id && !win.minimized ? 'pressed' : ''} aria-pressed={state.active === win.id && !win.minimized} onClick={() => dispatch({ type: state.active === win.id && !win.minimized ? 'minimize' : 'focus', id: win.id })}><Icon id={win.id} small/><span>{apps.find(a => a.id === win.id)!.title}</span></button>)}</div><div className="tray" role="status">{connection}<span>Client only</span></div></footer>
-  </main>;
+  </div>;
 }

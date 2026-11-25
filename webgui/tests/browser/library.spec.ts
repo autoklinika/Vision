@@ -25,8 +25,8 @@ test('library browsing is explicit, separates catalog and drafts, and clears pro
   const startup = page.getByRole('dialog', {name: 'Vision Workstation Startup'});
   await expect(startup.getByRole('button', {name: 'Refresh library'})).toHaveCount(0);
   await enterDesktop(page);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.getByRole('region', {name: 'ECU Library', exact: true, includeHidden: true});
   expect(reads).toEqual([]);
   await library.getByRole('button', {name: 'Refresh library'}).click();
   await expect(library).toContainText('SYNTHETIC TEST · no station library');
@@ -80,8 +80,8 @@ test('library pages replace prior entries and stale views or empty libraries sta
     return route.fulfill({contentType: type, body: JSON.stringify(mode === 'stale' && after > 0 ? {...report, viewId: 'f'.repeat(64)} : report)});
   });
   await page.goto('/?mode=real'); await enterDesktop(page);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.getByRole('region', {name: 'ECU Library', exact: true, includeHidden: true});
   const entries = library.getByRole('table', {name: 'ECU library entries'});
   await library.getByRole('button', {name: 'Refresh library'}).click();
   await expect(entries.locator('tbody tr')).toHaveCount(50);
@@ -118,8 +118,8 @@ test('library detail and history failures clear the whole previous view and allo
     return route.fulfill({contentType: type, body: JSON.stringify(report)});
   });
   await page.goto('/?mode=real'); await enterDesktop(page);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.getByRole('region', {name: 'ECU Library', exact: true, includeHidden: true});
   for (const next of ['none','detail','history','disconnect','none'] as const) {
     failure = next;
     await library.getByRole('button', {name: 'Refresh library'}).click();
@@ -138,8 +138,8 @@ test('demo and invalid modes never request library data', async ({page}) => {
   await page.route('**/api/v1/**', route => { requests.push(route.request().url()); return route.fulfill({status: 500}); });
   for (const mode of ['demo','invalid']) {
     await page.goto('/?mode=' + mode); await enterDesktop(page);
-    await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-    const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+    await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+    const library = page.getByRole('region', {name: 'ECU Library', exact: true, includeHidden: true});
     await expect(library).toContainText('Library reads are disabled');
     await expect(library.getByRole('button', {name: 'Refresh library'})).toBeDisabled();
     await expect(library.getByRole('button', {name: 'Open reference editor'})).toBeDisabled();
@@ -153,8 +153,8 @@ test('actual Library: authorized backend catalog, reference sections, exact hist
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { const path = new URL(request.url()).pathname; if (path.startsWith('/api/v1/')) methods.push(request.method()); if (path.startsWith('/api/v1/library')) libraryRequests.push(path); });
   await page.goto('/?mode=real'); await enterDesktop(page);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.getByRole('region', {name: 'ECU Library', exact: true, includeHidden: true});
   const denied = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/library');
   await library.getByRole('button', {name: 'Refresh library'}).click();
   expect((await denied).status()).toBe(401);
@@ -188,8 +188,11 @@ test('actual Library: authorized backend catalog, reference sections, exact hist
   await library.getByRole('tab', {name: '15 sections'}).click();
   await expect(library.getByRole('table', {name: 'Reference profile sections'}).locator('tbody tr')).toHaveCount(15);
   const box = (await library.boundingBox())!;
-  expect(box.x).toBeGreaterThanOrEqual(190); expect(box.x + box.width).toBeLessThanOrEqual(1280); expect(box.y + box.height).toBeLessThanOrEqual(762);
-  await page.screenshot({path: 'test-results/audit-library.png'});
+  const navigation = (await page.getByRole('navigation', {name: 'Main navigation'}).boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(navigation.x + navigation.width);
+  expect(box.x + box.width).toBeLessThanOrEqual(1280);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.screenshot({path: 'test-results/audit-library.png', fullPage: true});
   await library.getByRole('tab', {name: 'Revision history (2)'}).click();
   await expect(library.getByRole('table', {name: 'Reference revision history'}).locator('tbody tr')).toHaveCount(2);
   await expect(library.getByRole('button', {name: 'Next history page'})).toBeDisabled();

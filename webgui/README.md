@@ -1,12 +1,14 @@
 # Vision WebGUI — stanowisko i izolowany klient
 
-## Aktualny zakres stanowiskowy (25.11.2026)
+## Aktualny zakres klienta (25.11.2026)
 
-Pulpit Windows 98 działa na VENTUNO Q w trybie Kiosk i przez prywatny HTTPS. Wydanie stanowiskowe ma rzeczywiste logowanie, sesje backendowe, zmianę hasła i automatyczną synchronizację. API odczytuje niezależny Core przez prywatny Unix socket; GUI nie tworzy Workflow ani drugiej biblioteki. W stanie idle: CONNECTED, NO_ACTIVE_SESSION, UNKNOWN. System Status, ECU Library (odczyt), Inspection Manager i Event Viewer są połączone; okna Luxonis, NERO, Sony i Images nadal są placeholderami. Nie ma komend sprzętowych ani edycji/zatwierdzania profilu ECU.
+[Workspace V2](../docs/ux/VISION_WORKSPACE_V2.md) zastępuje pulpit Windows 98 czytelną przestrzenią roboczą: stałą nawigacją, jednym głównym widokiem, systemową typografią i menu mobilnym. Przełączanie sekcji zachowuje otwarty formularz ECU; opuszczenie Settings czyści pola hasła. Lokalnie zapamiętywana jest wyłącznie ostatnia sekcja. Nie ma już przesuwania, minimalizowania ani skalowania okien.
 
-- [Kontrakt stanowiskowy](../docs/implementation/VISION_STATION_WEBGUI_V1.md) i [runbook wdrożenia](../docs/operations/VISION_WEBGUI_DEPLOYMENT.md) są nadrzędne wobec historycznych opisów poniżej.
-- [#65 Core IPC](https://github.com/autoklinika/Vision/pull/65), [#68 Settings](https://github.com/autoklinika/Vision/pull/68), [#70 Firefox](https://github.com/autoklinika/Vision/pull/70) zawierają zakres testów i ograniczenia.
-- Stanowiskowy build: `VITE_VISION_DEPLOYMENT=station npm run build`. Testy `npm run test:station -- --browser=firefox` i osobno `--browser=chromium` wykonuje się wyłącznie w izolowanym środowisku z odpowiednimi zależnościami Python/Playwright i wolnym portem fixture. Nie wskazywać produkcyjnego serwera ani kont.
+Wydanie stanowiskowe ma rzeczywiste logowanie, sesje backendowe, zmianę hasła i automatyczną synchronizację. API odczytuje niezależny Core przez prywatny Unix socket. ECU Library udostępnia uniwersalny edytor 15 sekcji dla operatora; zatwierdzanie profilu pozostaje odrębne. System Status, biblioteka i raporty inspekcji korzystają z istniejących kontraktów. Widoki urządzeń i Images nadal jawnie pokazują brak integracji. Implementacja klienta nie oznacza przełączenia aktywnego wydania produkcyjnego.
+
+- [Kontrakt stanowiskowy](../docs/implementation/VISION_STATION_WEBGUI_V1.md), [edytor ECU](../docs/implementation/VISION_ECU_DRAFT_EDITOR_V1.md) i [runbook wdrożenia](../docs/operations/VISION_WEBGUI_DEPLOYMENT.md) opisują granice funkcjonalne.
+- Stanowiskowy build: `VITE_VISION_DEPLOYMENT=station npm run build`. Testy `npm run test:station -- --browser=firefox` i osobno `--browser=chromium` oraz `npx playwright test --config playwright.editor.config.ts --browser=chromium` wykonuje się wyłącznie w izolowanym środowisku z zależnościami Python/Playwright i wolnym portem fixture.
+- Współczesny interfejs nie importuje `98.css`, nie dystrybuuje bitmapowych fontów ani nie korzysta z zewnętrznego dostawcy fontów. Opisy 98.css poniżej dokumentują historyczne wydania.
 
 ---
 

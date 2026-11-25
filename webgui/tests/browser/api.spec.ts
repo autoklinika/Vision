@@ -32,9 +32,9 @@ test('actual API: Python loopback response and refresh recovery', async ({page})
   await expect(startup).toContainText('UNKNOWN');
   await expect(startup).not.toContainText('READY');
   await enterDesktop(page);
-  const desktop = page.getByRole('dialog',{name:'System Status',exact:true});
+  const desktop = page.getByRole('region', {name:'System Status',exact:true, includeHidden: true});
   await expect(desktop).toContainText('API AVAILABLE (last report)');
-  await expect(page.locator('.mode-banner')).toContainText('REAL · API REPORT');
+  await expect(page.locator('.app-header')).toContainText('REAL · API REPORT');
   expect(requests).toHaveLength(1);
 
   // Simulate loss of the HTTP path, then restore real, unmocked Python replies.
@@ -43,7 +43,7 @@ test('actual API: Python loopback response and refresh recovery', async ({page})
   await expect(desktop).toContainText('Real adapter unavailable');
   await expect(desktop).not.toContainText('API AVAILABLE');
   await expect(desktop).not.toContainText(report.reportTime);
-  await expect(page.locator('.mode-banner')).toContainText('UNAVAILABLE');
+  await expect(page.locator('.app-header')).toContainText('UNAVAILABLE');
   await page.unroute(endpoint);
   const next = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/status');
   await desktop.getByRole('button',{name:'Refresh API report'}).click();
@@ -55,7 +55,7 @@ test('actual API: Python loopback response and refresh recovery', async ({page})
   expect(requests).toHaveLength(3);
   expect(requests.every(r => r.method === 'GET' && r.url === 'http://127.0.0.1:4173/api/v1/status')).toBe(true);
   expect(errors).toEqual([]);
-  await page.locator('.desktop-icons').getByRole('button',{name:'ECU Library',exact:true}).click();
+  await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button',{name:'ECU Library',exact:true}).click();
   await expect(page.getByRole('button',{name:'Open reference editor'})).toBeDisabled();
   expect(requests).toHaveLength(3);
 });
@@ -97,6 +97,6 @@ test('ambiguous mode never contacts API', async ({page}) => {
   await page.goto('/?mode=real&mode=demo');
   await expect(page.getByRole('dialog',{name:'Vision Workstation Startup'})).toContainText('invalid client mode');
   await enterDesktop(page);
-  await expect(page.locator('.mode-banner')).toContainText('UNAVAILABLE');
+  await expect(page.locator('.app-header')).toContainText('UNAVAILABLE');
   expect(calls).toBe(0);
 });

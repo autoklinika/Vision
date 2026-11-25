@@ -1,5 +1,7 @@
 # ADR-VISION-WEBGUI-001 — WebGUI wyłącznie klientem systemu Vision
 
+> **Aktualizacja UI, 25.11.2026:** [Workspace V2](../ux/VISION_WORKSPACE_V2.md) zastępuje styl Windows 98, menu Start, zarządzanie oknami i zapis ich geometrii. Poniższe opisy tego wyglądu są historyczne. Zasady odpowiedzialności Core, uwierzytelniania, raportów i prywatności pozostają obowiązujące. Status wdrożenia jest odrębny od implementacji.
+
 - **Data decyzji:** 2026-11-24.
 - **Status:** **ACCEPTED** — granica odpowiedzialności, kierunek wizualny i tryby dostępu zatwierdzone przez właściciela Vision w rozmowie projektowej 24.11.2026.
 - **Zakres:** WebGUI / Vision Desktop Shell, komunikacja klient–system, lokalny Kiosk i zdalna przeglądarka.

@@ -1,5 +1,7 @@
 # Authenticated station WebGUI deployment
 
+> **Aktualizacja UI, 25.11.2026:** [Workspace V2](../ux/VISION_WORKSPACE_V2.md) zastępuje styl Windows 98, menu Start, zarządzanie oknami i zapis ich geometrii. Poniższe opisy tego wyglądu są historyczne. Zasady odpowiedzialności Core, uwierzytelniania, raportów i prywatności pozostają obowiązujące. Status wdrożenia jest odrębny od implementacji.
+
 This document describes the original reader-only deployment. The proposed session lifecycle extension is documented in [VISION-RUNTIME-002](VISION_RUNTIME_002_STATION_SESSION.md); it adds explicit operator permission and new bounded operations without changing the legacy read schemas.
 
 Scope: [initial deployment #62](https://github.com/autoklinika/Vision/issues/62), [independent Core connection #64](https://github.com/autoklinika/Vision/issues/64), and [Settings/password change #67](https://github.com/autoklinika/Vision/issues/67). The backend owns state, identity, permissions and ECU storage. The browser owns only presentation and local window preferences.

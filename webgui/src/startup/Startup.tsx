@@ -100,7 +100,6 @@ export function Startup({ client, report }: { client: ReadOnlyVisionClient; repo
             <label htmlFor="username">User name</label><input id="username" disabled autoComplete="off"/>
             <label htmlFor="password">Password</label><input id="password" type="password" disabled autoComplete="off"/>
           </div>
-          <div className="startup-actions"><button onClick={() => setPhase('report')}>Back to report</button><button onClick={() => setPhase('desktop')}>{client.mode === 'demo' ? 'Continue to DEMO desktop' : 'Open read-only view'}</button></div>
         </> : <>
           <p role="status" id="report-read-status">{snapshot
             ? 'Client report read finished. System initialization and readiness are not established.'
@@ -108,7 +107,15 @@ export function Startup({ client, report }: { client: ReadOnlyVisionClient; repo
           {!snapshot && <div className="report-progress" role="progressbar" aria-label="Waiting for selected adapter report" aria-describedby="report-read-status"><span aria-hidden="true"/></div>}
           <AppContent id="status" snapshot={snapshot} reset={() => {}} persistence="" refresh={client.canRefresh ? refresh : undefined}/>
           <p>Report acquisition starts independently of the intro. No device initialization or automatic commands.</p>
-          <div className="startup-actions"><button onClick={() => setPhase('login')}>Continue to login presentation</button><button onClick={() => setPhase('desktop')}>Open read-only diagnostics</button></div>
+        </>}
+      </div>
+      <div className="startup-actions startup-footer">
+        {phase === 'login' ? <>
+          <button onClick={() => setPhase('report')}>Back to report</button>
+          <button onClick={() => setPhase('desktop')}>{client.mode === 'demo' ? 'Continue to DEMO desktop' : 'Open read-only view'}</button>
+        </> : <>
+          <button onClick={() => setPhase('login')}>Continue to login presentation</button>
+          <button onClick={() => setPhase('desktop')}>Open read-only diagnostics</button>
         </>}
       </div>
     </section>}
