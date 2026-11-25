@@ -227,7 +227,7 @@ test('late denial from a previous login cannot sign out a new login', async ({pa
   await expect(page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true})).toBeVisible();
   await page.getByRole('navigation', {name: 'Main navigation'}).getByRole('button', {name: 'System Status', exact: true}).click();
   await page.getByRole('region', {name: 'System Status', exact: true, includeHidden: true}).getByRole('button', {name: 'Refresh station'}).click();
-  await expect(page.locator('.app-header')).toContainText('CONNECTED · VENTUNO');
+  await expect(page.locator('.app-header')).toContainText('Core connected');
 });
 
 test('unconfirmed logout hides protected data and retries without restoring the desktop', async ({page}) => {
