@@ -3,7 +3,8 @@ from dataclasses import dataclass, replace
 from .assets import AssetStore
 from .library import ReferenceLibrary
 from .models import ReferenceProfile
-from .readiness import evaluate_readiness
+from .readiness import evaluate_readiness, _evaluate_review_requirements
+from .codec import content_sha256
 from .releases import ReferenceReleaseStore
 from vision_modules.ecu_profiles import to_core_approved, record_sha256
 from vision_core.extensions import ModuleRegistry, ScenarioSpec
@@ -51,6 +52,34 @@ def compile_profile(profile, physical_state, recipe, record, catalog, release_st
     ref_sha = reference_release_store.require(profile)
     if library is not None:
         if not isinstance(library, ReferenceLibrary) or library.select(m['family_id'], m['variant_id'], m['profile_revision']) != profile: raise ValueError('NOT_READY: library mismatch')
+    return _compile_contents(profile, physical_state, recipe, record, catalog, release_store, calibrations,
+                             capabilities=capabilities, asset_store=asset_store, ref_sha=ref_sha,
+                             module_registry=module_registry, scenario_spec=scenario_spec, review=False)
+
+
+def _check_review_contents(profile, physical_state, recipe, record, catalog, release_store, calibrations,
+                           *, capabilities, asset_store):
+    """Run the existing compiler's content checks before reference release.
+
+    This deliberately returns no execution bundle. The public compiler still
+    requires the exact approved snapshot in ReferenceReleaseStore.
+    """
+    if not isinstance(profile, ReferenceProfile) or not isinstance(asset_store, AssetStore):
+        raise ValueError('typed review inputs required')
+    # Reject a non-review document before entering the shared checks.
+    d=profile.data; m=d['metadata']; pr=d['provenance_release']
+    if (m['status'] != 'REVIEW_READY' or m['template_only'] is not False
+            or m['approval_scopes'] or m['content_sha256'] is not None
+            or pr['release_approval'] is not None or pr['released_snapshot_sha256'] is not None):
+        raise ValueError('unsigned review candidate required')
+    _compile_contents(profile, physical_state, recipe, record, catalog, release_store, calibrations,
+                      capabilities=capabilities, asset_store=asset_store, ref_sha=content_sha256(profile),
+                      module_registry=None, scenario_spec=None, review=True)
+
+
+def _compile_contents(profile, physical_state, recipe, record, catalog, release_store, calibrations,
+                      *, capabilities, asset_store, ref_sha, module_registry, scenario_spec, review):
+    d=profile.data; m=d['metadata']
     core = to_core_approved(record, calibrations, catalog=catalog, release_store=release_store)
     if (m['profile_id'], m['family_id'], m['variant_id'], m['profile_revision']) != (record.profile_id, record.family, record.variant, record.revision): raise ValueError('NOT_READY: ECU identity mismatch')
     workflows = [x for x in d['inspection_workflows']['recipes'] if x['recipe_id'] == recipe and x['state_id'] == physical_state]
@@ -68,8 +97,9 @@ def compile_profile(profile, physical_state, recipe, record, catalog, release_st
     sources = {s['source_id']: s for s in d['provenance_release']['measurement_sources']}
     if any(assets[aid]['physical_state_id'] != physical_state or sources[assets[aid]['source_id']]['status'] != 'VERIFIED' or not any(h['asset_id'] == aid for h in d['provenance_release']['asset_hashes']) for aid in ids): raise ValueError('NOT_READY: asset provenance mismatch')
     verified = tuple(asset_store.verify_asset(assets[aid]) for aid in sorted(ids))
-    report = evaluate_readiness(profile, physical_state, recipe, scope, capabilities=capabilities, calibrations=calibrations, asset_ids_verified={x.asset_id for x in verified})
-    if report.status != 'PASS': raise ValueError('NOT_READY: ' + '; '.join(report.blockers))
+    evaluator = _evaluate_review_requirements if review else evaluate_readiness
+    report = evaluator(profile, physical_state, recipe, scope, capabilities=capabilities, calibrations=calibrations, asset_ids_verified={x.asset_id for x in verified})
+    if report.status != ('REVIEW_READY' if review else 'PASS'): raise ValueError('NOT_READY: ' + '; '.join(report.blockers))
     views = {v['view_id']: v for p in d['photography_recipes']['recipes'] if p['state_id'] == physical_state and p['recipe_id'] == recipe for v in p['views']}
     targets = {v.view_id: v for v in record.views}; roi_ids = set()
     if len(targets) != len(record.views) or len(set(w['required_view_ids'])) != len(w['required_view_ids']) or set(targets) != set(w['required_view_ids']): raise ValueError('NOT_READY: selected views must exactly match approved record')

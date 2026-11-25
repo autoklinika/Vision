@@ -18,7 +18,7 @@
 ## Implementacja i UX
 
 - Core: [001 Foundation](implementation/VISION_CORE_001_FOUNDATION.md), [002 Photography](implementation/VISION_CORE_002_PHOTOGRAPHY.md), [003 Repeatability](implementation/VISION_CORE_003_REPEATABLE_INSPECTION.md), [004 Extensions](implementation/VISION_CORE_004_MODULAR_EXTENSIONS.md).
-- ECU: [specyfikacja 15 sekcji](architecture/ECU_REFERENCE_PROFILE_V1_SPECIFICATION.md), [szablon](templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json), [ECU Profiles](implementation/VISION_ECU_PROFILES_V1.md), [Reference Profile](implementation/VISION_ECU_REFERENCE_PROFILE_V1_IMPLEMENTATION.md), [Library Backend](implementation/VISION_ECU_LIBRARY_BACKEND_V1.md), [ETC3 PoC — DRAFT](profiles/ETC3_POC_V1_PL.md).
+- ECU: [specyfikacja 15 sekcji](architecture/ECU_REFERENCE_PROFILE_V1_SPECIFICATION.md), [szablon](templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json), [ECU Profiles](implementation/VISION_ECU_PROFILES_V1.md), [Reference Profile](implementation/VISION_ECU_REFERENCE_PROFILE_V1_IMPLEMENTATION.md), [Review & Release candidate](implementation/VISION_ECU_REFERENCE_REVIEW_V1.md), [Library Backend](implementation/VISION_ECU_LIBRARY_BACKEND_V1.md), [ETC3 PoC — DRAFT](profiles/ETC3_POC_V1_PL.md).
 - Runtime: [Station Session Orchestration candidate](implementation/VISION_RUNTIME_002_STATION_SESSION.md), [S01–S04](implementation/VISION_RUNTIME_V1_S01_S04.md), [ROS 2 Luxonis adapter](implementation/VISION_RUNTIME_ROS2_LUXONIS_ADAPTER_V1.md).
 - Planner: [S05–S06](implementation/VISION_INSPECTION_PLANNER_V1_S05_S06.md).
 - [Thermal Inspection V1](implementation/VISION_THERMAL_INSPECTION_V1.md).
