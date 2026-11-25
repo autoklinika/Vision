@@ -137,6 +137,9 @@ class CoreHostTests(unittest.TestCase):
 
     def test_unsafe_parent_and_symlink_rejected(self):
         self.path.parent.mkdir(mode=0o755)
+        # The station launcher uses umask 077; establish the intentionally
+        # unsafe test mode explicitly rather than relying on mkdir's request.
+        self.path.parent.chmod(0o755)
         with self.assertRaises(ValueError):
             CoreServer(self.path, CoreHost(self.library))
         self.assertEqual(self.owner.station_report()["coreConnection"], "NOT_CONNECTED")
