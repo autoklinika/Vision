@@ -22,6 +22,8 @@ jobs:
           cache-dependency-path: webgui/package-lock.json
       - name: API wire contract and loopback tests
         run: PYTHONPATH=src python -B -m unittest discover -s tests/api -v
+      - name: Install pinned station HTTP server
+        run: python -m pip install --require-hashes -r requirements-station.txt
       - name: Install locked frontend dependencies
         working-directory: webgui
         run: npm ci --no-audit --no-fund
@@ -73,6 +75,12 @@ jobs:
         run: |
           VISION_LIBRARY_INTEGRATION=1 GUI_BUILD_SMOKE=1 npm run test:browser -- --grep 'actual Library:'
           test ! -e .api03-test-auth.json
+      - name: Authenticated station production build and Chromium
+        working-directory: webgui
+        run: |
+          VITE_VISION_DEPLOYMENT=station npm run build
+          npm run test:station
+          test ! -e ../.station-test-auth.json
       - name: Dependency audit
         working-directory: webgui
         run: npm audit --registry=https://registry.npmjs.org/
