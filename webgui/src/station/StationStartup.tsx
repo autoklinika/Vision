@@ -43,7 +43,7 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, changePas
     reportTime: report.capturedAt, reason: report.coreConnection === 'NOT_CONNECTED' ? 'Vision Core is not connected.' :
       report.state === 'NO_ACTIVE_SESSION' ? 'Vision Core is connected. No inspection session is active.' : 'Core session report available. Readiness is unknown.', components: [],
   };
-  const owner = `${identity.username}:${report.coreConnection}:${report.instanceId}:${report.sessionId ?? ''}:${report.sessionViewId ?? ''}`;
+  const owner = `${identity.username}:${identity.role}:${report.coreConnection}:${report.instanceId}:${report.sessionId ?? ''}:${report.sessionViewId ?? ''}`;
   return <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout, accountBusy, changePassword}}/>;
 }
 

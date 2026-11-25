@@ -1,6 +1,6 @@
 import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
-import {isDraftReport, isDraftValidation} from './draftContract';
-import type {DraftAction, DraftReport, DraftValidation} from './draftContract';
+import {isDraftReport, isDraftValidation, isDraftAssetReport, isDraftAssetPreview} from './draftContract';
+import type {DraftAction, DraftReport, DraftValidation, DraftAssetReport, DraftAssetPreview} from './draftContract';
 import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport, InspectionReport } from './contract';
 
 export type StationResult<T> = Readonly<{status: 'AVAILABLE'; report: T}> | Readonly<{status: 'ACCESS_DENIED' | 'RATE_LIMITED' | 'UNAVAILABLE'; report: null}>;
@@ -92,18 +92,30 @@ function editorBody(args: Record<string,string>, document?: string): string {
   const base = JSON.stringify(args);
   return document === undefined ? base : base.slice(0,-1)+',"document":'+document+'}';
 }
-async function editorRequest<T extends DraftReport | DraftValidation>(action: DraftAction, args: Record<string,string>,
+async function editorRequest<T extends DraftReport | DraftValidation | DraftAssetReport | DraftAssetPreview>(action: DraftAction, args: Record<string,string>,
     validate: (value: unknown) => value is T, document?: string): Promise<DraftResult<T>> {
   const body = editorBody(args,document);
-  if (new TextEncoder().encode(body).length > 131072) return {status:'BAD_REQUEST',report:null};
-  const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,131072);
+  const assetWire=3*1024*1024;
+  if (new TextEncoder().encode(body).length > (action==='asset_import'?assetWire:131072)) return {status:'BAD_REQUEST',report:null};
+  const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072);
+  if(result.status==='AVAILABLE'&&action==='asset_preview'&&(!('assetId' in result.report)||result.report.assetId!==args.assetId))return unavailable;
   if (result.status === 'AVAILABLE' && (result.report.instanceId !== args.instanceId ||
       result.report.key !== (action === 'clone' ? args.newKey : args.key))) return unavailable;
   return result;
 }
-export function editDraft(action: Exclude<DraftAction,'validate'>, args: Record<string,string>, document?: string): Promise<DraftResult<DraftReport>> {
+export function editDraft(action: Exclude<DraftAction,'validate'|'validate_structure'|'asset_import'|'asset_preview'>, args: Record<string,string>, document?: string): Promise<DraftResult<DraftReport>> {
   return editorRequest(action,args,isDraftReport,document);
 }
 export function validateDraft(args: Record<string,string>, document: string): Promise<DraftResult<DraftValidation>> {
   return editorRequest('validate',args,isDraftValidation,document);
+}
+
+export function validateDraftStructure(args:Record<string,string>, document:string):Promise<DraftResult<DraftValidation>> {
+  return editorRequest('validate_structure',args,isDraftValidation,document);
+}
+export function importDraftAsset(args:Record<string,string>):Promise<DraftResult<DraftAssetReport>> {
+  return editorRequest('asset_import',args,isDraftAssetReport);
+}
+export function previewDraftAsset(args:Record<string,string>):Promise<DraftResult<DraftAssetPreview>> {
+  return editorRequest('asset_preview',args,isDraftAssetPreview);
 }

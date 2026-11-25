@@ -1,7 +1,7 @@
 import {librarySections} from '../api/libraryContract';
 import {record} from './contract';
 
-export type DraftAction = 'open' | 'create' | 'save' | 'clone' | 'validate';
+export type DraftAction = 'open' | 'create' | 'create_empty' | 'save' | 'clone' | 'validate' | 'validate_structure' | 'asset_import' | 'asset_preview';
 export type DraftDocument = Record<typeof librarySections[number], unknown>;
 export type DraftReport = Readonly<{
   schema: 'vision.api.ecu-draft.v1'; source: 'STATION'; instanceId: string;
@@ -46,17 +46,25 @@ export function isDraftValidation(value: unknown): value is DraftValidation {
     value.status === (value.valid ? 'NOT_READY' : 'INVALID_DOCUMENT') && messages(value.errors) && messages(value.blockers);
 }
 
-export type DraftParts = Record<typeof librarySections[number],string>;
-export function draftParts(document: DraftDocument): DraftParts {
-  return Object.fromEntries(librarySections.map(k => [k,JSON.stringify(document[k],null,2)])) as DraftParts;
-}
-/** Syntax check each section without normalizing its raw text. Duplicate keys
- * are still visible to the server's strict JSON parser. */
-export function draftText(parts: DraftParts): string {
-  for (const key of librarySections) {
-    try { JSON.parse(parts[key]); } catch { throw new Error('Invalid JSON in section: ' + key); }
+
+export const maxEditorImageBytes=2*1024*1024;
+export type DraftAssetReport=Readonly<{
+  schema:'vision.api.ecu-draft-asset.v1';source:'STATION';instanceId:string;key:string;
+  sha256:string;relativePath:string;bytes:number;mime:'image/png'|'image/jpeg';status:'UNVERIFIED';
+}>;
+export type DraftAssetPreview=DraftAssetReport&Readonly<{assetId:string;data:string}>;
+function assetReport(value:unknown,preview:boolean):value is DraftAssetReport|DraftAssetPreview {
+  if(!record(value,['schema','source','instanceId','key','sha256','relativePath','bytes','mime','status',...(preview?['assetId','data']:[])]))return false;
+  if(value.schema!=='vision.api.ecu-draft-asset.v1'||value.source!=='STATION'||!hex32(value.instanceId)||!identifier(value.key)
+    ||typeof value.sha256!=='string'||value.sha256.length!==64||/[^a-f0-9]/.test(value.sha256)
+    ||value.relativePath!=='assets/'+value.sha256||typeof value.bytes!=='number'||!Number.isSafeInteger(value.bytes)||value.bytes<1||value.bytes>maxEditorImageBytes
+    ||(value.mime!=='image/png'&&value.mime!=='image/jpeg')||value.status!=='UNVERIFIED')return false;
+  if(preview){
+    if(!identifier(value.assetId)||typeof value.data!=='string'||value.data.length!==4*Math.ceil(value.bytes/3)||!/^[A-Za-z0-9+/]+={0,2}$/.test(value.data))return false;
+    const padding=value.data.endsWith('==')?2:value.data.endsWith('=')?1:0;
+    if(value.data.length/4*3-padding!==value.bytes)return false;
   }
-  const text = '{' + librarySections.map(key => JSON.stringify(key)+':'+parts[key]).join(',') + '}';
-  if (new TextEncoder().encode(text).length > 65536) throw new Error('Editor document exceeds 64 KiB.');
-  return text;
+  return true;
 }
+export function isDraftAssetReport(value:unknown):value is DraftAssetReport{return assetReport(value,false);}
+export function isDraftAssetPreview(value:unknown):value is DraftAssetPreview{return assetReport(value,true);}

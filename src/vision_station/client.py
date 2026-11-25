@@ -9,7 +9,7 @@ from vision_api.library_reports import (validate_library_report, validate_librar
 from vision_api.reports import _timestamp, validate_session_report, validate_events_report
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
-from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, FIELDS
+from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
 from .protocol import (ERRORS, EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
                        validate_station_report)
@@ -54,7 +54,7 @@ class RemoteStationOwner:
         self._outage_instance = uuid4().hex
         self.library_reader = _LibraryProxy(self)
 
-    def _read(self, operation, query, validator):
+    def _read(self, operation, query, validator, *, response_limit=RESPONSE_LIMIT):
         try:
             path = checked_path(self._socket_path)
             checked_socket(path)
@@ -65,7 +65,7 @@ class RemoteStationOwner:
                 check_peer(connection)
                 send(connection, {"schema": PROTOCOL, "operation": operation, "query": query},
                      limit=REQUEST_LIMIT, deadline=deadline)
-                response = receive(connection, limit=RESPONSE_LIMIT, deadline=deadline)
+                response = receive(connection, limit=response_limit, deadline=deadline)
             if type(response) is not dict or response.get("schema") != PROTOCOL:
                 raise ValueError("invalid station envelope")
             if set(response) == {"schema", "error"}:
@@ -134,8 +134,14 @@ class RemoteStationOwner:
     def draft_editor(self, action, args):
         if action not in FIELDS:
             raise ValueError("unknown draft operation")
-        validator = validate_diagnostic_report if action == "validate" else validate_draft_report
-        report = self._read("draft_editor", {"action":action,"args":args}, validator)
+        if action in ("asset_import","asset_preview"):
+            validator=lambda value:validate_asset_report(value,preview=action=="asset_preview")
+        else:
+            validator=validate_diagnostic_report if action in ("validate","validate_structure") else validate_draft_report
+        report=self._read("draft_editor",{"action":action,"args":args},validator,
+            response_limit=ASSET_WIRE_LIMIT if action=="asset_preview" else RESPONSE_LIMIT)
+        if action=="asset_preview" and report["assetId"]!=args["assetId"]:
+            raise ReportUnavailable()
         expected = args["newKey"] if action == "clone" else args["key"]
         if report["instanceId"] != args["instanceId"] or report["key"] != expected:
             raise ReportUnavailable()

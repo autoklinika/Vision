@@ -79,7 +79,15 @@ class ECULibraryService:
 
     def create_draft(self, family, variant, catalog_revision, profile_id, revision, display_name):
         self.catalog_detail(family, variant, catalog_revision)
-        identifier(profile_id); identifier(revision)
+        return self.create_empty_draft(family, variant, profile_id, revision, display_name)
+
+    def create_empty_draft(self, family, variant, profile_id, revision, display_name):
+        """An explicit unsigned declaration, not a new catalog registration.
+
+        A user may author a reference for an entirely new ECU type. The
+        reference is never executable without a separately approved catalog.
+        """
+        for value in (family, variant, profile_id, revision): identifier(value)
         if not isinstance(display_name, str) or not display_name.strip(): raise ValueError('display_name required')
         d = json.loads(TEMPLATE.read_text(encoding='utf-8'))
         d['metadata'].update(schema_version='1', template_only=False, profile_id=profile_id, family_id=family, variant_id=variant, profile_revision=revision, display_name=display_name, status='DRAFT')
