@@ -1,5 +1,7 @@
 # Authenticated station WebGUI deployment
 
+This document describes the original reader-only deployment. The proposed session lifecycle extension is documented in [VISION-RUNTIME-002](VISION_RUNTIME_002_STATION_SESSION.md); it adds explicit operator permission and new bounded operations without changing the legacy read schemas.
+
 Scope: [initial deployment #62](https://github.com/autoklinika/Vision/issues/62), [independent Core connection #64](https://github.com/autoklinika/Vision/issues/64), and [Settings/password change #67](https://github.com/autoklinika/Vision/issues/67). The backend owns state, identity, permissions and ECU storage. The browser owns only presentation and local window preferences.
 
 ## Deployment boundary

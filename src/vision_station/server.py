@@ -1,4 +1,4 @@
-"""Bounded private read server for one independently owned station backend."""
+"""Bounded private station server for one independently owned station backend."""
 import fcntl
 import os
 import socketserver
@@ -8,6 +8,7 @@ import time
 
 from vision_api.access import Credentials, CursorRejected, ReportUnavailable
 from vision_api.station_owner import NoActiveSession
+from .inspection import InspectionRejected
 from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send)
 
@@ -19,6 +20,12 @@ def dispatch(host, request):
     operation, query = request["operation"], request["query"]
     if operation == "station" and not query:
         return host.station_report()
+    if operation == "inspection" and not query:
+        return host.inspection_report()
+    if operation == "inspection_start" and set(query) == {"selection_id", "instance_id", "intent_token", "operator"}:
+        return host.start_inspection(**query)
+    if operation == "inspection_close" and set(query) == {"session_id", "instance_id", "operator"}:
+        return host.close_inspection(**query)
     if operation == "session" and not query:
         return host.session_report()
     if operation == "events" and set(query) == {"view", "after", "through"}:
@@ -29,7 +36,7 @@ def dispatch(host, request):
         return host.library_reader.entry_report(Credentials(), **query)
     if operation == "history" and set(query) == {"entry_id", "view", "after"}:
         return host.library_reader.history_report(Credentials(), **query)
-    raise ValueError("unknown station read")
+    raise ValueError("unknown station operation")
 
 
 class _Handler(socketserver.BaseRequestHandler):
@@ -40,6 +47,8 @@ class _Handler(socketserver.BaseRequestHandler):
             request = receive(self.request, limit=REQUEST_LIMIT, deadline=deadline)
             report = dispatch(self.server.host, request)
             response = {"schema": PROTOCOL, "report": report}
+        except InspectionRejected:
+            response = {"schema": PROTOCOL, "error": "INSPECTION_REJECTED"}
         except NoActiveSession:
             response = {"schema": PROTOCOL, "error": "NO_ACTIVE_SESSION"}
         except CursorRejected:
@@ -57,7 +66,7 @@ class _Handler(socketserver.BaseRequestHandler):
 
 
 class CoreServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
-    """At most four workers, one frame per connection, fixed read operations."""
+    """At most four workers, one frame per connection, fixed reads and inspection lifecycle operations."""
 
     request_queue_size = 8
     daemon_threads = False
@@ -124,6 +133,8 @@ class CoreServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
 
     def server_close(self):
         super().server_close()
+        if self.host is not None and hasattr(self.host, "shutdown_inspection") and self._inode is not None:
+            self.host.shutdown_inspection()
         if self._inode is not None:
             try:
                 info = self._path.lstat()

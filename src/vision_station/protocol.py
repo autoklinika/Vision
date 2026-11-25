@@ -1,4 +1,4 @@
-"""Closed JSON framing for same-user station reads; no executable payloads."""
+"""Closed JSON framing for same-user station operations; no executable payloads."""
 import json
 import os
 from pathlib import Path
@@ -14,7 +14,7 @@ REQUEST_LIMIT = 8192
 RESPONSE_LIMIT = MAX_PROTECTED_BYTES + 256
 EXCHANGE_TIMEOUT = 2.0
 PROTOCOL = "vision.station.ipc.v1"
-ERRORS = frozenset({"NO_ACTIVE_SESSION", "CURSOR_REJECTED", "REPORT_UNAVAILABLE", "BAD_REQUEST"})
+ERRORS = frozenset({"NO_ACTIVE_SESSION", "CURSOR_REJECTED", "REPORT_UNAVAILABLE", "BAD_REQUEST", "INSPECTION_REJECTED"})
 FIELDS = {"schema", "source", "instanceId", "stationId", "capturedAt", "libraryId",
           "state", "coreConnection", "coreReadiness", "sessionId", "sessionViewId"}
 

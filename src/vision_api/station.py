@@ -20,6 +20,7 @@ from .reports import MAX_PROTECTED_BYTES, MAX_SEQUENCE
 from .server import EVENTS_PATH, LIBRARY_ENTRY, LIBRARY_HISTORY, LIBRARY_PAGE
 from .station_owner import NoActiveSession
 from .status import boot_status
+from vision_station.inspection import InspectionRejected, ID, HEX32
 
 # Two 1024-byte passwords can each expand sixfold with JSON escaping.
 MAX_BODY = 16384
@@ -108,7 +109,7 @@ def _origins(values):
 
 
 class StationApplication:
-    """Authentication is enforced before accessing any protected read owner."""
+    """Authentication is enforced before accessing any protected owner. Session commands also require operator permission."""
 
     def __init__(self, *, identity, owner, dist_root, origins):
         self.identity = identity
@@ -193,6 +194,8 @@ class StationApplication:
             return self._error(start_response, 400, "PASSWORD_REJECTED", head=head)
         except AccessDenied:
             return self._error(start_response, 401, "ACCESS_DENIED", head=head)
+        except InspectionRejected:
+            return self._error(start_response, 409, "INSPECTION_REJECTED", head=head)
         except NoActiveSession:
             return self._error(start_response, 409, "NO_ACTIVE_SESSION", head=head)
         except CursorRejected:
@@ -257,6 +260,26 @@ class StationApplication:
                 self.identity.logout(token)
             return self._json(start_response, 200, {"schema": "vision.api.logout.v1", "loggedOut": True},
                               extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
+        if method == "POST" and target in ("/api/v1/inspection/start", "/api/v1/inspection/close"):
+            if (environ.get("HTTP_ORIGIN") != origin
+                    or environ.get("HTTP_X_VISION_CLIENT") != "webgui"):
+                return self._error(start_response, 403, "ORIGIN_REJECTED")
+            identity = self._authorize(environ, touch=False)
+            if identity["role"] != "operator":
+                return self._error(start_response, 403, "OPERATOR_REQUIRED")
+            if target.endswith("/start"):
+                body = self._body(environ, {"selectionId", "instanceId", "intentToken"})
+                if not isinstance(body["selectionId"], str) or not ID.fullmatch(body["selectionId"]) or not isinstance(body["instanceId"], str) or not HEX32.fullmatch(body["instanceId"]) or not isinstance(body["intentToken"], str) or not HEX32.fullmatch(body["intentToken"]):
+                    raise ValueError("invalid inspection request")
+                report = self.owner.start_inspection(selection_id=body["selectionId"],
+                    instance_id=body["instanceId"], intent_token=body["intentToken"], operator=identity["username"])
+            else:
+                body = self._body(environ, {"sessionId", "instanceId"})
+                if not isinstance(body["sessionId"], str) or not ID.fullmatch(body["sessionId"]) or not isinstance(body["instanceId"], str) or not HEX32.fullmatch(body["instanceId"]):
+                    raise ValueError("invalid inspection request")
+                report = self.owner.close_inspection(session_id=body["sessionId"],
+                    instance_id=body["instanceId"], operator=identity["username"])
+            return self._json(start_response, 200, report)
         if method != "GET":
             return self._error(start_response, 405, "METHOD_NOT_ALLOWED", extra=[("Allow", "GET")], head=head)
         if (environ.get("CONTENT_LENGTH", "") not in ("", "0")
@@ -266,7 +289,7 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
-        protected = (target in ("/api/v1/station", "/api/v1/session", "/api/v1/library")
+        protected = (target in ("/api/v1/station", "/api/v1/session", "/api/v1/library", "/api/v1/inspection")
                      or EVENTS_PATH.fullmatch(target) or LIBRARY_PAGE.fullmatch(target)
                      or LIBRARY_ENTRY.fullmatch(target) or LIBRARY_HISTORY.fullmatch(target))
         if not protected:
@@ -274,6 +297,8 @@ class StationApplication:
         self._authorize(environ)
         if target == "/api/v1/station":
             report = self.owner.station_report()
+        elif target == "/api/v1/inspection":
+            report = self.owner.inspection_report()
         elif target == "/api/v1/session":
             report = self.owner.session_report()
         elif target == "/api/v1/library":

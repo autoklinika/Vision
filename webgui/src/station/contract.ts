@@ -1,7 +1,7 @@
 /** Station transport reports; no client-side readiness or workflow decisions. */
 export type IdentityReport = Readonly<{
   schema: 'vision.api.identity.v1'; authenticated: true; username: string;
-  role: 'reader'; expiresAt: string;
+  role: 'reader' | 'operator'; expiresAt: string;
 }>;
 export type LogoutReport = Readonly<{schema: 'vision.api.logout.v1'; loggedOut: true}>;
 export type PasswordChangeReport = Readonly<{schema: 'vision.api.password-change.v1'; changed: true}>;
@@ -26,7 +26,7 @@ export function usernameValid(value: unknown): value is string {
 }
 export function isIdentityReport(value: unknown): value is IdentityReport {
   return record(value, ['schema','authenticated','username','role','expiresAt']) && value.schema === 'vision.api.identity.v1' &&
-    value.authenticated === true && value.role === 'reader' && usernameValid(value.username) && utc(value.expiresAt);
+    value.authenticated === true && (value.role === 'reader' || value.role === 'operator') && usernameValid(value.username) && utc(value.expiresAt);
 }
 export function isLogoutReport(value: unknown): value is LogoutReport {
   return record(value, ['schema','loggedOut']) && value.schema === 'vision.api.logout.v1' && value.loggedOut === true;
@@ -42,4 +42,42 @@ export function isStationReport(value: unknown): value is StationReport {
   return value.state === 'NO_ACTIVE_SESSION' ? value.sessionId === null && value.sessionViewId === null :
     value.state === 'SESSION_ACTIVE' && value.coreConnection === 'CONNECTED' && typeof value.sessionId === 'string' && value.sessionId.length >= 1 && value.sessionId.length <= 128 &&
     !/[^A-Za-z0-9_.:-]/.test(value.sessionId) && hex32(value.sessionViewId);
+}
+
+export type DeviceId = 'luxonis' | 'nero' | 'moveit' | 'sony';
+export type DeviceReport = Readonly<{device: DeviceId; availability: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN'; readiness: 'READY' | 'NOT_READY' | 'UNKNOWN'; observedAt: string}>;
+export type InspectionSelection = Readonly<{selectionId: string; family: string; variant: string; revision: string; physicalState: string; recipe: string}>;
+const deviceIds = ['luxonis', 'nero', 'moveit', 'sony'] as const;
+const blockerIds = ['COMPOSITION_UNCONFIGURED', 'NO_APPROVED_SELECTION', 'DEVICES_NOT_VERIFIED', 'SESSION_ACTIVE', 'RECOVERY_REQUIRED'] as const;
+export type InspectionBlocker = typeof blockerIds[number];
+export type InspectionReport = Readonly<{
+  schema: 'vision.api.inspection.v1'; source: 'STATION'; instanceId: string; capturedAt: string;
+  sessionId: string | null; intentToken: string; devices: readonly DeviceReport[]; selections: readonly InspectionSelection[];
+  blockers: readonly InspectionBlocker[]; startAllowed: boolean; closeAllowed: boolean;
+}>;
+function identifier(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value);
+}
+function isDevice(value: unknown, device: DeviceId): value is DeviceReport {
+  return record(value, ['device','availability','readiness','observedAt']) && value.device === device &&
+    ['ACTIVE','INACTIVE','UNKNOWN'].includes(String(value.availability)) && typeof value.availability === 'string' &&
+    ['READY','NOT_READY','UNKNOWN'].includes(String(value.readiness)) && typeof value.readiness === 'string' &&
+    (value.readiness !== 'READY' || value.availability === 'ACTIVE') && utc(value.observedAt);
+}
+function isSelection(value: unknown): value is InspectionSelection {
+  return record(value, ['selectionId','family','variant','revision','physicalState','recipe']) && Object.values(value).every(identifier);
+}
+export function isInspectionReport(value: unknown): value is InspectionReport {
+  if (!record(value, ['schema','source','instanceId','capturedAt','sessionId','intentToken','devices','selections','blockers','startAllowed','closeAllowed'])
+      || value.schema !== 'vision.api.inspection.v1' || value.source !== 'STATION' || !hex32(value.instanceId) || !hex32(value.intentToken) || !utc(value.capturedAt)
+      || (value.sessionId !== null && (typeof value.sessionId !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(value.sessionId)))
+      || typeof value.startAllowed !== 'boolean' || typeof value.closeAllowed !== 'boolean'
+      || !Array.isArray(value.devices) || value.devices.length !== deviceIds.length
+      || !deviceIds.every((device, index) => isDevice((value.devices as unknown[])[index], device))
+      || !Array.isArray(value.selections) || value.selections.length > 16 || !value.selections.every(isSelection)
+      || new Set(value.selections.map(s => s.selectionId)).size !== value.selections.length
+      || !Array.isArray(value.blockers) || !value.blockers.every(b => typeof b === 'string' && (blockerIds as readonly string[]).includes(b))
+      || new Set(value.blockers).size !== value.blockers.length
+      || value.startAllowed !== (value.blockers.length === 0) || (value.closeAllowed && value.sessionId === null)) return false;
+  return !value.startAllowed || (value.sessionId === null && value.selections.length > 0 && value.devices.every(d => d.readiness === 'READY'));
 }

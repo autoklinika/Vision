@@ -2,7 +2,7 @@
 
 Provisioning is an explicit local operation. The HTTP owner receives an existing
 private accounts path and a trusted client key; forwarded request headers do not
-establish identity. This module grants no system, administrator, or motion role.
+establish identity. Reader is the default; operator only grants inspection lifecycle permission, not system, administrator, or motion authority.
 It never logs passwords, cookies, session tokens, or account-file contents.
 """
 import argparse
@@ -79,10 +79,11 @@ class _Account:
     username: str
     salt: bytes
     password_hash: bytes
+    role: str = "reader"
 
     @property
     def fingerprint(self):
-        return hashlib.sha256(b'vision-reader-credential-v1\0' + self.salt + self.password_hash).digest()
+        return hashlib.sha256(b'vision-account-credential-v1\0' + self.role.encode('ascii') + b'\0' + self.salt + self.password_hash).digest()
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ class _Session:
     fingerprint: bytes
     created_at: float
     last_seen: float
+    role: str = "reader"
 
 
 def _username(value):
@@ -183,11 +185,11 @@ def _decode_accounts(raw):
         for row in document['accounts']:
             if (type(row) is not dict or set(row) != {'username', 'role', 'kdf', 'salt', 'hash'}
                     or not _username(row['username']) or row['username'] in accounts
-                    or row['role'] != 'reader' or row['kdf'] != _KDF
+                    or row['role'] not in ('reader', 'operator') or row['kdf'] != _KDF
                     or not isinstance(row['salt'], str) or not _HEX.fullmatch(row['salt'])
                     or not isinstance(row['hash'], str) or not _HEX.fullmatch(row['hash'])):
                 raise InvalidIdentityStore()
-            accounts[row['username']] = _Account(row['username'], bytes.fromhex(row['salt']), bytes.fromhex(row['hash']))
+            accounts[row['username']] = _Account(row['username'], bytes.fromhex(row['salt']), bytes.fromhex(row['hash']), row['role'])
         return accounts
     except (ValueError, TypeError, KeyError, UnicodeError, RecursionError, OverflowError):
         raise InvalidIdentityStore() from None
@@ -223,7 +225,7 @@ def _read_accounts(path, *, allow_missing=False):
 
 def _encoded_accounts(accounts):
     document = {'schema': ACCOUNT_SCHEMA, 'accounts': [
-        {'username': account.username, 'role': 'reader', 'kdf': _KDF,
+        {'username': account.username, 'role': account.role, 'kdf': _KDF,
          'salt': account.salt.hex(), 'hash': account.password_hash.hex()}
         for _, account in sorted(accounts.items())]}
     data = (json.dumps(document, ensure_ascii=True, separators=(',', ':')) + '\n').encode('ascii')
@@ -299,14 +301,14 @@ def _account_transaction(path, *, timeout=5):
             os.close(parent_fd)
 
 
-def provision_account(accounts_path, username, password, *, replace=False, forbidden_roots=()):
-    """Create/reset a reader locally; the private parent must already exist.
+def provision_account(accounts_path, username, password, *, replace=False, forbidden_roots=(), role=None):
+    """Create/reset an account locally; the private parent must already exist.
 
     This is not an HTTP action. Passwords are accepted in memory, never as CLI
     arguments. A reset generates a new salt, revoking existing sessions on their
     next account-file check even when the same password is entered again.
     """
-    if not _username(username) or type(replace) is not bool:
+    if not _username(username) or type(replace) is not bool or role not in (None, "reader", "operator"):
         raise ValueError('invalid account request')
     encoded = _password(password)
     path = _safe_path(accounts_path, forbidden_roots)
@@ -318,7 +320,8 @@ def provision_account(accounts_path, username, password, *, replace=False, forbi
         if not exists and len(accounts) >= MAX_ACCOUNTS:
             raise ValueError('account limit reached')
         salt = secrets.token_bytes(32)
-        accounts[username] = _Account(username, salt, _derive(encoded, salt))
+        accounts[username] = _Account(username, salt, _derive(encoded, salt),
+                                      role or (accounts[username].role if exists else "reader"))
         try:
             os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
             existing = True
@@ -448,7 +451,7 @@ class IdentityStore:
     def _report(session):
         expires = min(session.created_at + ABSOLUTE_SECONDS, session.last_seen + IDLE_SECONDS)
         return {'schema': IDENTITY_SCHEMA, 'authenticated': True,
-                'username': session.username, 'role': 'reader',
+                'username': session.username, 'role': session.role,
                 'expiresAt': datetime.fromtimestamp(expires, timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')}
 
     def login(self, username, password, client_key):
@@ -485,7 +488,7 @@ class IdentityStore:
                 del self._sessions[oldest]
             token = secrets.token_urlsafe(32)
             key = hashlib.sha256(token.encode('ascii')).digest()
-            session = _Session(username, account.fingerprint, now, now)
+            session = _Session(username, account.fingerprint, now, now, account.role)
             self._sessions[key] = session
             return token, self._report(session)
 
@@ -537,7 +540,7 @@ class IdentityStore:
             if hmac.compare_digest(new_encoded, current_encoded):
                 raise PasswordRejected()
             salt = secrets.token_bytes(32)
-            replacement = _Account(username, salt, _derive(new_encoded, salt))
+            replacement = _Account(username, salt, _derive(new_encoded, salt), account.role)
             path = _safe_path(self._path, self._forbidden_roots)
             with _account_transaction(path, timeout=PASSWORD_CHANGE_LOCK_SECONDS) as parent_fd:
                 # Hashing and lock acquisition may have crossed expiry, a
@@ -607,13 +610,14 @@ def _remove_generated(path, identity):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Provision a local Vision reader account without printing secrets.')
+    parser = argparse.ArgumentParser(description='Provision a local Vision account without printing secrets.')
     parser.add_argument('--accounts', required=True)
     parser.add_argument('--forbid-root', action='append', default=[])
     commands = parser.add_subparsers(dest='command', required=True)
     for command in ('provision', 'reset'):
         subparser = commands.add_parser(command)
         subparser.add_argument('username')
+        subparser.add_argument('--role', choices=('reader', 'operator'), help='Explicit local permission; new accounts default to reader; reset preserves role.')
         subparser.add_argument('--generate-to', help='Create a new 0600 password file; never overwrite an existing file.')
     args = parser.parse_args(argv)
     generated_path = generated_identity = None
@@ -626,12 +630,12 @@ def main(argv=None):
             password = secrets.token_urlsafe(32)
             generated_identity = _generated_password_file(generated_path, password)
         else:
-            password = getpass.getpass('New reader password: ')
-            confirmation = getpass.getpass('Confirm reader password: ')
+            password = getpass.getpass('New account password: ')
+            confirmation = getpass.getpass('Confirm account password: ')
             if not hmac.compare_digest(_password(password), _password(confirmation)):
                 raise ValueError('password confirmation mismatch')
         provision_account(path, args.username, password, replace=args.command == 'reset',
-                          forbidden_roots=args.forbid_root)
+                          forbidden_roots=args.forbid_root, role=args.role)
         return 0
     except (ValueError, OSError, EOFError, KeyboardInterrupt):
         if generated_identity is not None:

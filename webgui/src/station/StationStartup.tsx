@@ -37,7 +37,7 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, changePas
   }, [expired, accountBusy]);
   const client = useMemo(() => report ? createStationClient(report, expired) : null, [report, expired]);
   const refresh = () => refreshRef.current?.();
-  if (!report || !client) return <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · read-only access</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? 'Connecting to VENTUNO' : 'Connection lost'}</h1></div><div className="window-body"><p role="status">{connecting ? 'Waiting for the station report…' : 'Station data is unavailable. Retrying automatically.'}</p><p>Signed in as {identity.username}.</p><div className="startup-actions"><button onClick={refresh} disabled={accountBusy}>Retry connection</button><button onClick={() => window.location.reload()} disabled={accountBusy}>Reload interface</button><button onClick={logout} disabled={accountBusy}>Sign out</button></div></div></section></main>;
+  if (!report || !client) return <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · {identity.role === 'operator' ? 'inspection operator' : 'read-only access'}</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? 'Connecting to VENTUNO' : 'Connection lost'}</h1></div><div className="window-body"><p role="status">{connecting ? 'Waiting for the station report…' : 'Station data is unavailable. Retrying automatically.'}</p><p>Signed in as {identity.username}.</p><div className="startup-actions"><button onClick={refresh} disabled={accountBusy}>Retry connection</button><button onClick={() => window.location.reload()} disabled={accountBusy}>Reload interface</button><button onClick={logout} disabled={accountBusy}>Sign out</button></div></div></section></main>;
   const snapshot: Snapshot = {
     schema: 'client-view-v1', source: 'real', connection: 'API_AVAILABLE', readiness: 'UNKNOWN', observedAt: null,
     reportTime: report.capturedAt, reason: report.coreConnection === 'NOT_CONNECTED' ? 'Vision Core is not connected.' :
@@ -83,7 +83,7 @@ export function StationStartup() {
     if (version !== control.current.version) return;
     control.current.busy = false;
     if (result.status === 'AVAILABLE') {
-      if (control.current.identity && (control.current.identity.username !== result.report.username || control.current.identity.expiresAt !== result.report.expiresAt)) control.current.version++;
+      if (control.current.identity && (control.current.identity.username !== result.report.username || control.current.identity.role !== result.report.role || control.current.identity.expiresAt !== result.report.expiresAt)) control.current.version++;
       control.current.identity = result.report; control.current.unavailable = false;
       setAuth({phase: 'SIGNED_IN', identity: result.report, message: '', epoch: control.current.version});
     } else if (result.status === 'ACCESS_DENIED') {

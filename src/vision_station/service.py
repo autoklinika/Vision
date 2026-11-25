@@ -6,16 +6,20 @@ from .host import CoreHost
 from .server import CoreServer
 
 
-def main():
+def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", required=True)
     parser.add_argument("--library-root", required=True)
-    args = parser.parse_args()
+    parser.add_argument("--session-root", help="Existing private 0700 directory; no runtime composition is enabled by this option alone.")
+    parser.add_argument("--diagnostics-disabled", action="store_true", help="Explicitly disable service probes in isolated fixtures.")
+    args = parser.parse_args(argv)
     def stop(_signal, _frame):
         raise KeyboardInterrupt()
     signal.signal(signal.SIGTERM, stop)
     try:
-        server = CoreServer(args.socket, host_factory=lambda: CoreHost(args.library_root))
+        server = CoreServer(args.socket, host_factory=lambda: CoreHost(
+            args.library_root, session_root=args.session_root, composition=composition,
+            catalog_dir=catalog_dir, diagnostics=(lambda: ()) if args.diagnostics_disabled else diagnostics))
     except Exception:
         parser.exit(1, "Core station configuration rejected; check private paths and ownership.\n")
     try:
