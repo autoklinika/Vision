@@ -27,9 +27,9 @@ jobs:
       - name: Install locked frontend dependencies
         working-directory: webgui
         run: npm ci --no-audit --no-fund
-      - name: Install Chromium on ephemeral CI runner
+      - name: Install Chromium and Firefox on ephemeral CI runner
         working-directory: webgui
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
       - name: TypeScript, ESLint and shared contract unit tests
         working-directory: webgui
         run: |
@@ -80,6 +80,11 @@ jobs:
         run: |
           VITE_VISION_DEPLOYMENT=station npm run build
           npm run test:station
+          test ! -e ../.station-test-auth.json
+      - name: Authenticated station production build and Firefox
+        working-directory: webgui
+        run: |
+          npm run test:station -- --browser=firefox
           test ! -e ../.station-test-auth.json
       - name: Dependency audit
         working-directory: webgui

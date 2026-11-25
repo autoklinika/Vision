@@ -40,7 +40,7 @@ it('real login and logout use same-origin cookies and explicit JSON client heade
   expect((await signIn('operator', 'test-only-password')).status).toBe('AVAILABLE');
   expect((await signOut()).status).toBe('AVAILABLE');
   expect(network.mock.calls.map(call => String(call[0]))).toEqual([origin + '/api/v1/auth/login', origin + '/api/v1/auth/logout']);
-  for (const [, options] of network.mock.calls) expect(options).toMatchObject({method: 'POST', mode: 'same-origin', credentials: 'same-origin', redirect: 'error', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Vision-Client': 'webgui'}});
+  for (const [, options] of network.mock.calls) expect(options).toMatchObject({method: 'POST', mode: 'same-origin', credentials: 'same-origin', referrerPolicy: 'same-origin', redirect: 'error', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Vision-Client': 'webgui'}});
   expect(JSON.parse(network.mock.calls[0][1].body)).toEqual({username: 'operator', password: 'test-only-password'});
   expect(network.mock.calls[1][1].body).toBe('{}');
 });
@@ -57,12 +57,24 @@ it('session resume and station reads accept only bounded validated same-origin r
 
 it('denials, rate limits and offline errors contain no reports or credential details', async () => {
   secure();
-  for (const [status, expected] of [[401,'ACCESS_DENIED'], [403,'ACCESS_DENIED'], [429,'RATE_LIMITED'], [503,'UNAVAILABLE']] as const) {
+  for (const [status, expected] of [[401,'ACCESS_DENIED'], [403,'UNAVAILABLE'], [429,'RATE_LIMITED'], [503,'UNAVAILABLE']] as const) {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({private: 'never expose'}, '/api/v1/auth/login', status)));
     expect(await signIn('operator', 'test-only-password')).toEqual({status: expected, report: null});
   }
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('private transport detail')));
   expect(await readIdentity()).toEqual({status: 'UNAVAILABLE', report: null});
+});
+
+it('host and origin rejection never claim a wrong password or a confirmed sign-out', async () => {
+  secure();
+  for (const code of ['ORIGIN_REJECTED', 'HOST_REJECTED']) {
+    const error = {schema: 'vision.api.error.v1', code};
+    const network = vi.fn().mockResolvedValueOnce(response(error, '/api/v1/auth/login', 403))
+      .mockResolvedValueOnce(response(error, '/api/v1/auth/logout', 403));
+    vi.stubGlobal('fetch', network);
+    expect((await signIn('operator', 'test-only-password')).status).toBe('UNAVAILABLE');
+    expect((await signOut()).status).toBe('UNAVAILABLE');
+  }
 });
 
 it('insecure connections and invalid or oversized credentials send no request', async () => {
@@ -101,7 +113,7 @@ it('password changes send only the two secrets to the same-origin protected endp
   vi.stubGlobal('fetch', network);
   expect(await changePassword('test-current-password', 'test-next-password')).toEqual({status: 'AVAILABLE', report});
   expect(String(network.mock.calls[0][0])).toBe(origin + '/api/v1/auth/password');
-  expect(network.mock.calls[0][1]).toMatchObject({method: 'POST', mode: 'same-origin', credentials: 'same-origin', redirect: 'error', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Vision-Client': 'webgui'}});
+  expect(network.mock.calls[0][1]).toMatchObject({method: 'POST', mode: 'same-origin', credentials: 'same-origin', referrerPolicy: 'same-origin', redirect: 'error', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Vision-Client': 'webgui'}});
   expect(JSON.parse(network.mock.calls[0][1].body)).toEqual({currentPassword: 'test-current-password', newPassword: 'test-next-password'});
 });
 

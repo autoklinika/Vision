@@ -18,12 +18,15 @@ async function request<T, E extends PasswordError = never>(path: string, validat
     const url = new URL(path, location.origin);
     response = await fetch(url, {
       method: body === undefined ? 'GET' : 'POST', mode: 'same-origin', credentials: 'same-origin',
+      // Firefox also applies no-referrer to Origin on same-origin POSTs.
+      // Preserve the browser-generated Origin required by the API's CSRF check.
+      referrerPolicy: 'same-origin',
       redirect: 'error', cache: 'no-store', signal: controller.signal,
       headers: body === undefined ? {Accept: 'application/json'} : {Accept: 'application/json', 'Content-Type': 'application/json', 'X-Vision-Client': 'webgui'},
       ...(body === undefined ? {} : {body}),
     });
     if (response.redirected || response.url !== url.href) return unavailable;
-    if (response.status === 401 || response.status === 403 && !errorCodes) return {status: 'ACCESS_DENIED', report: null};
+    if (response.status === 401) return {status: 'ACCESS_DENIED', report: null};
     if (response.status === 429) return {status: 'RATE_LIMITED', report: null};
     if (response.status !== 200 && !errorCodes?.[response.status] || !/^application\/json\s*;\s*charset=utf-8$/i.test(response.headers.get('Content-Type') ?? '') || !response.body) return unavailable;
     const length = response.headers.get('Content-Length');
