@@ -307,9 +307,23 @@ Punktem wycofania jest wcześniejszy zachowany katalog wydania i kopia zarządza
 plików w `deployment-backups`. W kopii jednostki komentarz `# Release:` wskazuje
 poprzednią ścieżkę. Nie usuwamy starego wydania przed potwierdzeniem nowego.
 
-Powrót wymaga wcześniejszego potwierdzenia braku aktywnej inspekcji w połączonym
-Core. Następnie zatrzymujemy obie zarządzane usługi i uruchamiamy instalator
-poprzedniego rzeczywistego SHA. Zachowujemy ten sam wymagany origin HTTPS:
+Przy wycofaniu samego GUI/API używamy instalatora obsługującego `--core-release`,
+wskazując poprzednie wydanie GUI i nadal bieżące wydanie Core. Identyczne
+zależności oraz zgodna jednostka Core pozwalają pozostawić jego proces działający:
+
+```bash
+python3 -B "$VISION_RELEASE/scripts/deploy/install_webgui.py" \
+  --release "$VISION_PREVIOUS_RELEASE" --core-release "$VISION_CORE_RELEASE" \
+  --browser "$VISION_BROWSER" --https-origin "$VISION_HTTPS_ORIGIN" --start
+```
+
+Wycofanie interfejsu zachowuje aktualny magazyn kont. Nie przywracamy jego starszej
+kopii wraz z wydaniem aplikacji, ponieważ cofnęłoby to późniejsze zmiany haseł.
+
+Powrót obejmujący także zmianę Core wymaga wcześniejszego potwierdzenia braku
+aktywnej inspekcji w połączonym Core. Następnie zatrzymujemy obie zarządzane
+usługi i uruchamiamy instalator poprzedniego rzeczywistego SHA. Zachowujemy ten
+sam wymagany origin HTTPS:
 
 ```bash
 systemctl --user stop vision-webgui.service vision-core.service

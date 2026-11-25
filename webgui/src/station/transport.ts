@@ -8,7 +8,7 @@ export const stationTimeoutMs = 5000;
 const maxBytes = 4096;
 const unavailable = {status: 'UNAVAILABLE', report: null} as const;
 
-async function request<T, E extends string = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
+async function request<T, E extends PasswordError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
   if (!globalThis.isSecureContext) return unavailable;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), stationTimeoutMs);
@@ -54,12 +54,12 @@ async function request<T, E extends string = never>(path: string, validate: (val
     if (response?.body && !response.body.locked && !response.bodyUsed) void response.body.cancel().catch(() => {});
   }
 }
-export function readIdentity(): Promise<StationResult<IdentityReport>> { return request('/api/v1/auth/session', isIdentityReport); }
-export function readStation(): Promise<StationResult<StationReport>> { return request('/api/v1/station', isStationReport); }
-export function signOut(): Promise<StationResult<LogoutReport>> { return request('/api/v1/auth/logout', isLogoutReport, '{}'); }
+export function readIdentity(): Promise<StationResult<IdentityReport>> { return request<IdentityReport, never>('/api/v1/auth/session', isIdentityReport); }
+export function readStation(): Promise<StationResult<StationReport>> { return request<StationReport, never>('/api/v1/station', isStationReport); }
+export function signOut(): Promise<StationResult<LogoutReport>> { return request<LogoutReport, never>('/api/v1/auth/logout', isLogoutReport, '{}'); }
 export function signIn(username: string, password: string): Promise<StationResult<IdentityReport>> {
   if (!usernameValid(username) || typeof password !== 'string' || password.length === 0 || new TextEncoder().encode(password).length > 1024) return Promise.resolve({status: 'ACCESS_DENIED', report: null});
-  return request('/api/v1/auth/login', isIdentityReport, JSON.stringify({username, password}));
+  return request<IdentityReport, never>('/api/v1/auth/login', isIdentityReport, JSON.stringify({username, password}));
 }
 export function changePassword(currentPassword: string, newPassword: string): Promise<PasswordChangeResult> {
   return request('/api/v1/auth/password', isPasswordChangeReport, JSON.stringify({currentPassword, newPassword}),
