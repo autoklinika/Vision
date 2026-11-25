@@ -1,0 +1,29 @@
+{
+  "name": "vision-gui-design-samples",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build && node collect-notices.mjs"
+  },
+  "dependencies": {
+    "@carbon/react": "1.121.0",
+    "@fluentui/react-components": "9.75.3",
+    "@fluentui/react-icons": "2.0.347",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-is": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "sass": "1.108.2",
+    "typescript": "5.9.3",
+    "vite": "7.3.8"
+  }
+}

@@ -1,0 +1,491 @@
+.sample-fluent {
+  min-height: calc(100dvh - 44px);
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+  color: #242424;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.sample-fluent,
+.sample-fluent * {
+  box-sizing: border-box;
+}
+
+.fluent-titlebar {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 28px;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.fluent-wordmark {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.fluent-titlebar-rule {
+  width: 1px;
+  height: 20px;
+  background: #d1d1d1;
+}
+
+.fluent-product-area {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fluent-preview-label {
+  margin-left: auto;
+  color: #616161;
+  font-size: 13px;
+}
+
+.fluent-editor-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+}
+
+.fluent-outline {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 14px 24px;
+  border-right: 1px solid #e0e0e0;
+  background: #f5f5f5;
+}
+
+.fluent-outline-label {
+  margin: 0 12px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #616161;
+}
+
+.fluent-document-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #e8e8e8;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fluent-document-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 11px;
+  bottom: 11px;
+  width: 3px;
+  border-radius: 2px;
+  background: #0f6cbd;
+}
+
+.fluent-document-item svg {
+  flex-shrink: 0;
+  color: #0f6cbd;
+}
+
+.fluent-document-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fluent-outline nav {
+  display: grid;
+  margin-top: 10px;
+  padding-left: 28px;
+}
+
+.fluent-outline nav a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 8px 8px 12px;
+  border-left: 1px solid #d1d1d1;
+  border-radius: 0 4px 4px 0;
+  color: #424242;
+  font-size: 14px;
+  line-height: 20px;
+  text-decoration: none;
+}
+
+.fluent-outline nav a:hover {
+  background: #ebebeb;
+  color: #0f6cbd;
+}
+
+.fluent-outline nav a:focus-visible {
+  outline: 2px solid #0f6cbd;
+  outline-offset: 2px;
+}
+
+.fluent-outline-footer {
+  margin-top: auto;
+  padding: 48px 12px 0;
+  color: #616161;
+}
+
+.fluent-outline-rule {
+  display: block;
+  width: 28px;
+  height: 2px;
+  margin-bottom: 12px;
+  background: #c7c7c7;
+}
+
+.fluent-outline-footer p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fluent-outline-footer small {
+  display: block;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.fluent-document {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.fluent-content {
+  width: 100%;
+  max-width: 936px;
+  padding: 38px 48px 40px;
+}
+
+.fluent-document-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  justify-content: space-between;
+  max-width: 680px;
+  margin-bottom: 32px;
+}
+
+.fluent-document-heading > div {
+  min-width: 0;
+}
+
+.fluent-document-heading h1 {
+  margin: 0;
+  color: #242424;
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.fluent-document-heading p {
+  margin: 8px 0 0;
+  color: #616161;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.fluent-document-heading > .fui-Badge {
+  flex-shrink: 0;
+  margin-top: 7px;
+}
+
+.fluent-profile-form {
+  max-width: 680px;
+}
+
+.fluent-profile-form section {
+  scroll-margin-top: 76px;
+}
+
+.fluent-field {
+  min-width: 0;
+}
+
+.fluent-field .fui-Label {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.fluent-field .fui-Input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin-top: 2px;
+}
+
+.fluent-field .fui-Input input {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 24px;
+  scroll-margin-bottom: 160px;
+}
+
+.fluent-field .fui-Field__hint {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 19px;
+  color: #616161;
+}
+
+.fluent-field .fui-Field__validationMessage {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fluent-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.fluent-identifiers {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.fluent-identifiers h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.fluent-identifier-pair {
+  grid-template-columns: minmax(0, 1fr) 144px;
+  margin-top: 18px;
+}
+
+.fluent-field-profileId input,
+.fluent-field-revision input {
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+}
+
+.fluent-draft-note {
+  max-width: 680px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 28px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: #616161;
+}
+
+.fluent-draft-note svg {
+  flex: 0 0 20px;
+}
+
+.fluent-notice {
+  max-width: 680px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  margin: 0 0 24px;
+  border: 1px solid #d1e8d0;
+  border-radius: 4px;
+  background: #f1faf1;
+  color: #0e570c;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fluent-notice svg {
+  flex: 0 0 20px;
+}
+
+.fluent-commandbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 80px;
+  margin-top: auto;
+  padding: 16px 48px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.fluent-save-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #616161;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.fluent-save-state svg {
+  color: #107c10;
+}
+
+.fluent-state-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a0a0a0;
+}
+
+.fluent-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fluent-actions .fui-Button {
+  min-height: 44px;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+@media (min-width: 1600px) {
+  .fluent-content {
+    padding-top: 48px;
+    padding-left: 64px;
+    max-width: 984px;
+  }
+  .fluent-commandbar {
+    padding-left: 64px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .fluent-editor-layout {
+    grid-template-columns: 196px minmax(0, 1fr);
+  }
+  .fluent-content {
+    padding: 32px;
+  }
+  .fluent-commandbar {
+    padding: 14px 32px;
+  }
+  .fluent-outline nav {
+    padding-left: 18px;
+  }
+}
+
+@media (max-width: 760px) {
+  .fluent-editor-layout {
+    display: block;
+    flex: 1;
+  }
+  .fluent-outline {
+    display: none;
+  }
+  .fluent-document {
+    min-height: calc(100dvh - 100px);
+  }
+  .fluent-titlebar {
+    min-height: 48px;
+    padding: 0 20px;
+    gap: 16px;
+  }
+  .fluent-content {
+    max-width: none;
+    padding: 24px 24px 32px;
+  }
+  .fluent-document-heading {
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .fluent-document-heading h1 {
+    font-size: 28px;
+    line-height: 36px;
+  }
+  .fluent-commandbar {
+    padding: 12px 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .fluent-content {
+    padding: 22px 20px 116px;
+  }
+  .fluent-document-heading {
+    margin-bottom: 22px;
+  }
+  .fluent-document-heading h1 {
+    font-size: 26px;
+    line-height: 32px;
+  }
+  .fluent-document-heading p {
+    font-size: 14px;
+    line-height: 21px;
+    max-width: 260px;
+  }
+  .fluent-document-heading > .fui-Badge {
+    margin-top: 3px;
+  }
+  .fluent-field-pair,
+  .fluent-identifier-pair {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+    margin-top: 22px;
+  }
+  .fluent-identifiers {
+    margin-top: 28px;
+    padding-top: 22px;
+  }
+  .fluent-field-revision {
+    max-width: 168px;
+  }
+  .fluent-draft-note {
+    margin-top: 24px;
+  }
+  .fluent-commandbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: 72px;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -2px 8px rgb(0 0 0 / 4%);
+    gap: 10px;
+  }
+  .fluent-save-state {
+    display: none;
+  }
+  .fluent-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 374px) {
+  .fluent-titlebar {
+    padding-inline: 16px;
+    gap: 12px;
+  }
+  .fluent-content {
+    padding-inline: 16px;
+  }
+  .fluent-commandbar {
+    padding-inline: 16px;
+  }
+  .fluent-preview-label {
+    font-size: 12px;
+  }
+}
