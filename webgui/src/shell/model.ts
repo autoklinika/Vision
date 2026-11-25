@@ -27,7 +27,7 @@ export function reduce(state: DesktopState, action: Action, bounds: Bounds): Des
   if (action.type === 'reset') return { ...initialState, windows: initialState.windows.map(w => ({ ...w, rect: clamp(w.rect, bounds) })) };
   if (action.type === 'bounds') return { windows, active };
   const old = windows.find(w => w.id === action.id);
-  if (action.type === 'open' && !old) windows.push({ id: action.id, rect: clamp({ x: 220 + windows.length * 24, y: 40 + windows.length * 24, width: 570, height: 380 }, bounds), minimized: false, maximized: false });
+  if (action.type === 'open' && !old) windows.push({ id: action.id, rect: clamp({ x: 220 + windows.length * 24, y: 40 + windows.length * 24, width: action.id === 'ecu' ? 810 : 570, height: action.id === 'ecu' ? 610 : 380 }, bounds), minimized: false, maximized: false });
   if (action.type === 'open' || action.type === 'focus') {
     const win = windows.find(w => w.id === action.id);
     if (win) { windows = [...windows.filter(w => w.id !== action.id), { ...win, minimized: false }]; active = action.id; }

@@ -1,5 +1,6 @@
 import type { ProtectedResult } from './protectedAdapter';
 import type { EventsReport, SessionReport } from './sessionContract';
+import type { LibraryDetail, LibraryEntry, LibraryHistory, LibraryReport } from './libraryContract';
 /** Client presentation boundary v1; NOT an agreed Vision wire/API contract. */
 export type Snapshot = Readonly<{
   schema: 'client-view-v1';
@@ -17,4 +18,7 @@ export interface ReadOnlyVisionClient {
   readSnapshot(): Promise<Snapshot>;
   readonly readSession?: () => Promise<ProtectedResult<SessionReport>>;
   readonly readEvents?: (session: SessionReport, after: number) => Promise<ProtectedResult<EventsReport>>;
+  readonly readLibrary?: (prior?: LibraryReport, after?: number) => Promise<ProtectedResult<LibraryReport>>;
+  readonly readLibraryEntry?: (library: LibraryReport, entry: LibraryEntry) => Promise<ProtectedResult<LibraryDetail>>;
+  readonly readLibraryHistory?: (detail: LibraryDetail, after?: number) => Promise<ProtectedResult<LibraryHistory>>;
 }

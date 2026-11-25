@@ -1,4 +1,21 @@
-# Vision API V1 — boot status and protected Core reports
+# Vision API V1 — boot status and protected Core / ECU library reports
+
+## API-03 protected ECU library reads
+
+The library uses a separate `library:read` grant bound to one existing `ECULibraryService`. Session grants cannot authorize library reads. The ordinary LAB CLI remains default-deny; it does not initialize or discover a library.
+
+| Exact GET target | Closed response |
+| --- | --- |
+| `/api/v1/library` | [library.schema.json](library.schema.json), first page |
+| `/api/v1/library?view=<64hex>&after=<offset>` | Same library view, next/previous page |
+| `/api/v1/library/entries/<32hex>?view=<64hex>` | [library-entry.schema.json](library-entry.schema.json), exact catalog or draft detail |
+| `/api/v1/library/entries/<32hex>/history?view=<64hex>&after=<offset>` | [library-history.schema.json](library-history.schema.json), draft generation metadata |
+
+Offsets are zero-based multiples of 50. Pages contain exactly the expected number of rows, up to 50; `nextAfter` is null at the end. The content-bound view includes committed generation ETags and all projected detail/history metadata. Every request rechecks authorization and captures the current bounded backend view. Changed views reject with `409 CURSOR_REJECTED`; the client must refresh. This is a pinned identity check, not a server snapshot cache or a database transaction spanning HTTP requests.
+
+[Shared fixtures](library-fixtures.json) contain synthetic catalog, draft, 15-section structural summaries, physical states, workflows and two saved generations. Catalog records remain `NOT_READY / CATALOG_ONLY`; unsigned drafts remain `NOT_READY / UNSIGNED_DRAFT`. Section counts are `NOT_EVALUATED`, not a completeness or approval result. History contains IDs, ETags and revision labels, not old documents. No specimen selection, profile editing, release, asset download or operational readiness command is exposed. See the [implementation specification](../../../docs/implementation/VISION_API_ECU_LIBRARY_READ_V1.md).
+
+Python and TypeScript validators check closed fields, exact identities, page counts, unique IDs, current-generation ETag position and cross-response source/library/view/entry correlation. Labels are bounded Unicode text with no path separators or General Category C characters. Three schemas express structural constraints; their comments identify additional application checks. Responses are limited to 131072 encoded bytes. Failures use the existing sanitized error envelope. Public boot and API-02 session/event contracts remain unchanged.
 
 ## API-02 protected read reports
 

@@ -28,6 +28,24 @@ class ReadGrant:
 Authorizer = Callable[[Credentials], ReadGrant | None]
 
 
+@dataclass(frozen=True)
+class LibraryReadGrant:
+    """Library authority is independent of any specimen/session authority."""
+    library_id: str
+    scopes: frozenset[str]
+
+    def __post_init__(self):
+        if not isinstance(self.library_id, str) or not self.library_id:
+            raise ValueError("invalid grant")
+        scopes = frozenset(self.scopes)
+        if scopes != frozenset({"library:read"}):
+            raise ValueError("invalid grant")
+        object.__setattr__(self, "scopes", scopes)
+
+
+LibraryAuthorizer = Callable[[Credentials], LibraryReadGrant | None]
+
+
 class AccessDenied(Exception):
     """No valid, appropriately scoped server-side grant."""
 

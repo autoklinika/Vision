@@ -6,7 +6,7 @@ export type ProtectedResult<T> = Readonly<{ status: 'AVAILABLE'; report: T }> |
 export const maxProtectedBytes = 131072;
 export const protectedTimeoutMs = 3000;
 
-async function request<T>(path: string, validate: (value: unknown) => value is T): Promise<ProtectedResult<T>> {
+export async function requestProtected<T>(path: string, validate: (value: unknown) => value is T): Promise<ProtectedResult<T>> {
   if (!globalThis.isSecureContext) return {status: 'UNAVAILABLE', report: null};
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), protectedTimeoutMs);
@@ -52,10 +52,10 @@ async function request<T>(path: string, validate: (value: unknown) => value is T
 }
 
 export async function readSession(): Promise<ProtectedResult<SessionReport>> {
-  return request('/api/v1/session', isSessionReport);
+  return requestProtected('/api/v1/session', isSessionReport);
 }
 export async function readEvents(session: SessionReport, after: number): Promise<ProtectedResult<EventsReport>> {
   if (!isSessionReport(session) || !Number.isSafeInteger(after) || after < 0 || after > session.journalSequence) return {status: 'UNAVAILABLE', report: null};
   const path = `/api/v1/events?view=${session.viewId}&after=${after}&through=${session.journalSequence}`;
-  return request(path, (value): value is EventsReport => isEventsReport(value) && matchesSession(value, session, after));
+  return requestProtected(path, (value): value is EventsReport => isEventsReport(value) && matchesSession(value, session, after));
 }

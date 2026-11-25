@@ -1,6 +1,7 @@
 import type { ReadOnlyVisionClient, Snapshot } from './types';
 import { isBootStatus } from './statusContract';
 import { readEvents, readSession } from './protectedAdapter';
+import { readLibrary, readLibraryEntry, readLibraryHistory } from './libraryAdapter';
 
 export const statusPath = '/api/v1/status';
 export const maxStatusBytes = 4096;
@@ -78,5 +79,5 @@ async function readSnapshot(): Promise<Snapshot> {
 }
 
 export const realAdapter: ReadOnlyVisionClient = Object.freeze({
-  mode: 'real', canRefresh: true, readSnapshot, readSession, readEvents,
+  mode: 'real', canRefresh: true, readSnapshot, readSession, readEvents, readLibrary, readLibraryEntry, readLibraryHistory,
 });
