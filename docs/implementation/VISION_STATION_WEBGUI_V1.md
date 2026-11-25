@@ -1,10 +1,12 @@
 # Authenticated station WebGUI deployment
 
-Scope: [issue #62](https://github.com/autoklinika/Vision/issues/62). This adds a deployable station client after API-03. The backend owns state, identity, permissions and ECU storage. The browser owns only presentation and local window preferences.
+Scope: [initial deployment #62](https://github.com/autoklinika/Vision/issues/62) and [independent Core connection #64](https://github.com/autoklinika/Vision/issues/64). The backend owns state, identity, permissions and ECU storage. The browser owns only presentation and local window preferences.
 
 ## Deployment boundary
 
-`python -m vision_api.station` constructs the existing `ECULibraryService` once, an identity store once, and a `StationOwner` once. Waitress 3.0.2 provides the HTTP parser, four request workers and bounded request sizes on IPv4 loopback. A station build contains an explicit marker; deployment refuses a demo/LAB build. Built assets are loaded from a small allowlist at startup. HTTP requests never choose filesystem paths, read repository files, follow asset symlinks or expose source maps.
+`python -m vision_station.service` runs the independent Core host. It owns one persistent `ECULibraryService`, its `StationOwner` read adapter, and any explicitly attached real `VisionRuntimeCoordinator`. It starts idle, without constructing a Workflow or inventing specimen/profile/calibration data.
+
+`python -m vision_api.station --core-socket ...` owns browser identity and presentation. It constructs a `RemoteStationOwner` transport client; it never opens the library or owns a Runtime. Authenticated reads travel over the private local Unix socket. Waitress 3.0.2 provides the HTTP parser, four request workers and bounded request sizes on IPv4 loopback. A station build contains an explicit marker; deployment refuses a demo/LAB build. Built assets are loaded from a small allowlist at startup. HTTP requests never choose filesystem paths, read repository files, follow asset symlinks or expose source maps.
 
 The existing `vision_api.server` LAB executable and API-01/02/03 wire contracts remain compatible. Its public `/api/v1/status` is still a legacy LAB-only boot report and never means station readiness. The deployed client obtains its actual station summary from the authenticated `/api/v1/station` route.
 
@@ -22,11 +24,15 @@ All station/session/event/library reads authenticate before touching their provi
 
 ## Station lifecycle
 
-At startup the owner has no active Core binding. This is reported honestly as `NO_ACTIVE_SESSION`, `coreConnection=NOT_CONNECTED`, `coreReadiness=UNKNOWN`, and null session IDs. A persistent library can be available while Core is not connected. Built-in catalog data keeps its existing DRAFT/NOT_READY status; no synthetic draft or inspection is inserted into the deployed store.
+At Core host startup there is no active inspection. A live reply reports `NO_ACTIVE_SESSION`, `coreConnection=CONNECTED`, `coreReadiness=UNKNOWN`, and null session IDs. The station instance ID belongs to the Core process, not an HTTP worker or browser. A fresh proxy/API process observes the same Core identity. Built-in catalog data keeps its existing DRAFT/NOT_READY status; no synthetic draft or inspection is inserted into the deployed store.
 
-Trusted backend composition may call `StationOwner.bind_core(existing_engine)` with the actual already-owned Workflow. This does not construct Workflow, reopen a journal, replay events or issue commands. Replacement receives a fresh view ID. Cleanup uses the expected old view ID so a retired runtime cannot remove a newer binding. The registry lock is released before engine reads. A read checks its exact binding again before publication and rejects a concurrent cutover with 409. Engine/journal lifetime remains with its actual runtime owner; the adapter never closes it.
+The Unix transport accepts only bounded station/session/events/library reads. It is private to the station UID, with a 0700 parent directory, 0600 socket, peer credential checks and an exclusive service lock. It exposes no attach, session creation, runtime mutation, hardware, filesystem-path or shutdown operation. Responses use the existing validated projections; invalid, unavailable or untrusted peers fail closed. Browser credentials never cross this transport.
 
-The initial service does not own an operational Runtime coordinator. Attaching the actual inspection owner remains explicit backend integration work. `SESSION_ACTIVE`, when bound, means a session is attached; it is not proof that a stage is running or the system is ready. Closing or logging out of any browser has no lifecycle effect on Core or the library.
+If Core cannot be reached, the API returns a valid `NOT_CONNECTED` / `NO_ACTIVE_SESSION` station summary with its stable disconnected instance ID. In this fallback, `NO_ACTIVE_SESSION` means no reachable session binding; it does not assert that the actual Core has stopped an inspection. The UI shows its inspection state as unavailable. Session and library reads fail unavailable rather than returning cached Core data or creating a second owner. The desktop remains usable and retries automatically. Connection/instance changes remove old session and library views.
+
+Trusted Core host composition may attach an existing real `VisionRuntimeCoordinator`; its already-owned Workflow is supplied to `StationOwner.bind_core(existing_engine)`. Binding does not construct Workflow, reopen a journal, replay events or issue commands. Replacement receives a fresh view ID. Cleanup uses the expected old view ID so a retired runtime cannot remove a newer binding. The registry lock is released before engine reads. A read checks its exact binding again before publication and rejects a concurrent cutover with 409. Engine/journal lifetime remains with its actual runtime owner; the read adapter never closes it.
+
+The deployed host is real and idle. Starting an actual specimen inspection still requires the approved ECU/reference selection and trusted Runtime inputs; those prerequisites are not supplied by this read integration. `SESSION_ACTIVE`, when bound, means a session is attached; it is not proof that a stage is running or the system is ready. Closing or logging out of any browser, or restarting the WebGUI/API service, has no lifecycle effect on Core or the library.
 
 ## Additional HTTP contracts
 
@@ -36,14 +42,14 @@ The initial service does not own an operational Runtime coordinator. Attaching t
 | `GET /api/v1/auth/session` | Identity for an existing session, or 401. |
 | `POST /api/v1/auth/logout` | Exact JSON `{}`, same-origin Origin and client header; revokes cookie and returns logout confirmation. |
 | `GET /api/v1/station` | Protected station lifecycle summary. |
-| Existing session/events routes | Existing API-02 schemas when Core is bound; 409 `NO_ACTIVE_SESSION` otherwise. |
+| Existing session/events routes | Existing API-02 schemas for an attached inspection; 409 `NO_ACTIVE_SESSION` for connected idle Core; 503 if Core is unavailable. |
 | Existing library routes | Existing API-03 schemas with `source=STATION`, backed by the persistent library. |
 
 Identity: exact fields `schema=vision.api.identity.v1`, `authenticated=true`, `username` (1–64 ASCII identifier characters), `role=reader`, `expiresAt` (UTC timestamp).
 
 Logout: exact fields `schema=vision.api.logout.v1`, `loggedOut=true`.
 
-Station: exact fields `schema=vision.api.station.v1`, `source=STATION`, `instanceId` (32 hexadecimal characters, fresh per process), `stationId=VENTUNO`, `capturedAt`, `state`, `coreConnection`, `coreReadiness=UNKNOWN`, `sessionId`, `sessionViewId`, `libraryId=vision-ecu-library`. `capturedAt` is report time, not hardware observation freshness.
+Station: exact fields `schema=vision.api.station.v1`, `source=STATION`, `instanceId` (32 hexadecimal characters; Core process while connected, stable proxy fallback while disconnected), `stationId=VENTUNO`, `capturedAt`, `state`, `coreConnection`, `coreReadiness=UNKNOWN`, `sessionId`, `sessionViewId`, `libraryId=vision-ecu-library`. `capturedAt` is report time, not hardware observation freshness. `CONNECTED + NO_ACTIVE_SESSION` is valid and has null session identifiers; an active session requires connected Core and both identifiers.
 
 Errors use the existing closed `vision.api.error.v1` envelope. Authentication returns 401 `ACCESS_DENIED`; throttling returns 429 `RATE_LIMITED` and a bounded Retry-After; no bound Core returns 409 `NO_ACTIVE_SESSION`. Host/origin/method/cursor/storage failures remain explicit and sanitized. All responses are no-store, nosniff and frame-protected. POST request bodies and headers are limited to 8192 bytes; the body bound accommodates JSON escaping of a maximum-size password. Credential and report bounds are also enforced by their existing validators.
 
@@ -51,4 +57,4 @@ Errors use the existing closed `vision.api.error.v1` envelope. Authentication re
 
 `VITE_VISION_DEPLOYMENT=station npm run build` always creates the real authenticated station client. Query parameters cannot switch a station build to demo. The Win98 login resumes an existing HttpOnly session, signs in and signs out. Station summaries refresh every five seconds, identity every fifteen seconds, and library projections every fifteen seconds. A valid library view preserves browsing position; changed owner/view identities invalidate old selection. Protected data is removed when authentication or connectivity is lost and reacquired after recovery. The original LAB/demo shell remains available for isolated development.
 
-Acceptance includes real KDF and session lifecycle tests, request/CSRF/static-root tests, binding-cutover tests, existing API regressions, and Chromium tests against the actual production build and WSGI server. Test accounts and library storage are temporary. The short-lived browser-test credential handoff file is private, ignored, denied by Vite and excluded from the deployment allowlist. Deployment evidence records the reviewed commit, CI/native results, running service, actual URLs and rollback target separately.
+Acceptance includes real KDF and session lifecycle tests, request/CSRF/static-root tests, binding-cutover tests, private IPC/owner lifecycle tests, existing API regressions, and Chromium tests against the actual production build, WSGI server and separate Core host process. Test accounts and library storage are temporary. The short-lived browser-test credential handoff file is private, ignored, denied by Vite and excluded from the deployment allowlist. Deployment evidence records the reviewed commit, CI/native results, running services, actual URLs and rollback target separately.

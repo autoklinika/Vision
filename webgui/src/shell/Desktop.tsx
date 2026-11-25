@@ -16,7 +16,9 @@ export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
 }
 export function Desktop({ client, snapshot, refresh, station }: { client: ReadOnlyVisionClient; snapshot: Snapshot | null; refresh: () => void; station?: StationPresentation }) {
   const sessionRead = useSessionView(client, station?.report.state === 'SESSION_ACTIVE' ? 5000 : 0);
-  const sessionControls = station?.report.state === 'NO_ACTIVE_SESSION' ? {...sessionRead, view: {status: 'NO_ACTIVE_SESSION' as const, session: null, events: null}} : sessionRead;
+  const sessionControls = station?.report.coreConnection === 'NOT_CONNECTED'
+    ? {...sessionRead, refreshSession: station.refresh, view: {status: 'UNAVAILABLE' as const, session: null, events: null}}
+    : station?.report.state === 'NO_ACTIVE_SESSION' ? {...sessionRead, view: {status: 'NO_ACTIVE_SESSION' as const, session: null, events: null}} : sessionRead;
   const libraryControls = useLibraryView(client, station ? 15000 : 0);
   const mode = station ? 'CONNECTED · VENTUNO' : modeLabel(client.mode, snapshot);
   const connection = station ? 'Connected' : connectionLabel(snapshot);

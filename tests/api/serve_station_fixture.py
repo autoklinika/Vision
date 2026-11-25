@@ -1,4 +1,4 @@
-"""TEST-only station deployment: temporary accounts/library, no active Core.
+"""TEST-only station deployment: real separate Core host, temporary accounts/data.
 
 This harness exercises the real production WSGI/static/auth stack, without
 attaching to a station or importing any operational command dispatcher.
@@ -9,12 +9,14 @@ import os
 from pathlib import Path
 import secrets
 import signal
+import subprocess
+import sys
 import tempfile
+import time
 
 from vision_api.identity import IdentityStore, provision_account
 from vision_api.station import StationApplication, serve_application
-from vision_api.station_owner import StationOwner
-from vision_modules.ecu_library_backend import ECULibraryService
+from vision_station.client import RemoteStationOwner
 
 
 def main():
@@ -31,12 +33,22 @@ def main():
         username, password = "operator", secrets.token_urlsafe(32)
         accounts = root / "accounts.json"
         provision_account(accounts, username, password)
-        app = StationApplication(
-            identity=IdentityStore(accounts), owner=StationOwner(ECULibraryService(root / "library")),
-            dist_root=Path(__file__).resolve().parents[2] / "webgui/dist",
-            origins=[f"http://127.0.0.1:{args.port}"],
-        )
+        owner = RemoteStationOwner(root / "ipc/core.sock")
+        core = subprocess.Popen([sys.executable, "-B", "-m", "vision_station.service",
+                                 "--socket", str(root / "ipc/core.sock"),
+                                 "--library-root", str(root / "library")],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
+            deadline = time.monotonic() + 10
+            while owner.station_report()["coreConnection"] != "CONNECTED":
+                if core.poll() is not None or time.monotonic() >= deadline:
+                    raise RuntimeError("test Core process did not become available")
+                time.sleep(0.02)
+            app = StationApplication(
+                identity=IdentityStore(accounts), owner=owner,
+                dist_root=Path(__file__).resolve().parents[2] / "webgui/dist",
+                origins=[f"http://127.0.0.1:{args.port}"],
+            )
             fd = os.open(args.auth_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             created = True
             with os.fdopen(fd, "w") as stream:
@@ -48,6 +60,12 @@ def main():
         finally:
             if created:
                 args.auth_file.unlink(missing_ok=True)
+            core.terminate()
+            try:
+                core.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                core.kill()
+                core.wait(timeout=5)
 
 
 if __name__ == "__main__":

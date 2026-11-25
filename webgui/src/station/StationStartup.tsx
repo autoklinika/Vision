@@ -38,9 +38,10 @@ function StationDesktop({identity, epoch, denied, logout}: {identity: IdentityRe
   if (!report || !client) return <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · read-only access</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? 'Connecting to VENTUNO' : 'Connection lost'}</h1></div><div className="window-body"><p role="status">{connecting ? 'Waiting for the station report…' : 'Station data is unavailable. Retrying automatically.'}</p><p>Signed in as {identity.username}.</p><div className="startup-actions"><button onClick={refresh}>Retry connection</button><button onClick={logout}>Sign out</button></div></div></section></main>;
   const snapshot: Snapshot = {
     schema: 'client-view-v1', source: 'real', connection: 'API_AVAILABLE', readiness: 'UNKNOWN', observedAt: null,
-    reportTime: report.capturedAt, reason: report.coreConnection === 'NOT_CONNECTED' ? 'Vision Core is not connected.' : 'Station report received. Readiness is unknown.', components: [],
+    reportTime: report.capturedAt, reason: report.coreConnection === 'NOT_CONNECTED' ? 'Vision Core is not connected.' :
+      report.state === 'NO_ACTIVE_SESSION' ? 'Vision Core is connected. No inspection session is active.' : 'Core session report available. Readiness is unknown.', components: [],
   };
-  const owner = `${identity.username}:${report.instanceId}:${report.sessionId ?? ''}:${report.sessionViewId ?? ''}`;
+  const owner = `${identity.username}:${report.coreConnection}:${report.instanceId}:${report.sessionId ?? ''}:${report.sessionViewId ?? ''}`;
   return <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout}}/>;
 }
 
