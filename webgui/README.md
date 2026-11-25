@@ -1,6 +1,20 @@
-# Vision Startup & Desktop V1 (GUI-02 + API-01 / API-02)
+# Vision WebGUI — stanowisko i izolowany klient
 
-## API-02 protected reports
+## Aktualny zakres stanowiskowy (25.11.2026)
+
+Pulpit Windows 98 działa na VENTUNO Q w trybie Kiosk i przez prywatny HTTPS. Wydanie stanowiskowe ma rzeczywiste logowanie, sesje backendowe, zmianę hasła i automatyczną synchronizację. API odczytuje niezależny Core przez prywatny Unix socket; GUI nie tworzy Workflow ani drugiej biblioteki. W stanie idle: CONNECTED, NO_ACTIVE_SESSION, UNKNOWN. System Status, ECU Library (odczyt), Inspection Manager i Event Viewer są połączone; okna Luxonis, NERO, Sony i Images nadal są placeholderami. Nie ma komend sprzętowych ani edycji/zatwierdzania profilu ECU.
+
+- [Kontrakt stanowiskowy](../docs/implementation/VISION_STATION_WEBGUI_V1.md) i [runbook wdrożenia](../docs/operations/VISION_WEBGUI_DEPLOYMENT.md) są nadrzędne wobec historycznych opisów poniżej.
+- [#65 Core IPC](https://github.com/autoklinika/Vision/pull/65), [#68 Settings](https://github.com/autoklinika/Vision/pull/68), [#70 Firefox](https://github.com/autoklinika/Vision/pull/70) zawierają zakres testów i ograniczenia.
+- Stanowiskowy build: `VITE_VISION_DEPLOYMENT=station npm run build`. Testy `npm run test:station -- --browser=firefox` i osobno `--browser=chromium` wykonuje się wyłącznie w izolowanym środowisku z odpowiednimi zależnościami Python/Playwright i wolnym portem fixture. Nie wskazywać produkcyjnego serwera ani kont.
+
+---
+
+## Historyczne zakresy GUI-01/02 i API-01/02 (nie opis wdrożenia)
+
+Poniższe sekcje dokumentują wcześniejsze kontrakty izolowanego klienta DEMO/LAB; stwierdzenia o braku logowania i połączenia Core dotyczą tych etapów, nie wydania stanowiskowego.
+
+### API-02 protected reports
 
 System Status, Inspection Manager and Event Viewer share a read-only Core/Runtime view. In real mode, **Refresh session** requests a server-authorized session and first bounded journal page; **Load more events** reads the next page of the same pinned prefix. Source, capture time, current state, historical success and ACK are separate. Failures clear protected data; DEMO never fetches it.
 

@@ -1,91 +1,48 @@
 # Vision — stanowisko inspekcji PCB / ECU
 
-> **Aktualny stan zaakceptowany laboratoryjnie, 23.11.2026:** [Vision Guided Positioning V1](docs/baselines/VISION_GUIDED_POSITIONING_V1_2026-11-23.md) — kamera Luxonis wykrywa ETC3/PTM, MoveIt 2 planuje ruch, a AgileX NERO fizycznie wykonuje dojazdy i wraca do PARK. Operator potwierdził centralne pozycjonowanie nad PCB PTM. To **LAB**, nie wydanie produkcyjne; prywatne surowe obrazy, TF i snapshot runtime pozostają poza GitHub. Zobacz także [porządek repozytorium](docs/process/REPOSITORY_HYGIENE_V1.md) i [archiwum PR](docs/operations/OPEN_PR_PORTFOLIO_2026-11-23.md).
+Vision to modułowy system dokumentowania i inspekcji sterowników ECU oraz płytek PCB. Platforma stanowiskowa: VENTUNO Q / Ubuntu ARM64, sensor RGB-D Luxonis, AgileX NERO i aparat Sony; urządzenia są wymienne przez kontrakty i profile.
 
-> **Uwaga:** kolejne historyczne sekcje README i datowane audyty opisują stan z października i pierwszej połowy listopada 2026. Nie należy interpretować ich jako bieżącego statusu hardware po odbiorze V1.
+**Stan referencyjny: 25.11.2026, po odbiorze fundamentu Core ↔ WebGUI ([#65](https://github.com/autoklinika/Vision/pull/65), [#68](https://github.com/autoklinika/Vision/pull/68), [#70](https://github.com/autoklinika/Vision/pull/70)).** `main` jest zatwierdzonym punktem odniesienia dla kodu i dokumentacji, **nie obrazem uruchomionych usług ani wydaniem produkcyjnym**.
 
-> **Nowy fundament Vision (ustalenia 14.11.2026, PR dokumentacyjny):** [założenia nowego systemu](docs/architecture/VISION_FOUNDATION_2026-11-14.md) i [archiwum rozmowy architektonicznej](docs/architecture/VISION_ARCHITECTURE_DISCUSSION_2026-11-14.md). Vision budujemy od podstaw, operator deklaruje ECU, a moduły i modele są wymienne. Pierwszy scenariusz dotyczy **ETC3 z dwiema czarnymi i jedną szarą wtyczką**, nie DAF SAC. Szczegóły wykonawcze pozostają do walidacji. Historyczne dokumenty niżej zachowują swoje oryginalne daty i statusy.
+**Najważniejsza zasada: WebGUI jest wyłącznie klientem całego systemu Vision.** Core koordynuje scenariusze i bramki, ROS 2 integruje urządzenia, MoveIt 2 planuje ruch, a właściwe moduły dostarczają dane oraz dowody.
 
-Projekt stanowiska fotograficzno-inspekcyjnego opartego na **Arduino VENTUNO Q** (Ubuntu ARM64), aparacie Sony A6100, kamerze termowizyjnej i ramieniu **AgileX NERO**.
+## Aktualny stan projektu
 
-**Stan dokumentacji na 10.11.2026:** `main` jest **zatwierdzoną bazą architektury, decyzji i statusów**, a nie kompletną działającą aplikacją Vision Core. Stan urządzeń jest zmienny; raport AS-BUILT jest datowaną fotografią konfiguracji i wyników testów.
+| Obszar | Stan i zakres |
+| --- | --- |
+| [Vision Guided Positioning V1](docs/baselines/VISION_GUIDED_POSITIONING_V1_2026-11-23.md) | LAB ACCEPTED 23.11: fizyczne dojazdy NERO do celów ETC3/PTM i powrót do PARK; zamrożona baza laboratoryjna |
+| [Vision Core](src/vision_core/README.md) | Merged: fundament, fotografia offline, powtarzalność, rozszerzenia i audyty ([#39](https://github.com/autoklinika/Vision/pull/39)–[#45](https://github.com/autoklinika/Vision/pull/45)); nie stanowią pełnego wdrożenia sprzętowego |
+| [ECU Reference Profiles i biblioteka](docs/implementation/VISION_ECU_LIBRARY_BACKEND_V1.md) | Merged: katalog, model wzorcowy, wersje, walidacja, robocze profile, backend biblioteki ([#46](https://github.com/autoklinika/Vision/pull/46)–[#49](https://github.com/autoklinika/Vision/pull/49)); ETC3 DRAFT / NOT_READY |
+| [Runtime V1 S01–S04](docs/implementation/VISION_RUNTIME_V1_S01_S04.md) | Merged [#50](https://github.com/autoklinika/Vision/pull/50); odczyt ROS 2 Luxonis zweryfikowany, fizyczne S03/S04 dla ETC3 nadal wymagają odbioru |
+| [Inspection Planner V1 S05–S06](docs/implementation/VISION_INSPECTION_PLANNER_V1_S05_S06.md) | Merged [#52](https://github.com/autoklinika/Vision/pull/52); planowanie i testy plan-only, nie wykonanie ruchu ani zdjęć |
+| [Thermal Inspection V1](docs/implementation/VISION_THERMAL_INSPECTION_V1.md) | Merged moduł offline ([#44](https://github.com/autoklinika/Vision/pull/44), [#45](https://github.com/autoklinika/Vision/pull/45)); brak odbioru metrologicznego toru sprzętowego |
+| [WebGUI V1](webgui/README.md) | Wdrożony Win98 Kiosk i zdalny WebGUI z rzeczywistym logowaniem, zmianą hasła i odczytem raportów Core przez API. API-01–03 oraz prywatny Unix IPC. Core działa niezależnie; `CONNECTED / NO_ACTIVE_SESSION / UNKNOWN`. Okna urządzeń i Images pozostają placeholderami |
+| [ETC3 — lokalizacja RGB-D](https://github.com/autoklinika/Vision/pull/51) | Odrębny draft LAB, nie wdrożenie ani dowód S03/S04 PASS |
 
-## ECU Reference Profile V1 — zatwierdzony wzorzec wiedzy i instrukcji (24.11.2026)
+## Rozpocznij tutaj
 
-- [ADR — ECU Reference Profile V1: ACCEPTED](docs/decisions/ADR_VISION_ECU_REFERENCE_PROFILE_V1_2026-11-24.md) — profil jest nominalnym, wersjonowanym źródłem wiedzy o ECU i instrukcją dla całego Vision, nie plikiem komend robota.
-- [Pełna specyfikacja: 15 sekcji](docs/architecture/ECU_REFERENCE_PROFILE_V1_SPECIFICATION.md) i [szablon JSON](docs/templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json) — dokumentacja architektury, **nie** wykonywalny profil ETC3.
-- [Biblioteka ECU, wybór operatora i edytor — UX V1](docs/ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md) — zaakceptowany kierunek GUI; implementacja dopiero w kolejnym etapie.
-- Oddzielamy **Reference Profile**, wykonawczy **ECUProfile/ScenarioSpec** oraz **kartę badanej sztuki**. ETC3 pozostaje niezatwierdzonym DRAFT. Projekt katalogu: [PR #46](https://github.com/autoklinika/Vision/pull/46).
+- [Indeks aktualnej dokumentacji i ADR](docs/README.md) — obowiązujące decyzje, kontrakty, testy, raporty i materiały historyczne.
+- [Mapa kodu](src/README.md) — odpowiedzialność istniejących modułów.
+- [Testy offline](tests/README.md) i [testy WebGUI](webgui/README.md) — niezależne od sprzętu.
+- [Rejestr PR i gałęzi — 25.11.2026](docs/operations/REPOSITORY_REGISTER_2026-11-25.md) — bieżące prace i archiwum.
+- [Zasady utrzymania repozytorium](docs/process/REPOSITORY_HYGIENE_V1.md) i [proces rozwoju](docs/process/DEVELOPMENT.md).
 
-## Obowiązująca architektura Vision Core
+## Kolejne pakiety
 
-- [ADR-VISION-CORE-001 — Hardware Independence & Modular Architecture](docs/architecture/ADR_VISION_CORE_HARDWARE_INDEPENDENCE_2026-11-23.md) — **ACCEPTED (23.11.2026)**: Core jest niezależnym od sprzętu koordynatorem inspekcji. Aparat, obiektyw, RGB-D i robot są wymienne przez interfejsy, adaptery i profile. Nowe urządzenie wymaga odpowiedniej kalibracji i weryfikacji, lecz nie przepisywania scenariuszy ECU.
+Dwa równoległe tory, bez kopiowania logiki systemu do klienta:
 
-## Vision Inspection Planner V1 — S05–S06 (24.11.2026)
+| Tor | Najbliższe zadania |
+| --- | --- |
+| Backend | Odbiór absolutnej transformacji, profilu ETC3 i powiązania dowodów Runtime dla S03/S04; późniejsza integracja S07 i kolejnych etapów zgodnie z Workflow |
+| WebGUI | Uzgodnić następny ograniczony pakiet raportów sprzętu. Istnieją odczyt biblioteki ECU, raporty sesji i zdarzeń, autoryzacja i Kiosk. Edycja i zatwierdzanie profili, aktywna inspekcja i podglądy urządzeń są odrębnymi zadaniami |
 
-- [Implementacja i kontrakty](docs/implementation/VISION_INSPECTION_PLANNER_V1_S05_S06.md): recepta ECU, oddzielna kalibracja optyki Sony, konserwatywna ocena przewidywanego pokrycia PCB i adapter usług MoveIt do planowania wymaganych widoków.
-- Opcjonalny `strict_planning=True` wiąże S05 z pełnym przygotowaniem optycznym, a S06 z konkretnymi trajektoriami, sceną, stanem robota i rewizjami konfiguracji. Dowody są zapisywane atomowo przez istniejący Core.
-- [Audyt implementacji](docs/audits/VISION_INSPECTION_PLANNER_V1_AUDIT_2026-11-24.md) i [próba usług MoveIt na modelu NERO](docs/audits/VISION_INSPECTION_PLANNER_MOVEIT_SIMULATION_2026-11-24.md) opisują testy oraz granice odbioru.
-- [Końcowy audyt integracji Runtime + Planner](docs/audits/VISION_RUNTIME_PLANNER_FINAL_AUDIT_2026-11-24.md): 631 wykonań Core + 110 testów Plannera PASS lokalnie i na ARM64, poprawione uwierzytelnianie obserwacji i obliczenia obrotów, sprawdzone scalenie oraz wycofanie zmian. Odbiór rzeczywistego ETC3 S03/S04 i wdrożenie stanowiskowe pozostają osobnymi krokami. Moduł nie wykonuje ruchu ani zdjęć.
+Szczegóły i kryteria: [Workflow V1](docs/workflows/VISION_INSPECTION_WORKFLOW_V1.md), [WebGUI V1](docs/ux/VISION_WEBGUI_V1_SPECIFICATION.md). Oryginalne prywatne zasoby marki pozostają poza Git i standardowym buildem; prawa do dystrybucji prywatnych zasobów pozostają odrębną bramką. Prywatny dostęp HTTPS działa. [Kontrakt stanowiskowy](docs/implementation/VISION_STATION_WEBGUI_V1.md) · [Runbook wdrożenia](docs/operations/VISION_WEBGUI_DEPLOYMENT.md).
 
-## ECU Profiles V1 — katalog profili i ETC3 PoC (24.11.2026)
+## Zasady rozwoju
 
-- [Kontrakt ECU Profiles V1](docs/implementation/VISION_ECU_PROFILES_V1.md) — niezależny od sprzętu katalog wersjonowanych danych ECU, weryfikacja operatora i obserwacji, kontrolowany odbiór i wydawanie profili.
-- [ETC3 PoC V1 — karta danych i lista pomiarów](docs/profiles/ETC3_POC_V1_PL.md) — **DRAFT / NOT_READY**; dwie czarne i jedna szara wtyczka, brak zatwierdzonej geometrii i ujęć. To nie jest aktywny profil robota.
-- [Audyt ECU Profiles V1](docs/audits/VISION_ECU_PROFILES_V1_AUDIT_2026-11-24.md) — testy i granice zaufania. Moduł nie uruchamia NERO ani Sony.
+1. Nowy, mały PR od aktualnego `origin/main`; testy, audyt i zatwierdzenie właściciela przed merge.
+2. Nie przywracamy dawnych executorów ani własnego stosu Camera Service/Perception Engine jako konkurencyjnej architektury.
+3. Testy kodu nie oznaczają odbioru stanowiskowego. Operacje sprzętowe mają osobną procedurę i akceptację.
+4. Publiczny GitHub: kod, syntetyczne testy, zanonimizowane decyzje. Prywatne dane, kalibracje stanowiska, obrazy, logi i zasoby o niezweryfikowanych prawach pozostają poza Git.
 
-## ROS 2 i przenośność stanowiska (16.11.2026)
-
-- [Raport techniczny: ROS 2, NERO, MoveIt, Luxonis, ETC3 i przejście LAB → PROD](docs/architecture/VISION_ROS2_NERO_LAB_TO_PROD_TECHNICAL_REPORT_2026-11-16.md) — szczegółowe ustalenia, wymagania wejściowe, architektura i plan izolowanych testów; **DESIGN REPORT / PROPOSED**, bez wdrożenia na sprzęcie.
-- [ADR-VISION-STATION-001: jeden kod, profile LAB i PROD](docs/architecture/ADR_VISION_PORTABLE_STATION_LAB_PROD_2026-11-16.md) — **PROPOSED**, wymaga formalnego zatwierdzenia; zmiana stanowiska unieważnia odpowiednie kalibracje i dopuszczenie ruchu.
-
-## Bieżąca dokumentacja projektu
-
-- [Stan faktyczny VENTUNO Q i modułów (AS-BUILT, 10.11.2026)](docs/operations/VISION_AS_BUILT_2026-11-10.md).
-- [Otwarte problemy, ryzyka i bramki techniczne](docs/operations/OPEN_ITEMS_2026-11-10.md).
-- [Polityka `main`, eksperymentów i dopuszczenia Vision Core](docs/operations/RELEASE_GATES_2026-11-10.md).
-- [Architektura logiczna Vision](docs/architecture/OVERVIEW.md).
-- [ADR-VISION-ROBOT-001 — dwustopniowy STOP AgileX NERO](docs/architecture/ADR_VISION_NERO_TWO_STAGE_STOP_2026-11-10.md), **ACCEPTED** jako architektura; wdrożenie etapu 1 **częściowe**.
-- [ADR Sony — kanały HDMI/Wi-Fi/SD/USB](docs/architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md), **PROPOSED** — brak wdrożenia produkcyjnego.
-
-## Status potwierdzonych prac
-
-| Moduł | Najważniejsze potwierdzone wyniki | Stan integracji |
-|---|---|---|
-| VENTUNO Q | Ubuntu 24.04.4 ARM64, NVMe ext4, próby GPU/NPU, STM32/CAN | platforma laboratoryjna; pełny hardware baseline nadal otwarty |
-| Sony A6100 | PTP, HDMI, Wi-Fi, BLE, RAW/JPEG, testy AF i stabilności | osobne próby udokumentowane; docelowy pipeline jeszcze nie wdrożony |
-| Vision Thermal / InfiRay T2S+ | Web DEV v0.6: podgląd, 3 ROI, historia, obrót | **DEV FROZEN**, temperatury **NOT VALIDATED** metrologicznie; źródła prywatne |
-| AgileX NERO 7 DOF | pyAgxArm, firmware 1.22, odczyt wszystkich przegubów i potwierdzenie komendy STOP | pierwsze ruchy / hamowanie pod obciążeniem jeszcze niewalidowane |
-| Stream Deck Plus | OpenDeck 2.14.1 i klawisz STOP SW z wcześniejszym potwierdzeniem sterownika | podczas audytu po restarcie **brak panelu w USB, usługa restartowała się** |
-| Vision Core, ruch autonomiczny, Eye-in-Hand, UPS / automatyczne parkowanie | architektura i plany etapów | **niezatwierdzone jako produkcyjny system** |
-
-Powyższa tabela przedstawia datowany audyt, a nie bieżącą telemetrię online. W szczególności **STOP programowy nie zastępuje niezależnego zabezpieczenia operatora**, a odcięcie zasilania NERO może spowodować opadnięcie ramienia.
-
-## Gdzie znajdują się testy i kod roboczy?
-
-Pełna konsolidacja prac z października i listopada, łącznie z testami Sony, STM32, skryptami GPU/NPU, referencyjnym kodem NERO/OpenDeck, raportami Thermal i dowodami, pozostaje na osobnej gałęzi:
-
-- [PR #15 — integracyjny punkt odniesienia całego projektu](https://github.com/autoklinika/Vision/pull/15).
-- [Zamrożony commit pełnego snapshotu](https://github.com/autoklinika/Vision/tree/34181a6206918dce91021dce3286a221f6e32058).
-
-Kod eksperymentalny, testy urządzeń i niezatwierdzone konfiguracje **nie są scalane do `main`** tylko dlatego, że działały w laboratorium. Zostają w swoich gałęziach i w archiwum na NVMe. Zamrożone źródła Thermal, zewnętrzne SDK, duże obrazy, prywatne sesje i sekrety nie trafiają do publicznego GitHuba.
-
-## Zasady bezpieczeństwa i procesu
-
-1. **`main` to wiarygodna, zatwierdzona baza**, a nie automatyczny obraz aktualnego systemu lub kompletna dystrybucja oprogramowania.
-2. Moduły wprowadzamy do `main` po przeglądzie, testach i jawnej zgodzie właściciela. Każda zmiana przez osobną gałąź i PR.
-3. Autonomiczny ruch ramienia wymaga odrębnej oceny ryzyka i niezależnych zabezpieczeń; kamera głębi i algorytmy AI ich nie zastępują.
-4. Nie uruchamiamy aktuatorów, migawki, zasilania ani testów na żywym sprzęcie w trakcie zwykłego tworzenia PR.
-5. Nie publikujemy kluczy, tokenów, numerów seryjnych, prywatnej adresacji, surowych zdjęć, archiwów i logów laboratoryjnych.
-
-Historia wcześniejszych testów: [weryfikacja VENTUNO Q](docs/hardware/VENTUNO_Q_HARDWARE_VERIFICATION_2026-10-10.md), [weryfikacja Sony A6100](docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md), [proces rozwoju](docs/process/DEVELOPMENT.md).
-
-ECU reference profile V1 usage and release gates: [implementation guide](docs/implementation/VISION_ECU_REFERENCE_PROFILE_V1_IMPLEMENTATION.md).
-
-- [ECU library backend V1](docs/implementation/VISION_ECU_LIBRARY_BACKEND_V1.md) — offline catalog and reference-profile draft editing service.
-
-Vision Runtime Stage A coordinator contract: [S01–S04 implementation](docs/implementation/VISION_RUNTIME_V1_S01_S04.md).
-
-Vision Runtime Stage B read-only adapter: [ROS2 Luxonis adapter](docs/implementation/VISION_RUNTIME_ROS2_LUXONIS_ADAPTER_V1.md).
-
-[Luxonis real ROS2 read-only acceptance — 24 Nov 2026](docs/audits/VISION_RUNTIME_LUXONIS_LIVE_READONLY_ACCEPTANCE_2026-11-24.md) — RGB/Depth/CameraInfo/PointCloud2 and local TF passed; ECU S03/S04 still NOT_READY.
+Historia dawnych testów i opisów: [indeks dokumentacji historycznej](docs/README.md#materiały-historyczne), [poprzedni README](https://github.com/autoklinika/Vision/blob/4bb088186eb06a40ab9fd2e96072551d318a2d90/README.md) i [snapshot #15](https://github.com/autoklinika/Vision/pull/15). Zachowujemy historię bez scalania przestarzałych eksperymentów.
