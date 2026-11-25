@@ -4,6 +4,7 @@ import threading
 from vision_api.station_owner import StationOwner
 from vision_modules.ecu_library_backend import ECULibraryService
 from vision_runtime import VisionRuntimeCoordinator
+from .inspection import InspectionOwner
 
 
 class CoreHost:
@@ -16,18 +17,21 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root):
-        self.library = ECULibraryService(library_root)
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None):
+        self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         self._reader = StationOwner(self.library)
         self.library_reader = self._reader.library_reader
-        self._lifecycle_lock = threading.Lock()
+        self._lifecycle_lock = threading.RLock()
         self._runtime = None
         self._view_id = None
+        self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
 
     def attach_runtime(self, runtime):
         if not isinstance(runtime, VisionRuntimeCoordinator):
             raise ValueError("an existing Vision Runtime coordinator is required")
         with self._lifecycle_lock:
+            if self._inspection.owned_id is not None:
+                raise ValueError("owned inspection cannot be replaced")
             view_id = self._reader.bind_core(runtime.engine)
             self._runtime, self._view_id = runtime, view_id
             return view_id
@@ -60,3 +64,19 @@ class CoreHost:
 
     def events_report(self, *, view, after, through):
         return self._reader.events_report(view=view, after=after, through=through)
+
+    def inspection_report(self):
+        with self._lifecycle_lock:
+            return self._inspection.report()
+
+    def start_inspection(self, **intent):
+        with self._lifecycle_lock:
+            return self._inspection.start(**intent)
+
+    def close_inspection(self, **intent):
+        with self._lifecycle_lock:
+            return self._inspection.close(**intent)
+
+    def shutdown_inspection(self):
+        with self._lifecycle_lock:
+            self._inspection.shutdown()

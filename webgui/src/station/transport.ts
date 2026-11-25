@@ -1,14 +1,16 @@
-import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, record, usernameValid } from './contract';
-import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport } from './contract';
+import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
+import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport, InspectionReport } from './contract';
 
 export type StationResult<T> = Readonly<{status: 'AVAILABLE'; report: T}> | Readonly<{status: 'ACCESS_DENIED' | 'RATE_LIMITED' | 'UNAVAILABLE'; report: null}>;
 type PasswordError = 'CURRENT_PASSWORD_INVALID' | 'PASSWORD_REJECTED';
+type InspectionError = 'OPERATOR_REQUIRED' | 'INSPECTION_REJECTED';
+export type InspectionCommandResult = StationResult<StationReport> | Readonly<{status: InspectionError; report: null}>;
 export type PasswordChangeResult = StationResult<PasswordChangeReport> | Readonly<{status: PasswordError; report: null}>;
 export const stationTimeoutMs = 5000;
 const maxBytes = 4096;
 const unavailable = {status: 'UNAVAILABLE', report: null} as const;
 
-async function request<T, E extends PasswordError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
+async function request<T, E extends PasswordError | InspectionError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>, limit = maxBytes): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
   if (!globalThis.isSecureContext) return unavailable;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), stationTimeoutMs);
@@ -30,14 +32,14 @@ async function request<T, E extends PasswordError = never>(path: string, validat
     if (response.status === 429) return {status: 'RATE_LIMITED', report: null};
     if (response.status !== 200 && !errorCodes?.[response.status] || !/^application\/json\s*;\s*charset=utf-8$/i.test(response.headers.get('Content-Type') ?? '') || !response.body) return unavailable;
     const length = response.headers.get('Content-Length');
-    if (length !== null && (!/^[0-9]+$/.test(length) || Number(length) > maxBytes)) return unavailable;
+    if (length !== null && (!/^[0-9]+$/.test(length) || Number(length) > limit)) return unavailable;
     reader = response.body.getReader();
     const chunks: Uint8Array[] = []; let count = 0;
     for (;;) {
       const {done, value} = await reader.read();
       if (done) break;
       count += value.byteLength;
-      if (count > maxBytes) return unavailable;
+      if (count > limit) return unavailable;
       chunks.push(value);
     }
     if (length !== null && Number(length) !== count) return unavailable;
@@ -67,4 +69,16 @@ export function signIn(username: string, password: string): Promise<StationResul
 export function changePassword(currentPassword: string, newPassword: string): Promise<PasswordChangeResult> {
   return request('/api/v1/auth/password', isPasswordChangeReport, JSON.stringify({currentPassword, newPassword}),
     {400: 'PASSWORD_REJECTED', 403: 'CURRENT_PASSWORD_INVALID'} as const);
+}
+
+export function readInspection(): Promise<StationResult<InspectionReport>> {
+  return request<InspectionReport, never>('/api/v1/inspection', isInspectionReport, undefined, undefined, 16384);
+}
+export function startInspection(instanceId: string, selectionId: string, intentToken: string): Promise<InspectionCommandResult> {
+  return request('/api/v1/inspection/start', isStationReport, JSON.stringify({instanceId, selectionId, intentToken}),
+    {403: 'OPERATOR_REQUIRED', 409: 'INSPECTION_REJECTED'} as const);
+}
+export function closeInspection(instanceId: string, sessionId: string): Promise<InspectionCommandResult> {
+  return request('/api/v1/inspection/close', isStationReport, JSON.stringify({instanceId, sessionId}),
+    {403: 'OPERATOR_REQUIRED', 409: 'INSPECTION_REJECTED'} as const);
 }

@@ -1,4 +1,4 @@
-"""Read-only proxy: no local fallback owner, Workflow, journal or ECU store."""
+"""Station proxy: no local fallback owner, Workflow, journal or ECU store."""
 import socket
 import time
 from uuid import uuid4
@@ -8,6 +8,7 @@ from vision_api.library_reports import (validate_library_report, validate_librar
                                         validate_library_history_report)
 from vision_api.reports import _timestamp, validate_session_report, validate_events_report
 from vision_api.station_owner import NoActiveSession
+from .inspection import InspectionRejected, validate_inspection_report
 from .protocol import (ERRORS, EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
                        validate_station_report)
@@ -70,6 +71,8 @@ class RemoteStationOwner:
                 code = response["error"]
                 if not isinstance(code, str) or code not in ERRORS:
                     raise ValueError("invalid station error")
+                if code == "INSPECTION_REJECTED":
+                    raise InspectionRejected()
                 if code == "NO_ACTIVE_SESSION":
                     raise NoActiveSession()
                 if code == "CURSOR_REJECTED":
@@ -83,7 +86,7 @@ class RemoteStationOwner:
             if operation in ("library", "entry", "history") and report["libraryId"] != "vision-ecu-library":
                 raise ValueError("station library identity mismatch")
             return report
-        except (NoActiveSession, CursorRejected, ReportUnavailable):
+        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected):
             raise
         except Exception:
             raise ReportUnavailable() from None
@@ -111,3 +114,12 @@ class RemoteStationOwner:
                 or report["throughSequence"] != through):
             raise ReportUnavailable()
         return report
+
+    def inspection_report(self):
+        return self._read("inspection", {}, validate_inspection_report)
+
+    def start_inspection(self, **intent):
+        return self._read("inspection_start", intent, validate_station_report)
+
+    def close_inspection(self, **intent):
+        return self._read("inspection_close", intent, validate_station_report)

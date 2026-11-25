@@ -36,7 +36,7 @@ def main():
         owner = RemoteStationOwner(root / "ipc/core.sock")
         core = subprocess.Popen([sys.executable, "-B", "-m", "vision_station.service",
                                  "--socket", str(root / "ipc/core.sock"),
-                                 "--library-root", str(root / "library")],
+                                 "--library-root", str(root / "library"), "--diagnostics-disabled"],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             deadline = time.monotonic() + 10
