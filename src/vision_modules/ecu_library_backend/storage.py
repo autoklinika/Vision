@@ -1,6 +1,7 @@
 """Private, atomic draft and asset persistence."""
 import hashlib
 import json
+import math
 import struct
 import fcntl
 from contextlib import contextmanager
@@ -101,22 +102,60 @@ class DraftStore:
         self._transaction_state = threading.local()
 
     @contextmanager
-    def transaction(self):
-        with self.lock:
+    def transaction(self, *, timeout=None):
+        """Retain legacy blocking semantics unless a caller bounds admission.
+
+        A bounded call shares one deadline across the in-process and cross-
+        process locks. Reentrant operations retain their existing transaction.
+        """
+        if timeout is not None and (type(timeout) not in (int, float)
+                or not math.isfinite(timeout) or timeout < 0):
+            raise ValueError("invalid transaction timeout")
+        deadline = None if timeout is None else time.monotonic() + timeout
+        if deadline is None:
+            self.lock.acquire()
+        elif not self.lock.acquire(timeout=max(0, deadline - time.monotonic())):
+            raise DraftReadUnavailable('LIBRARY_BUSY')
+        try:
             if getattr(self._transaction_state, "active", False):
                 yield
                 return
             path = _check_path(self.root / ".lock")
             fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+            locked = False
             try:
                 if not stat.S_ISREG(os.fstat(fd).st_mode): raise ValueError("invalid lock")
-                fcntl.flock(fd, fcntl.LOCK_EX)
+                if deadline is None:
+                    fcntl.flock(fd, fcntl.LOCK_EX)
+                    locked = True
+                else:
+                    allow_immediate = timeout == 0
+                    while True:
+                        # A scheduling pause must not turn an expired wait
+                        # into a late admission after the lock becomes free.
+                        if not allow_immediate and time.monotonic() >= deadline:
+                            raise DraftReadUnavailable('LIBRARY_BUSY')
+                        allow_immediate = False
+                        try:
+                            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            locked = True
+                            if timeout > 0 and time.monotonic() >= deadline:
+                                raise DraftReadUnavailable('LIBRARY_BUSY')
+                            break
+                        except BlockingIOError:
+                            remaining = deadline - time.monotonic()
+                            if remaining <= 0:
+                                raise DraftReadUnavailable('LIBRARY_BUSY')
+                            time.sleep(min(0.01, remaining))
                 self._transaction_state.active = True
                 yield
             finally:
-                self._transaction_state.active = False
-                fcntl.flock(fd, fcntl.LOCK_UN)
+                if locked:
+                    self._transaction_state.active = False
+                    fcntl.flock(fd, fcntl.LOCK_UN)
                 os.close(fd)
+        finally:
+            self.lock.release()
 
     def _path(self, area, name):
         p = _check_path(self.root / area / name)

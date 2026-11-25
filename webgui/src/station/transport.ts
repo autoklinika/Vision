@@ -11,13 +11,14 @@ export type DraftResult<T> = StationResult<T> | Readonly<{status: DraftError; re
 export type InspectionCommandResult = StationResult<StationReport> | Readonly<{status: InspectionError; report: null}>;
 export type PasswordChangeResult = StationResult<PasswordChangeReport> | Readonly<{status: PasswordError; report: null}>;
 export const stationTimeoutMs = 5000;
+export const editorTimeoutMs = 35000;
 const maxBytes = 4096;
 const unavailable = {status: 'UNAVAILABLE', report: null} as const;
 
-async function request<T, E extends PasswordError | InspectionError | DraftError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>, limit = maxBytes): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
+async function request<T, E extends PasswordError | InspectionError | DraftError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>, limit = maxBytes, timeoutMs = stationTimeoutMs): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
   if (!globalThis.isSecureContext) return unavailable;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), stationTimeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response | undefined;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
@@ -97,7 +98,7 @@ async function editorRequest<T extends DraftReport | DraftValidation | DraftAsse
   const body = editorBody(args,document);
   const assetWire=3*1024*1024;
   if (new TextEncoder().encode(body).length > (action==='asset_import'?assetWire:131072)) return {status:'BAD_REQUEST',report:null};
-  const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072);
+  const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072,editorTimeoutMs);
   if(result.status==='AVAILABLE'&&action==='asset_preview'&&(!('assetId' in result.report)||result.report.assetId!==args.assetId))return unavailable;
   if (result.status === 'AVAILABLE' && (result.report.instanceId !== args.instanceId ||
       result.report.key !== (action === 'clone' ? args.newKey : args.key))) return unavailable;

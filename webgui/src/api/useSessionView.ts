@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReadOnlyVisionClient } from './types';
 import type { EventsReport, SessionReport } from './sessionContract';
 
@@ -14,13 +14,18 @@ export type SessionControls = Readonly<{
 const empty = (status: SessionView['status']): SessionView => ({status, session: null, events: null});
 
 /** In-memory presentation only. Station composition can opt into bounded polling. */
-export function useSessionView(client: ReadOnlyVisionClient, intervalMs = 0): SessionControls {
+export function useSessionView(client: ReadOnlyVisionClient, intervalMs = 0, owner = ''): SessionControls {
   const enabled = client.mode === 'real' && !!client.readSession && !!client.readEvents;
-  const [view, setView] = useState<SessionView>(() => empty(enabled ? 'NOT_REQUESTED' : 'DISABLED'));
+  // A -> disconnected -> A is a new observation, even with the same IDs.
+  const ownerToken = useMemo(() => Symbol(owner), [owner]);
+  const [ownedView, setOwnedView] = useState(() => ({owner: ownerToken, view: empty(enabled ? 'NOT_REQUESTED' : 'DISABLED')}));
+  // Mask the old owner synchronously, before effects and late requests settle.
+  const view = ownedView.owner === ownerToken ? ownedView.view : empty(enabled ? 'NOT_REQUESTED' : 'DISABLED');
+  const setView = (next: SessionView) => setOwnedView({owner: ownerToken, view: next});
   const busy = useRef(false);
   const generation = useRef(0);
   const refreshRef = useRef<(quiet: boolean) => Promise<void>>(async () => {});
-  useEffect(() => () => { generation.current++; }, []);
+  useEffect(() => () => { generation.current++; busy.current = false; }, [ownerToken, enabled]);
 
   async function refresh(quiet = false) {
     if (!enabled || busy.current || !client.readSession || !client.readEvents) return;
@@ -39,7 +44,7 @@ export function useSessionView(client: ReadOnlyVisionClient, intervalMs = 0): Se
     } catch {
       if (current === generation.current) setView(empty('UNAVAILABLE'));
     } finally {
-      busy.current = false;
+      if (current === generation.current) busy.current = false;
     }
   }
 
@@ -58,7 +63,7 @@ export function useSessionView(client: ReadOnlyVisionClient, intervalMs = 0): Se
     } catch {
       if (current === generation.current) setView(empty('UNAVAILABLE'));
     } finally {
-      busy.current = false;
+      if (current === generation.current) busy.current = false;
     }
   }
   useEffect(() => { refreshRef.current = refresh; });
@@ -67,6 +72,6 @@ export function useSessionView(client: ReadOnlyVisionClient, intervalMs = 0): Se
     const first = window.setTimeout(() => { void refreshRef.current(true); }, 0);
     const timer = window.setInterval(() => { void refreshRef.current(true); }, intervalMs);
     return () => { window.clearTimeout(first); window.clearInterval(timer); };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, ownerToken]);
   return {view, refreshSession: () => { void refresh(); }, nextEvents, autoRefresh: intervalMs > 0};
 }

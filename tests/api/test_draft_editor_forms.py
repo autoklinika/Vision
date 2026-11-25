@@ -15,7 +15,7 @@ import test_draft_editor as fixture
 from vision_api.identity import provision_account
 from vision_station.client import RemoteStationOwner
 from vision_station.draft_editor import (DraftConflict,DraftNotFound,
-    ASSET_LIMIT,validate_asset_report)
+    ASSET_LIMIT,DraftRequestInvalid,validate_asset_report)
 from vision_station.host import CoreHost
 from vision_station.server import CoreServer
 
@@ -99,6 +99,39 @@ class FormEditorTests(unittest.TestCase):
         p=self.host.library.store.root/"assets"/imported["sha256"]
         p.write_bytes(b"X"*len(raw))
         with self.assertRaises(ValueError):self.host.draft_editor("asset_preview",{**args,"assetId":"photo-test"})
+
+    def test_preview_accepts_reference_ids_via_ipc_without_path_access(self):
+        report=self.new()
+        raw=image_bytes()
+        sock=self.root/"ipc/core.sock"
+        server=CoreServer(sock,self.host)
+        thread=threading.Thread(target=server.serve_forever,kwargs={"poll_interval":.01})
+        thread.start()
+        self.addCleanup(lambda:(server.shutdown(),thread.join(3),server.server_close()))
+        proxy=RemoteStationOwner(sock)
+        args={"instanceId":self.instance,"key":self.key,"etag":report["etag"]}
+        imported=proxy.draft_editor("asset_import",{**args,"data":base64.b64encode(raw).decode("ascii")})
+        doc=copy.deepcopy(report["document"])
+        doc["physical_states"]=[dict(state_id="state-test",display_name="Synthetic state",geometry_id=None,required_recipe_ids=[],verified=False,source_id=None)]
+        doc["provenance_release"]["measurement_sources"]=[dict(source_id="source-test",date="2026-01-01",status="MEASURED",instrument="synthetic",datum="synthetic",uncertainty_mm=.1,reference="test")]
+        asset_ids=("photo.test","p"+"a"*126+".")
+        for asset_id in asset_ids:
+            doc["reference_assets"]["assets"].append(dict(asset_id=asset_id,kind="photo",relative_path=imported["relativePath"],
+                sha256=imported["sha256"],bytes=imported["bytes"],mime=imported["mime"],physical_state_id="state-test",source_id="source-test",verified=False,privacy_class="private"))
+            doc["provenance_release"]["asset_hashes"].append(dict(asset_id=asset_id,sha256=imported["sha256"]))
+        saved=proxy.draft_editor("save",{**args,"document":doc})
+        args["etag"]=saved["etag"]
+        for asset_id in asset_ids:
+            with self.subTest(asset_id=asset_id):
+                result=proxy.draft_editor("asset_preview",{**args,"assetId":asset_id})
+                self.assertEqual(result["assetId"],asset_id)
+                self.assertEqual(base64.b64decode(result["data"]),raw)
+                self.assertTrue(validate_asset_report(result,preview=True))
+        for invalid in ("../photo", "photo/test", "a"*129):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(DraftRequestInvalid):
+                    proxy.draft_editor("asset_preview",{**args,"assetId":invalid})
+                self.assertFalse(validate_asset_report({**result,"assetId":invalid},preview=True))
 
     def test_import_rejects_malformed_oversize_and_stale_requests(self):
         report=self.new()

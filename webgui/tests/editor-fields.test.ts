@@ -54,4 +54,29 @@ describe('reference form presentation schema',()=>{
     row(array(row(form.validation_policies).policies)[0]).thresholds=[{name:'m',value:'1'},{name:'m',value:'2'}];
     expect(()=>serializeDocument(form)).toThrow(/unique identifier/);
   });
+  it('rejects projected state and workflow IDs before a failed server save',()=>{
+    for(const invalid of ['name.with.dot','x'.repeat(65)]) {
+      const stateForm=hydrateDocument(document());
+      row(array(stateForm.physical_states)[0]).state_id=invalid;
+      expect(()=>serializeDocument(stateForm)).toThrow(/Physical states.*State ID.*64 ASCII/);
+      const workflowForm=hydrateDocument(document());
+      row(array(row(workflowForm.inspection_workflows).recipes)[0]).recipe_id=invalid;
+      expect(()=>serializeDocument(workflowForm)).toThrow(/Inspection workflows.*Recipe ID.*64 ASCII/);
+    }
+    const form=hydrateDocument(document());
+    row(array(form.physical_states)[0]).state_id='s'.repeat(64);
+    row(array(row(form.inspection_workflows).recipes)[0]).recipe_id='r'.repeat(64);
+    expect(()=>serializeDocument(form)).not.toThrow();
+  });
+  it('preserves the full V1 identifier range for assets and standalone recipes',()=>{
+    const d=document();
+    const assetId='photo.'+'x'.repeat(122);
+    row(array(row(d.reference_assets).assets)[0]).asset_id=assetId;
+    row(array(row(d.photography_recipes).recipes)[0]).recipe_id='photo.recipe';
+    row(array(row(d.thermal_recipes).recipes)[0]).recipe_id='thermal.'+'x'.repeat(120);
+    expect(JSON.parse(serializeDocument(hydrateDocument(d)))).toEqual(d);
+    const form=hydrateDocument(d);
+    row(array(row(form.reference_assets).assets)[0]).asset_id='photo.test\n';
+    expect(()=>serializeDocument(form)).toThrow(/Asset ID.*128 ASCII/);
+  });
 });

@@ -6,10 +6,10 @@ export type ProtectedResult<T> = Readonly<{ status: 'AVAILABLE'; report: T }> |
 export const maxProtectedBytes = 131072;
 export const protectedTimeoutMs = 3000;
 
-export async function requestProtected<T>(path: string, validate: (value: unknown) => value is T): Promise<ProtectedResult<T>> {
+export async function requestProtected<T>(path: string, validate: (value: unknown) => value is T, timeoutMs = protectedTimeoutMs): Promise<ProtectedResult<T>> {
   if (!globalThis.isSecureContext) return {status: 'UNAVAILABLE', report: null};
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), protectedTimeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response | undefined;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {

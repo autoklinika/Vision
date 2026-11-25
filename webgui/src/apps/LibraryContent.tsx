@@ -75,7 +75,7 @@ export function LibraryContent({controls,station}: {controls: LibraryControls; s
     <div className="library-heading"><div><h2>ECU Library</h2><span>Catalog records & reference drafts</span></div><div className="library-tools"><button onClick={refreshLibrary} disabled={view.status === 'LOADING' || view.status === 'DISABLED' || view.refreshing}>Refresh library</button><button disabled={!editorAvailable || editorEntry!==null} onClick={()=>setEditorEntry("new")}>New profile</button><button disabled={!editorAvailable || !detail || editorEntry!==null} onClick={()=>{if(detail)setEditorEntry(detail.entry);}}>Open reference editor</button></div></div>
     <p className="fine-print library-purpose">Reference profiles describe ECU types. Browsing does not select an ECU or create a specimen inspection.</p>
     {station && station.identity.role === "reader" && <p className="fine-print">Reference editing requires operator permission.</p>}
-    {editorEntry && station?.identity.role === "operator" && station.report.coreConnection === "CONNECTED" && <DraftEditorContent key={station.report.instanceId+":"+(editorEntry==="new"?"new":editorEntry.entryId)} entry={editorEntry} station={station} onClose={()=>setEditorEntry(null)} refreshLibrary={refreshLibrary}/>}
+    {editorEntry && station?.identity.role === "operator" && <DraftEditorContent key={editorEntry==="new"?"new":editorEntry.entryId} entry={editorEntry} station={station} onClose={()=>setEditorEntry(null)} refreshLibrary={refreshLibrary}/>}
     {view.status !== 'AVAILABLE' && <p role="status" className="protected-read-status">{messages[view.status]}</p>}
     {library && !editorEntry && <>
       {library.source === 'SYNTHETIC_TEST' && <p className="synthetic-label">SYNTHETIC TEST · no station library</p>}

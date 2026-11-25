@@ -1,6 +1,6 @@
 import {useRef,useState} from 'react';
 import type {DraftReport,DraftAssetPreview} from './draftContract';
-import {identifier,maxEditorImageBytes} from './draftContract';
+import {referenceIdentifier,maxEditorImageBytes} from './draftContract';
 import type {FormDocument} from './editorFields';
 import {row,array,referenceOptions} from './editorFields';
 import {importDraftAsset,previewDraftAsset} from './transport';
@@ -38,9 +38,9 @@ export function EditorAssets({report,document,disabled,readable,onAttach,onBusy,
   const sources=referenceOptions(document,'source');
   const saved=array(row(report.document.reference_assets).assets).map(row)
     .filter(x=>typeof x.relative_path==='string'&&typeof x.sha256==='string'&&x.relative_path==='assets/'+x.sha256.toLowerCase()
-      &&(x.mime==='image/png'||x.mime==='image/jpeg')&&typeof x.bytes==='number'&&x.bytes<=maxEditorImageBytes&&identifier(x.asset_id));
+      &&(x.mime==='image/png'||x.mime==='image/jpeg')&&typeof x.bytes==='number'&&x.bytes<=maxEditorImageBytes&&referenceIdentifier(x.asset_id));
   async function doImport(){
-    if(running.current||disabled||!file||!identifier(assetId)||duplicate||!states.some(x=>x.value===stateId)||!sources.some(x=>x.value===sourceId))return;
+    if(running.current||disabled||!file||!referenceIdentifier(assetId)||duplicate||!states.some(x=>x.value===stateId)||!sources.some(x=>x.value===sourceId))return;
     if(file.size<1||file.size>maxEditorImageBytes){setMessage('Select a JPEG or PNG up to 2 MiB.');return;}
     running.current=true;onBusy(true);setMessage('');
     try{
@@ -73,13 +73,13 @@ export function EditorAssets({report,document,disabled,readable,onAttach,onBusy,
     <p className="fine-print">Import JPEG/PNG up to 2 MiB and 8 megapixels. Core validates the image and stores it privately by SHA-256. No image is marked verified automatically.</p>
     <div className="draft-fields">
       <label htmlFor="asset-file">Image file</label><input id="asset-file" ref={fileInput} type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={disabled} onChange={e=>{setFile(e.target.files?.[0]??null);setMessage('');}}/>
-      <label htmlFor="asset-id">Imported asset ID</label><input id="asset-id" value={assetId} maxLength={64} disabled={disabled} onChange={e=>setAssetId(e.target.value)}/>
+      <label htmlFor="asset-id">Imported asset ID</label><input id="asset-id" value={assetId} maxLength={128} disabled={disabled} onChange={e=>setAssetId(e.target.value)}/>
       <label htmlFor="asset-kind">Image kind</label><select id="asset-kind" value={kind} disabled={disabled} onChange={e=>setKind(e.target.value)}><option value="photo">Photo</option><option value="image">Image</option></select>
       <label htmlFor="asset-state">Image physical state</label><select id="asset-state" value={stateId} disabled={disabled} onChange={e=>setStateId(e.target.value)}><option value="">Select state…</option>{states.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>
       <label htmlFor="asset-source">Image source</label><select id="asset-source" value={sourceId} disabled={disabled} onChange={e=>setSourceId(e.target.value)}><option value="">Select source…</option>{sources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>
     </div>
     {duplicate&&<p className="editor-warning">Asset ID already used in the working draft or its manifest.</p>}
-    <button disabled={disabled||!file||!identifier(assetId)||duplicate||!states.some(x=>x.value===stateId)||!sources.some(x=>x.value===sourceId)} onClick={()=>{void doImport();}}>Import reference image</button>
+    <button disabled={disabled||!file||!referenceIdentifier(assetId)||duplicate||!states.some(x=>x.value===stateId)||!sources.some(x=>x.value===sourceId)} onClick={()=>{void doImport();}}>Import reference image</button>
     <p className="fine-print">An imported file is stored before the draft is saved; closing without saving can leave an unattached private asset. No automatic deletion.</p>
     <div className="draft-fields">
       <label htmlFor="asset-preview">Saved image preview</label><select id="asset-preview" value={previewId} disabled={!readable||running.current} onChange={e=>{setPreviewId(e.target.value);setPreview(null);}}><option value="">Select saved image…</option>{saved.map((x,i)=><option key={i} value={String(x.asset_id)}>{String(x.asset_id)}</option>)}</select>

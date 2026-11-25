@@ -15,11 +15,15 @@ export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
   return <svg className={small ? 'app-icon small' : 'app-icon'} viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges"><path d="M3 5h23v3h3v21H3z" fill="#000"/><path d="M4 6h21v3h3v19H4z" fill="#fff"/><path d="M6 9h19v16H6z" fill={['#008080','#b59c42','#487a48','#367ca5','#756198','#a65d5d','#488b8b','#777','#b38b45','#6a7484'][index]}/><path d="M6 9h19v3H6z" fill="#000080"/><text x="16" y="23" textAnchor="middle" fontSize="15" fill="white">{apps[index].glyph}</text><path d="M2 29h27v2H2z" fill="#004747"/></svg>;
 }
 export function Desktop({ client, snapshot, refresh, station }: { client: ReadOnlyVisionClient; snapshot: Snapshot | null; refresh: () => void; station?: StationPresentation }) {
-  const sessionRead = useSessionView(client, station?.report.state === 'SESSION_ACTIVE' ? 5000 : 0);
+  const projectionOwner = station ? [station.report.instanceId, station.report.coreConnection,
+    station.report.state, station.report.sessionId, station.report.sessionViewId].join(':') : '';
+  const sessionRead = useSessionView(client, station?.report.state === 'SESSION_ACTIVE' ? 5000 : 0, projectionOwner);
   const sessionControls = station?.report.coreConnection === 'NOT_CONNECTED'
     ? {...sessionRead, refreshSession: station.refresh, view: {status: 'UNAVAILABLE' as const, session: null, events: null}}
     : station?.report.state === 'NO_ACTIVE_SESSION' ? {...sessionRead, view: {status: 'NO_ACTIVE_SESSION' as const, session: null, events: null}} : sessionRead;
-  const libraryControls = useLibraryView(client, station ? 15000 : 0);
+  const libraryRead = useLibraryView(client, station ? 15000 : 0, projectionOwner);
+  const libraryControls = station?.report.coreConnection === 'NOT_CONNECTED'
+    ? {...libraryRead, view: {status: 'UNAVAILABLE' as const, library: null, detail: null, history: null}} : libraryRead;
   const mode = station ? 'CONNECTED · VENTUNO' : modeLabel(client.mode, snapshot);
   const connection = station ? 'Connected' : connectionLabel(snapshot);
   const description = station ? `${station.identity.username} · ${station.report.coreConnection === 'CONNECTED' ? 'Core connected' : 'Core not connected'} · ${station.identity.role==='operator'?'Operator':'Read only'}` : modeDescription(client.mode, snapshot);

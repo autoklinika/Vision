@@ -85,7 +85,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   // Import the actual synthetic PNG. No file path or digest is supplied by the form.
   await section('reference_assets');
   await label('Image file').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABgAAAAQCAIAAACDRijCAAAANklEQVQ4Ea3BAQEAAAABIJZ33QlV5KHIQ5GHIg9FHoo8FHko8lDkochDkYciD0UeijwUeSjyMLa3F+G+cxutAAAAAElFTkSuQmCC','base64')});
-  await label('Imported asset ID').fill('image-test');
+  await label('Imported asset ID').fill('synthetic.image');
   await label('Image physical state').selectOption('state-test');
   await label('Image source').selectOption('source-test');
   await button('Import reference image').click();
@@ -93,9 +93,9 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await expect(editor.getByRole('group',{name:'asset 1',exact:true}).getByLabel('Evidence verified (declaration)',{exact:true})).not.toBeChecked();
   await button('Save draft generation').click();
   await expect(editor).toContainText('Draft saved in Core.');
-  await label('Saved image preview').selectOption('image-test');
+  await label('Saved image preview').selectOption('synthetic.image');
   await button('Preview saved image').click();
-  const image=editor.getByRole('img',{name:'Stored reference image image-test',exact:true});
+  const image=editor.getByRole('img',{name:'Stored reference image synthetic.image',exact:true});
   await expect(image).toBeVisible();
   await expect.poll(()=>image.evaluate((node:HTMLImageElement)=>node.naturalWidth)).toBe(24);
   await button('Close preview').click();

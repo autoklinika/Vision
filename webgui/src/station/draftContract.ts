@@ -14,6 +14,10 @@ export type DraftValidation = Readonly<{
 export function identifier(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value) && !/[^A-Za-z0-9_-]/.test(value);
 }
+// Reference IDs belong to the V1 document, not to filesystem draft keys.
+export function referenceIdentifier(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value) && !/[^A-Za-z0-9_.-]/.test(value);
+}
 function hex32(value: unknown): value is string {
   return typeof value === 'string' && value.length === 32 && !/[^a-f0-9]/.test(value);
 }
@@ -60,7 +64,7 @@ function assetReport(value:unknown,preview:boolean):value is DraftAssetReport|Dr
     ||value.relativePath!=='assets/'+value.sha256||typeof value.bytes!=='number'||!Number.isSafeInteger(value.bytes)||value.bytes<1||value.bytes>maxEditorImageBytes
     ||(value.mime!=='image/png'&&value.mime!=='image/jpeg')||value.status!=='UNVERIFIED')return false;
   if(preview){
-    if(!identifier(value.assetId)||typeof value.data!=='string'||value.data.length!==4*Math.ceil(value.bytes/3)||!/^[A-Za-z0-9+/]+={0,2}$/.test(value.data))return false;
+    if(!referenceIdentifier(value.assetId)||typeof value.data!=='string'||value.data.length!==4*Math.ceil(value.bytes/3)||!/^[A-Za-z0-9+/]+={0,2}$/.test(value.data))return false;
     const padding=value.data.endsWith('==')?2:value.data.endsWith('=')?1:0;
     if(value.data.length/4*3-padding!==value.bytes)return false;
   }

@@ -23,7 +23,7 @@ async function fillPasswordChange(page: Page, current: string, next: string, con
 }
 async function mockStation(page: Page) {
   const state = {authenticated: false, offline: false, coreConnected: true, active: false, revoked: false, logoutOffline: false,
-    libraryCount: 2, libraryView: 'c'.repeat(64), reads: [] as string[], writes: [] as string[], holdDetail: null as null | (() => Promise<void>),
+    holdSession: null as null | (() => Promise<void>), libraryCount: 2, libraryView: 'c'.repeat(64), reads: [] as string[], writes: [] as string[], holdDetail: null as null | (() => Promise<void>),
     holdPassword: null as null | (() => Promise<void>), passwordResult: 'success' as 'success' | 'wrong' | 'rejected' | 'limited' | 'unconfirmed'};
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname;
@@ -46,7 +46,10 @@ async function mockStation(page: Page) {
     if (path === '/api/v1/station') return reply(stationFixture(state.coreConnected && state.active, state.coreConnected));
     const session = {...sessionFixture(), source: 'STATION', sessionId: 'station-session'} as const;
     if (!state.coreConnected && (path === '/api/v1/session' || path === '/api/v1/events')) return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
-    if (path === '/api/v1/session') return state.active ? reply(session) : reply({schema: 'vision.api.error.v1', code: 'NO_ACTIVE_SESSION'}, 409);
+    if (path === '/api/v1/session') {
+      if (state.holdSession) await state.holdSession();
+      return state.active ? reply(session) : reply({schema: 'vision.api.error.v1', code: 'NO_ACTIVE_SESSION'}, 409);
+    }
     if (path === '/api/v1/events') return reply(eventsFixture(session, Number(url.searchParams.get('after'))));
     if (path.startsWith('/api/v1/library')) {
       if (!state.coreConnected) return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
@@ -125,7 +128,8 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   state.offline = true;
   await page.clock.fastForward(5100);
   await expect(page.getByRole('dialog', {name: 'Connection lost'})).toBeVisible();
-  await expect(page.locator('.desktop')).toHaveCount(0);
+  await expect(page.locator('.desktop')).toBeHidden();
+  await expect(page.getByRole('table')).toHaveCount(0);
   state.offline = false;
   await page.clock.fastForward(5100);
   await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toBeVisible();
@@ -154,6 +158,29 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   await expect(page.getByLabel('User name', {exact: true})).toBeEnabled();
   await expect(page.locator('.desktop')).toHaveCount(0);
   await expect(page.getByRole('table')).toHaveCount(0);
+});
+
+test('reconnecting to the same session keeps old stages hidden until a fresh report arrives', async ({page}) => {
+  await page.clock.install();
+  const state = await mockStation(page);
+  state.active = true;
+  await page.goto('/'); await login(page, 'operator', 'mock-password');
+  await page.locator('.desktop-icons').getByRole('button', {name: 'Inspection Manager', exact: true}).click();
+  const stages = page.getByRole('table', {name: 'Reported inspection stages'});
+  await expect(stages.locator('tbody tr')).toHaveCount(11);
+  state.coreConnected = false;
+  await page.clock.fastForward(5100);
+  await expect(stages).toHaveCount(0);
+  let releaseSession: (() => void) | undefined;
+  state.holdSession = () => new Promise<void>(resolve => { releaseSession = resolve; });
+  state.coreConnected = true;
+  await page.clock.fastForward(5100);
+  await expect.poll(() => releaseSession !== undefined).toBe(true);
+  // Assert immediately, before the held request could expire and hide stale data.
+  expect(await stages.count()).toBe(0);
+  state.holdSession = null;
+  releaseSession!();
+  await expect(stages.locator('tbody tr')).toHaveCount(11);
 });
 
 test('automatic library refresh preserves valid selected detail and history page', async ({page}) => {

@@ -10,6 +10,7 @@ import stat
 from vision_api.access import ReportUnavailable
 from vision_modules.ecu_reference import load_json, canonical_json
 from vision_modules.ecu_reference.models import thaw
+from vision_modules.ecu_reference.validation import _id as reference_identifier
 from vision_modules.ecu_library_backend.read_model import (
     _profile_detail, _display_name, LibraryReadUnavailable)
 from vision_modules.ecu_library_backend.storage import (
@@ -17,6 +18,7 @@ from vision_modules.ecu_library_backend.storage import (
 from vision_modules.ecu_library_backend.service import SCOPES
 
 DOCUMENT_LIMIT = 64 * 1024
+EDITOR_LOCK_TIMEOUT = 0.25
 EDITOR_WIRE_LIMIT = 128 * 1024
 ASSET_LIMIT = 2 * 1024 * 1024
 ASSET_WIRE_LIMIT = 3 * 1024 * 1024
@@ -96,8 +98,11 @@ def _check_args(action, args):
         raise ValueError("invalid editor request")
     if not _match(INSTANCE, args["instanceId"]):
         raise ValueError("invalid instance")
-    for name in set(args) - {"instanceId", "etag", "document", "displayName", "scope", "data"}:
+    for name in set(args) - {"instanceId", "etag", "document", "displayName", "scope", "data", "assetId"}:
         identifier(args[name])
+    if "assetId" in args:
+        # An in-document reference ID, never a store filename or path.
+        reference_identifier(args["assetId"])
     if "etag" in args and not _match(ETAG, args["etag"]):
         raise ValueError("invalid etag")
     if "displayName" in args:
@@ -177,7 +182,7 @@ def validate_asset_report(value,preview=False):
             return False
         identifier(value["key"])
         if preview:
-            identifier(value["assetId"])
+            reference_identifier(value["assetId"])
             data=_decode_image(value["data"])
             if len(data)!=value["bytes"] or hashlib.sha256(data).hexdigest()!=value["sha256"] or _image_preflight(data)!=value["mime"]:
                 return False
@@ -198,6 +203,13 @@ def _bounded_store(store, additional=0, create=False):
         raise DraftConflict()
     for key in keys:
         store._chain(key, budget=budget)
+    _reserve_store_budget(budget, additional)
+    return budget, len(keys)
+
+
+def _reserve_store_budget(budget, additional):
+    # The caller retains the same outer transaction. No writes can invalidate
+    # this budget between the complete history check and its reservation.
     if additional and (budget.revisions_left < 1 or budget.bytes_left < additional + 2048):
         raise DraftConflict()
 
@@ -275,7 +287,7 @@ class DraftEditor:
         try:
             # The host lifecycle lock serializes this operation against start.
             # The store transaction also protects its ETag/history across owners.
-            with lib.store.transaction():
+            with lib.store.transaction(timeout=EDITOR_LOCK_TIMEOUT):
                 if action in ("create","create_empty"):
                     _bounded_store(lib.store, additional=DOCUMENT_LIMIT, create=True)
                     if action == "create":
@@ -284,7 +296,7 @@ class DraftEditor:
                     else:
                         value = lib.create_empty_draft(args["family"],args["variant"],key,args["revision"],args["displayName"])
                 else:
-                    _bounded_store(lib.store)
+                    budget, profile_count = _bounded_store(lib.store)
                     old = lib.get_draft(key)
                     if old["etag"] != args["etag"]:
                         raise DraftConflict()
@@ -296,20 +308,24 @@ class DraftEditor:
                         return _asset_report(instance,key,asset)
                     if action == "save":
                         candidate = _profile(args["document"],key)
-                        _bounded_store(lib.store, additional=len(canonical_json(candidate)))
+                        _reserve_store_budget(budget, len(canonical_json(candidate)))
                         value = lib.update_draft(key,args["document"],args["etag"])
                     else:
                         candidate = thaw(_profile(old["profile"],key).data)
                         candidate["metadata"].update(profile_id=args["newKey"], profile_revision=args["newRevision"])
                         checked = _profile(candidate,args["newKey"])
-                        _bounded_store(lib.store, additional=len(canonical_json(checked)), create=True)
+                        if profile_count >= MAX_READ_PROFILES:
+                            raise DraftConflict()
+                        _reserve_store_budget(budget, len(canonical_json(checked)))
                         value = lib.clone_draft(key,args["newKey"],args["newRevision"])
                 return _draft_report(value,instance)
         except FileExistsError:
             raise DraftConflict() from None
         except FileNotFoundError:
             raise DraftNotFound() from None
-        except LibraryReadUnavailable:
+        except LibraryReadUnavailable as exc:
+            if exc.reason == "LIBRARY_BUSY":
+                raise DraftConflict() from None
             raise ReportUnavailable() from None
 
 

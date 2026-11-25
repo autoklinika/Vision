@@ -43,10 +43,22 @@ requires the exact saved source ETag, new profile ID and different revision.
 History remains in the existing library projection. Failed/ambiguous mutations
 are not automatically retried. Reload the current version or check the exact
 requested key. Closing the editor, its window, resetting the desktop or signing
-out requires confirmation when unsaved changes are present; pending editor
-requests guard normal window close. Unsaved fields persist across sections and
-minimization in component memory, not browser storage. Auth loss, Core owner
-cutover or a forced browser shutdown can discard unsaved fields.
+out requires confirmation when unsaved changes are present, including the
+initial new-profile form before creation; pending editor requests guard normal
+window close. Unsaved fields persist across sections, minimization, transient
+station/authentication transport outages, a temporary Core disconnection and
+inspection-session changes. They stay in component memory, not browser storage.
+While station/authentication observations are unavailable, the desktop is hidden
+and live projections and operations are disabled. A reported Core disconnection
+keeps the form visible but read-only. Reconnection resumes the same working copy.
+An actual authorization denial, account/role change, genuinely new Core owner or
+forced browser shutdown clears that copy. Stale asynchronous read results cannot
+restore data from an earlier observation owner.
+
+Profile/family/revision keys, physical-state IDs and inspection-workflow IDs
+follow the existing library projection limit of 64 characters without dots.
+Other reference IDs, including image assets, retain the V1 limit of 128
+characters with dots; import, save and preview accept the same identifier set.
 
 ## Reference image import
 
@@ -113,9 +125,23 @@ transport remains an unconfirmed outcome. Documents are capped at 64 KiB
 canonical ASCII JSON and 128 KiB semantic editor request budget; image
 import/preview uses an explicit 3 MiB framed limit. Other protected responses
 retain the 128 KiB bound, older HTTP routes retain their 16 KiB body limit,
-and legacy IPC operations retain the 8 KiB canonical request bound. All
-framing/worker/deadline and peer checks remain in place. Existing library
-read-projection and history budget constraints are checked before publishing.
+and legacy IPC operations retain the 8 KiB canonical request bound. Framing,
+worker limits and peer checks remain in place. Existing library read-projection
+and history budgets are checked before publishing. A verified budget is reused
+within the same exclusive storage transaction instead of scanning every history
+again merely to reserve space for the next generation.
+
+Complete history verification needs a bounded disk-work response budget distinct
+from short operational exchanges. IPC request reception remains 2 seconds;
+station/inspection exchanges remain 2 seconds; library/entry/history responses
+allow 10 seconds and editor responses 30 seconds. Browser deadlines are 15
+seconds for library reads and 35 seconds for editor requests; authentication,
+station and session-read deadlines are unchanged. Mutations are never retried
+automatically. Editor and inspection intents have a bounded 0.25-second lifecycle
+lock admission, and editor storage transactions bound lock admission across
+threads and processes to 0.25 seconds. A rejected waiting intent cannot execute
+later after its caller has timed out. These bounds do not interrupt a physical
+inspection operation that has already begun.
 
 ## Boundaries and rollout
 
@@ -139,8 +165,11 @@ tests cover empty creation, structural validation, ETag conflicts, history,
 authorization, approval guards and image integrity/size. Playwright tests
 exercise all 15 forms, partial authoring, linked source/state/geometry,
 invalid numeric inputs, close protection, image import and preview, stale
-ETags, new revision, history and retained data. The normal station browser
-suite remains reader-only.
+ETags, new revision, history and retained data. Regression coverage includes
+transient station/authentication failures, Core disconnection, session changes,
+real authorization loss, account/role changes, dotted/128-character image IDs,
+a valid 3000-generation history over real IPC and rejected lock contention
+without delayed mutation. The normal station browser suite remains reader-only.
 
 ```sh
 VITE_VISION_DEPLOYMENT=station npm run build

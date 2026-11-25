@@ -12,7 +12,7 @@ from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
 from .draft_editor import DraftConflict, DraftNotFound, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
-                       check_peer, checked_path, checked_socket, receive, send)
+                       check_peer, checked_path, checked_socket, exchange_timeout, receive, send)
 
 
 def dispatch(host, request):
@@ -50,11 +50,14 @@ def dispatch(host, request):
 
 class _Handler(socketserver.BaseRequestHandler):
     def handle(self):
-        deadline = time.monotonic() + EXCHANGE_TIMEOUT
+        started = time.monotonic()
+        deadline = started + EXCHANGE_TIMEOUT
         response_limit=RESPONSE_LIMIT
         try:
             check_peer(self.request)
             request = receive(self.request, limit=REQUEST_LIMIT, deadline=deadline)
+            if type(request) is dict:
+                deadline = started + exchange_timeout(request.get("operation"))
             report = dispatch(self.server.host, request)
             if request["operation"]=="draft_editor" and request["query"]["action"]=="asset_preview":
                 response_limit=ASSET_WIRE_LIMIT

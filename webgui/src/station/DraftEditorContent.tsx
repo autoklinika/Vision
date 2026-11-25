@@ -138,15 +138,15 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
     <div className="editor-heading"><div><h3>ECU reference editor</h3><span>Universal V1 profile forms</span></div>
       <button disabled={busy} onClick={()=>{if(confirmDiscard())onClose();}}>Close editor</button></div>
     <p className="library-not-ready"><strong>DRAFT / NOT_READY</strong> · Reference definitions only. Approval and release are separate.</p>
-    {!idle&&<p>Core has an active session. Editing is read-only until the session closes.</p>}
+    {station.report.coreConnection!=='CONNECTED'?<p>Core connection is unavailable. Your unsaved form remains in this tab; editing resumes after reconnection.</p>:!idle&&<p>Core has an active session. Editing is read-only until the session closes.</p>}
     {!report&&(newProfile?<fieldset>
       <legend>{fromCatalog?'Create from catalog — '+entry.family+' / '+entry.variant+' / '+entry.revision:'Create a new unsigned reference profile'}</legend>
       <div className="draft-fields">
-        <label htmlFor="draft-family">ECU family</label><input id="draft-family" value={family} maxLength={64} onChange={e=>setFamily(e.target.value)} disabled={busy||fromCatalog||uncertain}/>
-        <label htmlFor="draft-variant">Variant ID</label><input id="draft-variant" value={variant} maxLength={64} onChange={e=>setVariant(e.target.value)} disabled={busy||fromCatalog||uncertain}/>
-        <label htmlFor="draft-key">New profile ID</label><input id="draft-key" value={newKey} maxLength={64} onChange={e=>setNewKey(e.target.value)} disabled={busy||uncertain}/>
-        <label htmlFor="draft-revision">Revision</label><input id="draft-revision" value={revision} maxLength={64} onChange={e=>setRevision(e.target.value)} disabled={busy||uncertain}/>
-        <label htmlFor="draft-name">Display name</label><input id="draft-name" value={displayName} maxLength={160} onChange={e=>setDisplayName(e.target.value)} disabled={busy||uncertain}/>
+        <label htmlFor="draft-family">ECU family</label><input id="draft-family" value={family} maxLength={64} onChange={e=>{setFamily(e.target.value);setDirty(true);}} disabled={!writable||fromCatalog}/>
+        <label htmlFor="draft-variant">Variant ID</label><input id="draft-variant" value={variant} maxLength={64} onChange={e=>{setVariant(e.target.value);setDirty(true);}} disabled={!writable||fromCatalog}/>
+        <label htmlFor="draft-key">New profile ID</label><input id="draft-key" value={newKey} maxLength={64} onChange={e=>{setNewKey(e.target.value);setDirty(true);}} disabled={!writable}/>
+        <label htmlFor="draft-revision">Revision</label><input id="draft-revision" value={revision} maxLength={64} onChange={e=>{setRevision(e.target.value);setDirty(true);}} disabled={!writable}/>
+        <label htmlFor="draft-name">Display name</label><input id="draft-name" value={displayName} maxLength={160} onChange={e=>{setDisplayName(e.target.value);setDirty(true);}} disabled={!writable}/>
       </div>
       <p className="fine-print">A new reference is not a registered or approved ECU catalog record. No measurements are prefilled.</p>
       <button disabled={!writable||!canCreate} onClick={()=>{void execute(fromCatalog?'create':'create_empty');}}>Create draft</button>
@@ -205,8 +205,8 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
         <button disabled={!editable||busy||!target.stateId||!target.recipeId||!target.scope} onClick={()=>{void execute('validate');}}>Validate document</button>
       </details>
       <details className="editor-diagnostics"><summary>Clone saved draft to a new revision</summary><div className="draft-fields">
-        <label htmlFor="draft-clone-key">New profile ID</label><input id="draft-clone-key" value={newKey} maxLength={64} onChange={e=>setNewKey(e.target.value)} disabled={busy||uncertain}/>
-        <label htmlFor="draft-clone-revision">New revision</label><input id="draft-clone-revision" value={revision} maxLength={64} onChange={e=>setRevision(e.target.value)} disabled={busy||uncertain}/>
+        <label htmlFor="draft-clone-key">New profile ID</label><input id="draft-clone-key" value={newKey} maxLength={64} onChange={e=>setNewKey(e.target.value)} disabled={!writable}/>
+        <label htmlFor="draft-clone-revision">New revision</label><input id="draft-clone-revision" value={revision} maxLength={64} onChange={e=>setRevision(e.target.value)} disabled={!writable}/>
       </div><button disabled={!writable||dirty||!identifier(newKey)||!identifier(revision)} onClick={()=>{void execute('clone');}}>Clone saved revision</button></details>
     </>}
     {!report&&message&&<p role="status" className="editor-feedback">{message}</p>}

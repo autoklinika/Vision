@@ -5,11 +5,12 @@
 import type {LibrarySectionName} from '../api/libraryContract';
 import {libraryScopes,librarySections} from '../api/libraryContract';
 import type {DraftDocument} from './draftContract';
+import {identifier,referenceIdentifier} from './draftContract';
 
 export type RefKind = 'state'|'source'|'geometry'|'feature'|'asset'|'board'|'roi'|'policy'|'recipe'|'view'|'calibration';
 type Base={label:string;optional?:boolean;help?:string};
 export type Field = Base & (
-  {kind:'text';placeholder?:string;max?:number;id?:boolean} |
+  {kind:'text';placeholder?:string;max?:number;id?:'reference'|'library'} |
   {kind:'number';unit?:string;positive?:boolean;integer?:boolean} |
   {kind:'bool'} |
   {kind:'enum';options:readonly string[]} |
@@ -24,7 +25,8 @@ export type Field = Base & (
 export type Fields=Record<string,Field>;
 type Section={title:string;description:string;field:Field};
 const text=(label:string,options:Omit<Extract<Field,{kind:'text'}>,'kind'|'label'>={}):Field=>({kind:'text',label,...options});
-const id=(label:string,optional=false):Field=>text(label,{id:true,optional,max:128,placeholder:'Stable identifier'});
+const id=(label:string,optional=false):Field=>text(label,{id:'reference',optional,max:128,placeholder:'Stable identifier'});
+const libraryId=(label:string):Field=>text(label,{id:'library',max:64,placeholder:'Stable identifier',help:'Up to 64 ASCII letters, digits, _ or -; start with a letter or digit.'});
 const num=(label:string,unit?:string,positive=false,optional=false,integer=false):Field=>({kind:'number',label,unit,positive,optional,integer});
 const bool=(label:string,help?:string):Field=>({kind:'bool',label,help});
 const locked=(label:string,initial?:unknown,help?:string):Field=>({kind:'locked',label,initial,help});
@@ -63,7 +65,7 @@ export const editorSections:Record<LibrarySectionName,Section>={
     declared_by_operator:locked('Declared by operator',true),
   })},
   physical_states:{title:'Physical states',description:'Define each physical configuration. Geometry and recipe references can be filled after those rows exist.',field:rows('Physical states','physical state',{
-    state_id:id('State ID'),display_name:text('State name',{max:160}),geometry_id:ref('Geometry','geometry',true),
+    state_id:libraryId('State ID'),display_name:text('State name',{max:160}),geometry_id:ref('Geometry','geometry',true),
     required_recipe_ids:refs('Required inspection recipes','recipe'),verified:verified(),source_id:source(true),
   })},
   coordinate_systems:{title:'Coordinate systems',description:'Define the local datum, axis directions and transformations between states. All positions are in millimetres.',field:obj('Coordinates',{
@@ -106,7 +108,7 @@ export const editorSections:Record<LibrarySectionName,Section>={
     radiometric_requires_calibration:locked('Radiometric calibration required',true),
   })},
   inspection_workflows:{title:'Inspection workflows',description:'Select the declarative recipe and existing reference IDs. Core owns execution and sequencing.',field:obj('Workflows',{
-    recipes:rows('Inspection recipes','inspection recipe',{...recipeFields,scenario_ref:id('Scenario reference'),required_view_ids:refs('Required views','view'),required_modules:list('Required modules',id('Module ID')),required_capabilities:strings('Required capabilities'),quality_policy_refs:refs('Quality policies','policy'),required_asset_ids:refs('Required assets','asset'),approval_scope:choice('Requested scope',libraryScopes)}),
+    recipes:rows('Inspection recipes','inspection recipe',{...recipeFields,recipe_id:libraryId('Recipe ID'),scenario_ref:id('Scenario reference'),required_view_ids:refs('Required views','view'),required_modules:list('Required modules',id('Module ID')),required_capabilities:strings('Required capabilities'),quality_policy_refs:refs('Quality policies','policy'),required_asset_ids:refs('Required assets','asset'),approval_scope:choice('Requested scope',libraryScopes)}),
     no_arbitrary_executable_code_in_profile:locked('No executable profile code',true),no_automatic_motion_after_failure:locked('No automatic motion after failure',true),
   })},
   validation_policies:{title:'Validation policies',description:'Describe measurable thresholds and requested review scopes. Approval flags cannot be edited here.',field:obj('Policies',{
@@ -180,7 +182,12 @@ function serialize(field:Field,value:unknown,path:string):unknown {
     case 'enum':
     case 'ref': {
       if(typeof value!=='string'||!value.trim()) return fail(path,'required value missing.');
-      if(field.kind==='text'&&field.id&&!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value)) return fail(path,'use an ASCII identifier (letters, digits, _, . or -).');
+      if(field.kind==='text'&&field.id) {
+        const valid=field.id==='library'?identifier(value):referenceIdentifier(value);
+        if(!valid) return fail(path,field.id==='library'
+          ?'use up to 64 ASCII letters, digits, _ or -; start with a letter or digit.'
+          :'use up to 128 ASCII letters, digits, _, . or -; start with a letter or digit.');
+      }
       if(field.kind==='text'&&value.length>(field.max??4096)) return fail(path,'text too long.');
       // Preserve existing enum/reference values; Core rejects unsupported or
       // unresolved values. The form never substitutes a different identifier.

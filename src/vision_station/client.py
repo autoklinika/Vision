@@ -10,7 +10,7 @@ from vision_api.reports import _timestamp, validate_session_report, validate_eve
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
 from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
-from .protocol import (ERRORS, EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
+from .protocol import (ERRORS, exchange_timeout, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
                        validate_station_report)
 
@@ -58,9 +58,10 @@ class RemoteStationOwner:
         try:
             path = checked_path(self._socket_path)
             checked_socket(path)
-            deadline = time.monotonic() + EXCHANGE_TIMEOUT
+            timeout = exchange_timeout(operation)
+            deadline = time.monotonic() + timeout
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-                connection.settimeout(EXCHANGE_TIMEOUT)
+                connection.settimeout(timeout)
                 connection.connect(str(path))
                 check_peer(connection)
                 send(connection, {"schema": PROTOCOL, "operation": operation, "query": query},
