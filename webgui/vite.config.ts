@@ -22,7 +22,11 @@ export default defineConfig({
     closeBundle() { copyFileSync('public/THIRD_PARTY_NOTICES.txt', 'dist/THIRD_PARTY_NOTICES.txt'); },
     apply: 'build',
   }],
-  server: { host: '127.0.0.1', cors: false, proxy },
+  server: { host: '127.0.0.1', cors: false, proxy, fs: {
+    // Retain Vite 7 defaults and keep synthetic harness credentials private.
+    // The files are outside public/, but the dev server also serves its root.
+    deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/.api02-test-auth.json', '**/.api03-test-auth.json'],
+  } },
   preview: { host: '127.0.0.1', cors: false, proxy },
   build: { copyPublicDir: false },
   test: { include: ['tests/*.test.ts'] },

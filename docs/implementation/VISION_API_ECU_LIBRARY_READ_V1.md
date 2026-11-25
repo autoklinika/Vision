@@ -71,6 +71,8 @@ All four exact route forms are listed in the [contract index](../../contracts/vi
 
 The Vite LAB proxy enumerates the exact library paths. It cannot become a general proxy to the backend. The browser uses the existing same-origin protected transport: secure context, GET, same-origin credentials, no-store, redirect rejection, fatal UTF-8 decoding, closed-schema validation, three-second fetch/body deadline and byte limit. A rejected response is cancelled even when failure occurs before body reading.
 
+Vite's existing filesystem-deny defaults are preserved and extended to explicitly deny both private API-02/API-03 test credential filenames. Being gitignored or mode 0600 is not sufficient when the development server runs as the file owner. Actual integration tests attempt direct, encoded, transform-query and `/@fs/` reads before authentication and verify that no credential is returned. Production preview serves the build directory, which excludes these files.
+
 The serial Python HTTPServer remains a loopback LAB adapter. Its two-second socket inactivity timeout is not an overall request deadline. TLS, deployment ingress, production identity/session lifecycle, active library ownership and production concurrency budgets remain separate deployment gates.
 
 ## Win98 client behavior

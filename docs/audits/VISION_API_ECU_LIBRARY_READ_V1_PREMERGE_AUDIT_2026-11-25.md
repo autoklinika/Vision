@@ -23,6 +23,7 @@ WebGUI remains a read-only client. The change introduces no operational HTTP com
 | History semantics | History is saved generations within an immutable draft revision identity. Current ETag appears only at the end of the final page; old document bodies are not returned. |
 | Client behavior | Explicit Refresh, no polling, no protected data persistence or fallback. Every failed load clears prior protected list/detail/history. DEMO and invalid modes have no library capability. |
 | Test credentials | Random ignored 0600 file, no stdout/HTTP/bundle exposure. Test-only composition outside production packages, SIGTERM cleanup and CI absence checks. |
+| Vite fixture-file exposure | An additional native DEV probe of the initial candidate returned HTTP 200 for the API-02 synthetic credential file. The finding was confined to the explicit, short-lived loopback test harness. The candidate was withheld from merge. Both API-02 and API-03 fixture filenames are now explicitly denied while preserving Vite's existing deny defaults; actual browser integration tests check direct, encoded, transform-query and raw-filesystem requests before authenticating. Tests report booleans, never credential bodies or values. Final acceptance must use the corrected commit. |
 
 ## Verification completed before candidate publication
 

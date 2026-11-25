@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { isLibraryDetail, isLibraryHistory, isLibraryReport, matchesLibraryDetail, matchesLibraryHistory } from '../../src/api/libraryContract';
 import { catalogEntry, draftEntry, libraryDetailFixture, libraryFixture, libraryHistoryFixture } from '../fixtures/library';
-import { enterDesktop } from './helpers';
+import { assertPrivateFixtureFile, enterDesktop } from './helpers';
 
 const type = 'application/json; charset=utf-8';
 const boot = JSON.parse(readFileSync(new URL('../../../contracts/vision-api/v1/status-fixtures.json', import.meta.url), 'utf8')).valid;
@@ -160,6 +160,7 @@ test('actual Library: authorized backend catalog, reference sections, exact hist
   expect((await denied).status()).toBe(401);
   await expect(library).toContainText('Access denied');
   const auth = JSON.parse(readFileSync('.api03-test-auth.json', 'utf8'));
+  await assertPrivateFixtureFile(page, '.api03-test-auth.json', auth.cookieValue);
   await context.addCookies([{name: auth.cookieName, value: auth.cookieValue, url: 'http://127.0.0.1:4173', httpOnly: true, sameSite: 'Strict'}]);
   const response = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/library');
   await library.getByRole('button', {name: 'Refresh library'}).click();
@@ -199,6 +200,6 @@ test('actual Library: authorized backend catalog, reference sections, exact hist
   await expect(library).not.toContainText(draft.profileId);
   expect(libraryRequests).toHaveLength(beforeReload);
   const storage = await page.evaluate(() => JSON.stringify({...localStorage, ...sessionStorage}));
-  expect(storage).not.toContain(draft.profileId); expect(storage).not.toContain(report.viewId); expect(storage).not.toContain(auth.cookieValue);
+  expect(storage).not.toContain(draft.profileId); expect(storage).not.toContain(report.viewId); expect(storage.includes(auth.cookieValue)).toBe(false);
   expect(methods.every(method => method === 'GET')).toBe(true); expect(errors).toEqual([]);
 });

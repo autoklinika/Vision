@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { eventsFixture, sessionFixture } from '../fixtures/session';
 import { isEventsReport, isSessionReport, matchesSession } from '../../src/api/sessionContract';
-import { enterDesktop } from './helpers';
+import { assertPrivateFixtureFile, enterDesktop } from './helpers';
 
 const type = 'application/json; charset=utf-8';
 const boot = JSON.parse(readFileSync(new URL('../../../contracts/vision-api/v1/status-fixtures.json', import.meta.url), 'utf8')).valid;
@@ -111,6 +111,7 @@ test('actual Core: authorized synthetic Workflow projection, pinned journal and 
   expect((await deniedResponse).status()).toBe(401);
   await expect(status).toContainText('Access denied');
   const auth = JSON.parse(readFileSync('.api02-test-auth.json', 'utf8'));
+  await assertPrivateFixtureFile(page, '.api02-test-auth.json', auth.cookieValue);
   await context.addCookies([{name: auth.cookieName, value: auth.cookieValue, url: 'http://127.0.0.1:4173', httpOnly: true, sameSite: 'Strict'}]);
   const sessionResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/session');
   await status.getByRole('button', {name: 'Refresh session'}).click();
