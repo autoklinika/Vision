@@ -30,4 +30,14 @@ describe('window manager', () => {
     for (const raw of ['{', 'x'.repeat(13000), JSON.stringify({version: 2, windows: []}), JSON.stringify({version: 1, windows: [...initialState.windows, ...initialState.windows]}), JSON.stringify({version: 1, windows: [{...initialState.windows[0], id: 'hardware'}]}), JSON.stringify({version: 1, windows: [{...initialState.windows[0], rect: {x: null}}]})]) expect(decodeLayout(raw, bounds)).toEqual(initialState);
     expect(decodeLayout(encodeLayout({ windows: [], active: null }), bounds).windows).toEqual([]);
   });
+  it('preserves a pre-Settings layout and opens one independent Settings window', () => {
+    const existing = reduce(initialState, {type: 'open', id: 'control'}, bounds);
+    const restored = decodeLayout(encodeLayout(existing), bounds);
+    expect(restored).toEqual(existing);
+    const opened = reduce(restored, {type: 'open', id: 'settings'}, bounds);
+    expect(opened.windows.slice(0, -1)).toEqual(existing.windows);
+    expect(opened.active).toBe('settings');
+    expect(reduce(opened, {type: 'open', id: 'settings'}, bounds).windows).toHaveLength(3);
+    expect(decodeLayout(encodeLayout(opened), bounds)).toEqual(opened);
+  });
 });

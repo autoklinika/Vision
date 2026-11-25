@@ -26,7 +26,7 @@
 
 ## Wrażliwe dane
 
-- GitHub CLI przechowuje poświadczenia lokalnie na VENTUNO — nie kopiować `~/.config/gh/hosts.yml`.
+- Poświadczenia GitHub pozostają w autoryzowanym środowisku; nie kopiować lokalnych plików poświadczeń ani włączać tokenów do komend/logów.
 - Nie commitować kluczy SSH, tokenów, plików `.env`, parametrów prywatnej sieci ani niezredagowanych logów sprzętowych.
 - Przed publikacją raportu audytu usunąć numery seryjne i identyfikatory sprzętu, a także dane topologii sieci i wszelkie przypadkowo ujawnione sekrety.
 - Ponieważ repozytorium jest publiczne, audyty i surowe zdjęcia domyślnie pozostają lokalne.

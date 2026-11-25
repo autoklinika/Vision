@@ -30,6 +30,7 @@
 *.local
 *credentials*.json
 *token*.json
+/.station-test-auth.json
 
 # Python/C++/IDE
 __pycache__/

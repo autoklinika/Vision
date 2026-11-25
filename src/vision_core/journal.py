@@ -46,8 +46,27 @@ class Journal:
                 raise
 
     def replay(self, session_id: str) -> list[Event]:
-        rows = self.db.execute('SELECT sequence,session_id,step_id,request_id,kind,data,timestamp FROM events WHERE session_id=? ORDER BY sequence', (session_id,))
-        return [Event(*row[:5], json.loads(row[5]), row[6]) for row in rows]
+        with self._lock:
+            rows = self.db.execute('SELECT sequence,session_id,step_id,request_id,kind,data,timestamp FROM events WHERE session_id=? ORDER BY sequence', (session_id,))
+            return [Event(*row[:5], json.loads(row[5]), row[6]) for row in rows]
+
+    @contextmanager
+    def read_transaction(self):
+        """Pin a committed SQLite read view without writes or journal replay.
+
+        The owner lock also spans Workflow's memory updates after commit.
+        BEGIN is deferred; the statements inside this context must be SELECTs.
+        Rollback releases the read snapshot, including on an extraction error.
+        """
+        with self._lock:
+            if self.db.in_transaction:
+                raise RuntimeError('committed read view unavailable')
+            self.db.execute('BEGIN')
+            try:
+                yield self.db
+            finally:
+                self.db.rollback()
 
     def close(self) -> None:
-        self.db.close()
+        with self._lock:
+            self.db.close()

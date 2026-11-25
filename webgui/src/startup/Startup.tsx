@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReadOnlyVisionClient, Snapshot } from '../api/types';
 import { Desktop } from '../shell/Desktop';
 import { AppContent } from '../apps/AppContent';
+import { readClientReport } from './report';
+import { modeLabel, modeDescription } from '../api/presentation';
 import { introDuration, loadBrand, releaseBrand, InsecureBrandContext } from './brand';
 import type { Brand } from './brand';
 import './startup.css';
@@ -11,6 +13,7 @@ type Phase = 'intro' | 'report' | 'login' | 'desktop';
 export function Startup({ client, report }: { client: ReadOnlyVisionClient; report: Promise<Snapshot> }) {
   const [phase, setPhase] = useState<Phase>(() => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'report' : 'intro');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [activeReport, setActiveReport] = useState(report);
   const [brand, setBrand] = useState<Brand | null>(null);
   const [assetMessage, setAssetMessage] = useState('Checking optional local intro.');
   const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -19,9 +22,15 @@ export function Startup({ client, report }: { client: ReadOnlyVisionClient; repo
 
   useEffect(() => {
     let alive = true;
-    void report.then(value => { if (alive) setSnapshot(value); });
+    void activeReport.then(value => { if (alive) setSnapshot(value); });
     return () => { alive = false; };
-  }, [report]);
+  }, [activeReport]);
+
+  function refresh() {
+    if (!client.canRefresh || snapshot === null) return;
+    setSnapshot(null);
+    setActiveReport(readClientReport(client));
+  }
 
   useEffect(() => {
     const media = matchMedia('(prefers-reduced-motion: reduce)');
@@ -70,11 +79,11 @@ export function Startup({ client, report }: { client: ReadOnlyVisionClient; repo
   };
 
   const showIntro = phase === 'intro' && !reduced;
-  if (phase === 'desktop') return <Desktop client={client} snapshot={snapshot}/>;
+  if (phase === 'desktop') return <Desktop client={client} snapshot={snapshot} refresh={refresh}/>;
   return <main className={`startup ${showIntro ? 'intro-stage' : ''}`}>
     <header className="mode-banner">
-      <strong>{client.mode === 'demo' ? 'DEMO' : 'REAL · UNAVAILABLE'}</strong>
-      <span>{client.mode === 'demo' ? 'Synthetic fixtures only · No connection to Vision or hardware' : 'Disconnected read-only client · No transport integrated'}</span>
+      <strong>{modeLabel(client.mode, snapshot)}</strong>
+      <span>{modeDescription(client.mode, snapshot)}</span>
     </header>
     {showIntro ? <div className="intro-content">
       {brand && <img className="intro-logo" src={brand.intro} alt="Original Vision handwriting intro" onLoad={() => setPlaying(true)} onError={() => { discardBrand('Original intro could not be decoded.'); }}/>}
@@ -91,13 +100,13 @@ export function Startup({ client, report }: { client: ReadOnlyVisionClient; repo
             <label htmlFor="username">User name</label><input id="username" disabled autoComplete="off"/>
             <label htmlFor="password">Password</label><input id="password" type="password" disabled autoComplete="off"/>
           </div>
-          <div className="startup-actions"><button onClick={() => setPhase('report')}>Back to report</button><button onClick={() => setPhase('desktop')}>{client.mode === 'demo' ? 'Continue to DEMO desktop' : 'Open read-only disconnected view'}</button></div>
+          <div className="startup-actions"><button onClick={() => setPhase('report')}>Back to report</button><button onClick={() => setPhase('desktop')}>{client.mode === 'demo' ? 'Continue to DEMO desktop' : 'Open read-only view'}</button></div>
         </> : <>
           <p role="status" id="report-read-status">{snapshot
             ? 'Client report read finished. System initialization and readiness are not established.'
             : 'Waiting for selected adapter report. No system initialization is performed.'}</p>
           {!snapshot && <div className="report-progress" role="progressbar" aria-label="Waiting for selected adapter report" aria-describedby="report-read-status"><span aria-hidden="true"/></div>}
-          <AppContent id="status" snapshot={snapshot} reset={() => {}} persistence=""/>
+          <AppContent id="status" snapshot={snapshot} reset={() => {}} persistence="" refresh={client.canRefresh ? refresh : undefined}/>
           <p>Report acquisition starts independently of the intro. No device initialization or automatic commands.</p>
           <div className="startup-actions"><button onClick={() => setPhase('login')}>Continue to login presentation</button><button onClick={() => setPhase('desktop')}>Open read-only diagnostics</button></div>
         </>}

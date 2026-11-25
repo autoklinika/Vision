@@ -1,5 +1,6 @@
 """Offline S01–S04 coordinator; trust is supplied by an external verifier."""
 from dataclasses import dataclass
+from functools import wraps
 import hashlib
 import json
 import math
@@ -32,6 +33,14 @@ class RuntimeResult:
     operator_id: str = ''
     record_sha256: str = ''
     reference_sha256: str = ''
+
+
+def _serialized_runtime(method):
+    @wraps(method)
+    def serialized(self, *args, **kwargs):
+        with self.engine.owner_operation():
+            return method(self, *args, **kwargs)
+    return serialized
 
 
 class VisionRuntimeCoordinator:
@@ -71,6 +80,7 @@ class VisionRuntimeCoordinator:
     def _compile(self):
         return compile_profile(self.reference_profile, self.physical_state, self.recipe, self.record, self.catalog, self.release_store, self.calibrations, capabilities=self.capabilities, asset_store=self.asset_store, reference_release_store=self.reference_release_store, library=self.library)
 
+    @_serialized_runtime
     def begin(self, stage, request):
         """Dispatch a stage before acquiring an externally produced receipt."""
         if stage not in ('S01', 'S02', 'S03', 'S04'): raise ValueError('unsupported stage')
@@ -102,6 +112,7 @@ class VisionRuntimeCoordinator:
     def _ref(self, value):
         return 'sha256:' + digest({'record': self.record, 'reference': self.reference_profile, 'declaration': self.declaration, 'bundle': self.bundle, 'receipt': value})
 
+    @_serialized_runtime
     def prepare_station(self, receipt, request):
         def check():
             validate_readiness(receipt, self.engine.context, self.calibrations, now=self.clock(), max_age=self.max_age)
@@ -113,6 +124,7 @@ class VisionRuntimeCoordinator:
             return self.engine.context, receipt.timestamp, self._ref(receipt), {}
         return self._run('S01', request, check)
 
+    @_serialized_runtime
     def confirm_selection(self, request):
         def check():
             self._selection_check()
@@ -142,6 +154,7 @@ class VisionRuntimeCoordinator:
             if c.color != e.color or e.position is None or e.position.provenance.uncertainty_mm is None or not 1e-9 <= c.uncertainty_mm <= e.position.provenance.uncertainty_mm or math.dist(c.position_mm, e.position.values) > e.position.provenance.uncertainty_mm: raise ValueError('connector landmark mismatch')
         evaluate_reference(self.reference_profile, self.physical_state, self.record, receipt)
 
+    @_serialized_runtime
     def accept_localization(self, observation, request):
         def check():
             self._validate_observation(observation, request.request_id)
@@ -152,6 +165,7 @@ class VisionRuntimeCoordinator:
         if result.status != 'SUCCEEDED': self._observation = None
         return result
 
+    @_serialized_runtime
     def verify_selected_ecu(self, request):
         def check():
             receipt = self._observation

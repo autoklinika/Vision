@@ -8,7 +8,7 @@ export async function readClientReport(client: ReadOnlyVisionClient): Promise<Sn
   } catch {
     return {
       schema: 'client-view-v1', source: client.mode, connection: 'UNAVAILABLE',
-      readiness: 'UNKNOWN', observedAt: null, components: [],
+      readiness: 'UNKNOWN', observedAt: null, reportTime: null, components: [],
       reason: 'Snapshot unavailable: selected adapter failed or returned a mismatched source. System state is UNKNOWN.',
     };
   }

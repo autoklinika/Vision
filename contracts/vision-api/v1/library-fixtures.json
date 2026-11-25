@@ -1,0 +1,225 @@
+{
+  "library": {
+    "schema": "vision.api.library.v1",
+    "scope": "LIBRARY_READ_ONLY",
+    "source": "SYNTHETIC_TEST",
+    "libraryId": "api03_synthetic_library",
+    "viewId": "57aa1c0a535ef8b742968f9c818303565b4f373ad6876dd025c51937baf0440d",
+    "capturedAt": "2026-11-25T07:00:00Z",
+    "after": 0,
+    "totalCount": 2,
+    "nextAfter": null,
+    "entries": [
+      {
+        "entryId": "2ce1d42abda7609f966177c610202375",
+        "kind": "CATALOG_RECORD",
+        "profileId": "etc3_poc",
+        "family": "ETC3",
+        "variant": "provisional_3connector",
+        "revision": "v1",
+        "displayName": "ETC3",
+        "status": "DRAFT",
+        "readiness": "NOT_READY",
+        "reasonCode": "CATALOG_ONLY",
+        "etag": null
+      },
+      {
+        "entryId": "2b6edbdf6fb778c59c52ce221ab0425c",
+        "kind": "REFERENCE_DRAFT",
+        "profileId": "api03_synthetic",
+        "family": "ETC3",
+        "variant": "provisional_3connector",
+        "revision": "r1",
+        "displayName": "API-03 synthetic reference",
+        "status": "DRAFT",
+        "readiness": "NOT_READY",
+        "reasonCode": "UNSIGNED_DRAFT",
+        "etag": "\"a20248c7f641bea3ab7e1640ea5ac3a6b69d2d209ccc6df16e9677f0069b35dc\""
+      }
+    ]
+  },
+  "catalogEntry": {
+    "schema": "vision.api.library-entry.v1",
+    "scope": "LIBRARY_READ_ONLY",
+    "source": "SYNTHETIC_TEST",
+    "libraryId": "api03_synthetic_library",
+    "viewId": "57aa1c0a535ef8b742968f9c818303565b4f373ad6876dd025c51937baf0440d",
+    "capturedAt": "2026-11-25T07:00:00Z",
+    "entry": {
+      "entryId": "2ce1d42abda7609f966177c610202375",
+      "kind": "CATALOG_RECORD",
+      "profileId": "etc3_poc",
+      "family": "ETC3",
+      "variant": "provisional_3connector",
+      "revision": "v1",
+      "displayName": "ETC3",
+      "status": "DRAFT",
+      "readiness": "NOT_READY",
+      "reasonCode": "CATALOG_ONLY",
+      "etag": null
+    },
+    "catalog": {
+      "connectors": [
+        {
+          "id": "black_1",
+          "color": "black"
+        },
+        {
+          "id": "black_2",
+          "color": "black"
+        },
+        {
+          "id": "gray_1",
+          "color": "gray"
+        }
+      ],
+      "fieldNoteCount": 2,
+      "fieldNotesVerified": false,
+      "envelopePresent": false
+    },
+    "profile": null
+  },
+  "profileEntry": {
+    "schema": "vision.api.library-entry.v1",
+    "scope": "LIBRARY_READ_ONLY",
+    "source": "SYNTHETIC_TEST",
+    "libraryId": "api03_synthetic_library",
+    "viewId": "57aa1c0a535ef8b742968f9c818303565b4f373ad6876dd025c51937baf0440d",
+    "capturedAt": "2026-11-25T07:00:00Z",
+    "entry": {
+      "entryId": "2b6edbdf6fb778c59c52ce221ab0425c",
+      "kind": "REFERENCE_DRAFT",
+      "profileId": "api03_synthetic",
+      "family": "ETC3",
+      "variant": "provisional_3connector",
+      "revision": "r1",
+      "displayName": "API-03 synthetic reference",
+      "status": "DRAFT",
+      "readiness": "NOT_READY",
+      "reasonCode": "UNSIGNED_DRAFT",
+      "etag": "\"a20248c7f641bea3ab7e1640ea5ac3a6b69d2d209ccc6df16e9677f0069b35dc\""
+    },
+    "catalog": null,
+    "profile": {
+      "sections": [
+        {
+          "name": "metadata",
+          "rowCount": null,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "identity",
+          "rowCount": null,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "physical_states",
+          "rowCount": 1,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "coordinate_systems",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "geometry",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "connectors_landmarks",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "reference_assets",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "recognition_rules",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "localization_rules",
+          "rowCount": null,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "pcb_definition",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "photography_recipes",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "thermal_recipes",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "inspection_workflows",
+          "rowCount": 1,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "validation_policies",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        },
+        {
+          "name": "provenance_release",
+          "rowCount": 0,
+          "status": "NOT_EVALUATED"
+        }
+      ],
+      "physicalStates": [
+        {
+          "id": "closed",
+          "displayName": "Closed enclosure",
+          "declaredVerified": false
+        }
+      ],
+      "workflows": [
+        {
+          "id": "inspect",
+          "stateId": "closed",
+          "scope": "verify_identity"
+        }
+      ],
+      "historyCount": 2
+    }
+  },
+  "history": {
+    "schema": "vision.api.library-history.v1",
+    "scope": "LIBRARY_READ_ONLY",
+    "source": "SYNTHETIC_TEST",
+    "libraryId": "api03_synthetic_library",
+    "viewId": "57aa1c0a535ef8b742968f9c818303565b4f373ad6876dd025c51937baf0440d",
+    "capturedAt": "2026-11-25T07:00:00Z",
+    "after": 0,
+    "totalCount": 2,
+    "nextAfter": null,
+    "entryId": "2b6edbdf6fb778c59c52ce221ab0425c",
+    "profileId": "api03_synthetic",
+    "revision": "r1",
+    "etag": "\"a20248c7f641bea3ab7e1640ea5ac3a6b69d2d209ccc6df16e9677f0069b35dc\"",
+    "items": [
+      {
+        "snapshotId": "00000000000000000000000000000001",
+        "etag": "\"e0cca2965509df678c8064f5e0b9076016fa752f88a6c749768db83479450cc5\"",
+        "revision": "r1"
+      },
+      {
+        "snapshotId": "00000000000000000000000000000004",
+        "etag": "\"a20248c7f641bea3ab7e1640ea5ac3a6b69d2d209ccc6df16e9677f0069b35dc\"",
+        "revision": "r1"
+      }
+    ]
+  }
+}

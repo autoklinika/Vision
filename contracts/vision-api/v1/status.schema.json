@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vision API-01 boot status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "api",
+    "reportTime",
+    "coreReadiness",
+    "observedAt",
+    "reasonCode",
+    "components"
+  ],
+  "properties": {
+    "schema": {
+      "const": "vision.api.status.v1"
+    },
+    "scope": {
+      "const": "LAB_API_ONLY"
+    },
+    "api": {
+      "const": "AVAILABLE"
+    },
+    "reportTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "coreReadiness": {
+      "const": "UNKNOWN"
+    },
+    "observedAt": {
+      "type": "null"
+    },
+    "reasonCode": {
+      "const": "CORE_REPORT_NOT_CONNECTED"
+    },
+    "components": {
+      "type": "array",
+      "maxItems": 0
+    }
+  }
+}

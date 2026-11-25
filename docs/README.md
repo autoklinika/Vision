@@ -1,6 +1,6 @@
 # Dokumentacja Vision — indeks
 
-**Punkt wejścia aktualny 24.11.2026.** Dokumenty z wcześniejszych dat zachowują własny status i zakres; nie są aktualną telemetrią. [README projektu](../README.md) zawiera bieżący przegląd.
+**Punkt wejścia aktualny 25.11.2026.** Dokumenty z wcześniejszych dat zachowują własny status i zakres; nie są aktualną telemetrią. [README projektu](../README.md) zawiera bieżący przegląd.
 
 ## Decyzje i obowiązujące kontrakty
 
@@ -22,7 +22,8 @@
 - Runtime: [S01–S04](implementation/VISION_RUNTIME_V1_S01_S04.md), [ROS 2 Luxonis adapter](implementation/VISION_RUNTIME_ROS2_LUXONIS_ADAPTER_V1.md).
 - Planner: [S05–S06](implementation/VISION_INSPECTION_PLANNER_V1_S05_S06.md).
 - [Thermal Inspection V1](implementation/VISION_THERMAL_INSPECTION_V1.md).
-- WebGUI: [specyfikacja V1](ux/VISION_WEBGUI_V1_SPECIFICATION.md), [biblioteka i edytor ECU](ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md), [kod i instrukcja](../webgui/README.md). GUI-01/02 są w main; GUI-03 pozostaje kolejnym pakietem.
+- WebGUI: [specyfikacja V1](ux/VISION_WEBGUI_V1_SPECIFICATION.md), [biblioteka i edytor ECU](ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md), [kod i instrukcja](../webgui/README.md). GUI-01/02, API-01–03 i stanowiskowy Core/GUI są w main; edytor i obsługa urządzeń pozostają odrębnymi pakietami.
+- API: [Foundation](implementation/VISION_API_FOUNDATION_V1.md), [Core reports](implementation/VISION_API_CORE_REPORTS_V1.md), [ECU Library read](implementation/VISION_API_ECU_LIBRARY_READ_V1.md), [Station WebGUI](implementation/VISION_STATION_WEBGUI_V1.md), [deployment](operations/VISION_WEBGUI_DEPLOYMENT.md), [kontrakt API](../contracts/vision-api/v1/README.md).
 
 ## Odbiory i kalibracja
 
@@ -31,13 +32,13 @@
 - [Audyt Core](audits/VISION_CORE_INTEGRATION_AUDIT_2026-11-23.md), [Core 004/Thermal](audits/VISION_CORE_004_THERMAL_PREMERGE_AUDIT.md).
 - [ECU Profiles](audits/VISION_ECU_PROFILES_V1_AUDIT_2026-11-24.md), [Reference Profile](audits/VISION_ECU_REFERENCE_PROFILE_V1_PREMERGE_AUDIT_2026-11-24.md), [Library Backend](audits/VISION_ECU_LIBRARY_BACKEND_V1_AUDIT_2026-11-24.md).
 - [Runtime](audits/VISION_RUNTIME_V1_FINAL_AUDIT_2026-11-24.md), [odczyt Luxonis](audits/VISION_RUNTIME_LUXONIS_LIVE_READONLY_ACCEPTANCE_2026-11-24.md), [Planner](audits/VISION_INSPECTION_PLANNER_V1_AUDIT_2026-11-24.md), [symulacja MoveIt](audits/VISION_INSPECTION_PLANNER_MOVEIT_SIMULATION_2026-11-24.md), [wspólny audyt Runtime/Planner](audits/VISION_RUNTIME_PLANNER_FINAL_AUDIT_2026-11-24.md).
-- [GUI-01](../webgui/docs/audit/GUI-01_AUDIT_2026-11-24.md), [GUI-02 końcowy odbiór](../webgui/docs/audit/GUI-02_FINAL_ACCEPTANCE_2026-11-24.md). Bez odbioru produkcyjnego i sprzętowego GUI.
+- [GUI-01](../webgui/docs/audit/GUI-01_AUDIT_2026-11-24.md), [GUI-02 końcowy odbiór](../webgui/docs/audit/GUI-02_FINAL_ACCEPTANCE_2026-11-24.md). Historyczne odbiory izolowanego klienta. Nowsze odbiory stanowiskowe: [#63](https://github.com/autoklinika/Vision/pull/63), [#65](https://github.com/autoklinika/Vision/pull/65), [#68](https://github.com/autoklinika/Vision/pull/68), [#70](https://github.com/autoklinika/Vision/pull/70). Aktywna inspekcja i sprzęt pozostają osobnymi bramkami.
 
 ## Proces i stan prac
 
 - [Mapa kodu](../src/README.md), [testy](../tests/README.md).
 - [Repository Hygiene V1](process/REPOSITORY_HYGIENE_V1.md), [Development](process/DEVELOPMENT.md).
-- [Rejestr repozytorium 24.11](operations/REPOSITORY_REGISTER_2026-11-24.md).
+- [Aktualny rejestr repozytorium 25.11](operations/REPOSITORY_REGISTER_2026-11-25.md); [snapshot 24.11](operations/REPOSITORY_REGISTER_2026-11-24.md) — historyczny.
 - [Przegląd PR z 23.11](operations/OPEN_PR_PORTFOLIO_2026-11-23.md) jest historycznym punktem odniesienia, nie bieżącą listą.
 
 ## Materiały historyczne

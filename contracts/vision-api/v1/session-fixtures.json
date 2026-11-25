@@ -1,0 +1,118 @@
+{
+  "session": {
+    "schema": "vision.api.session.v1",
+    "scope": "SESSION_READ_ONLY",
+    "source": "SYNTHETIC_TEST",
+    "viewId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sessionId": "synthetic-api02",
+    "capturedAt": "2026-11-25T00:00:00Z",
+    "journalSequence": 8,
+    "invalidated": false,
+    "stages": [
+      {
+        "id": "S01",
+        "state": "SUCCEEDED",
+        "historicalSuccess": true,
+        "lastTransitionSequence": 5,
+        "lastAckSequence": 4
+      },
+      {
+        "id": "S02",
+        "state": "RUNNING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": 7,
+        "lastAckSequence": 8
+      },
+      {
+        "id": "S03",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S04",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S05",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S06",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S07",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S08",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S09",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S10",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      },
+      {
+        "id": "S11",
+        "state": "PENDING",
+        "historicalSuccess": false,
+        "lastTransitionSequence": null,
+        "lastAckSequence": null
+      }
+    ]
+  },
+  "events": {
+    "scope": "SESSION_READ_ONLY",
+    "source": "SYNTHETIC_TEST",
+    "viewId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sessionId": "synthetic-api02",
+    "capturedAt": "2026-11-25T00:00:00Z",
+    "schema": "vision.api.events.v1",
+    "throughSequence": 8,
+    "afterSequence": 0,
+    "nextAfterSequence": null,
+    "events": [
+      {
+        "sequence": 7,
+        "stageId": "S02",
+        "kind": "transition",
+        "timestamp": "2026-11-25T00:00:00Z",
+        "state": "RUNNING"
+      },
+      {
+        "sequence": 8,
+        "stageId": "S02",
+        "kind": "ack",
+        "timestamp": "2026-11-25T00:00:00Z",
+        "state": null
+      }
+    ]
+  }
+}

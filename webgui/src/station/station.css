@@ -1,0 +1,17 @@
+.station-login { width: min(480px, calc(100vw - 24px)); margin: 0; position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); }
+.station-login h1 { font-size: 12px; margin: 0; }
+.station-login .window-body { padding: 20px; }
+.station-login-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.station-login-heading > span { font: bold italic 34px Arial; padding: 2px 10px; background: #000080; color: white; border: 2px solid white; }
+.station-login-heading h2 { margin: 0; }
+.station-login-heading p { margin: 3px 0; color: #444; }
+.station-login-message { min-height: 36px; }
+.station-login input { width: 100%; min-width: 0; }
+.station-login .fine-print { margin-top: 20px; }
+.station-account { padding: 6px 8px; border-bottom: 1px solid #888; color: #444; overflow-wrap: anywhere; font-size: 11px; }
+.settings-content fieldset { margin-top: 14px; }
+.password-fields { display: grid; grid-template-columns: 145px minmax(0, 1fr); align-items: center; gap: 12px 10px; margin: 20px 0 14px; }
+.password-fields input { width: 100%; min-width: 0; }
+.password-message { min-height: 32px; }
+.settings-content .app-actions { flex-wrap: wrap; }
+@media (max-width: 500px) { .password-fields { grid-template-columns: 1fr; gap: 5px; } .password-fields input { margin-bottom: 9px; } }

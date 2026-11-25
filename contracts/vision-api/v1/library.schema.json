@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vision API-03 library",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "source",
+    "libraryId",
+    "viewId",
+    "capturedAt",
+    "after",
+    "totalCount",
+    "nextAfter",
+    "entries"
+  ],
+  "properties": {
+    "schema": {
+      "const": "vision.api.library.v1"
+    },
+    "scope": {
+      "const": "LIBRARY_READ_ONLY"
+    },
+    "source": {
+      "enum": [
+        "SYNTHETIC_TEST",
+        "STATION"
+      ]
+    },
+    "libraryId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+    },
+    "viewId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z(?![\\s\\S])"
+    },
+    "after": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 512
+    },
+    "totalCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 512
+    },
+    "nextAfter": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 512
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 50,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entryId",
+              "kind",
+              "profileId",
+              "family",
+              "variant",
+              "revision",
+              "displayName",
+              "status",
+              "readiness",
+              "reasonCode",
+              "etag"
+            ],
+            "properties": {
+              "entryId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}(?![\\s\\S])"
+              },
+              "kind": {
+                "const": "CATALOG_RECORD"
+              },
+              "profileId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "family": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "variant": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s*$)[^/\\\\\\u0000-\\u001f\\u007f-\\u009f]+(?![\\s\\S])"
+              },
+              "status": {
+                "enum": [
+                  "DRAFT",
+                  "READY_FOR_REVIEW",
+                  "APPROVED"
+                ]
+              },
+              "readiness": {
+                "const": "NOT_READY"
+              },
+              "reasonCode": {
+                "const": "CATALOG_ONLY"
+              },
+              "etag": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entryId",
+              "kind",
+              "profileId",
+              "family",
+              "variant",
+              "revision",
+              "displayName",
+              "status",
+              "readiness",
+              "reasonCode",
+              "etag"
+            ],
+            "properties": {
+              "entryId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}(?![\\s\\S])"
+              },
+              "kind": {
+                "const": "REFERENCE_DRAFT"
+              },
+              "profileId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "family": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "variant": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?![\\s\\S])"
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(?!\\s*$)[^/\\\\\\u0000-\\u001f\\u007f-\\u009f]+(?![\\s\\S])"
+              },
+              "status": {
+                "const": "DRAFT"
+              },
+              "readiness": {
+                "const": "NOT_READY"
+              },
+              "reasonCode": {
+                "const": "UNSIGNED_DRAFT"
+              },
+              "etag": {
+                "type": "string",
+                "pattern": "^\"[0-9a-f]{64}\"(?![\\s\\S])"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$comment": "Application validators additionally enforce real calendar dates; all Unicode General Category C characters are rejected in labels; unique IDs; state references; exact 50-item offset pagination and counts; unchanged view/source/library/entry/ETag correlation. History is oldest first and only its last page may contain the current ETag, at its final item. Section counts describe declared structure, not completeness, approval or readiness. A capture time is not sensor freshness. All responses are capped to 131072 encoded bytes, and an over-limit report fails as a whole."
+}
