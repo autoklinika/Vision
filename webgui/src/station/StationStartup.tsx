@@ -11,13 +11,15 @@ import './station.css';
 type AuthPhase = 'CHECKING' | 'SIGNED_OUT' | 'SIGNING_IN' | 'SIGNED_IN' | 'CHANGING_PASSWORD' | 'UNAVAILABLE' | 'SIGNING_OUT' | 'LOGOUT_PENDING';
 type AuthState = {phase: AuthPhase; identity: IdentityReport | null; message: string; epoch?: number};
 
-function StationDesktop({identity, epoch, denied, logout, accountBusy, changePassword}: {identity: IdentityReport; epoch: number; denied: (epoch: number) => void; logout: () => void; accountBusy: boolean; changePassword: (currentPassword: string, newPassword: string) => Promise<PasswordChangeResult>}) {
+function StationDesktop({identity, epoch, denied, logout, accountBusy, authUnavailable, changePassword}: {identity: IdentityReport; epoch: number; denied: (epoch: number) => void; logout: () => void; accountBusy: boolean; authUnavailable: boolean; changePassword: (currentPassword: string, newPassword: string) => Promise<PasswordChangeResult>}) {
   const expired = useCallback(() => denied(epoch), [denied, epoch]);
-  const [report, setReport] = useState<StationReport | null>(null);
+  // A transient transport failure must not destroy an in-memory editor. The
+  // observation is never shown as current until this auth epoch is refreshed.
+  const [observation, setObservation] = useState<{report: StationReport | null; coreOwner: string | null; available: boolean; epoch: number}>({report: null, coreOwner: null, available: false, epoch});
   const [connecting, setConnecting] = useState(true);
   const refreshRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (accountBusy) { refreshRef.current = null; return; }
+    if (accountBusy || authUnavailable) { refreshRef.current = null; return; }
     let alive = true, busy = false;
     async function refresh() {
       if (busy || !alive) return;
@@ -25,8 +27,9 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, changePas
       try {
         const result = await readStation();
         if (!alive) return;
-        if (result.status === 'AVAILABLE') setReport(result.report);
-        else { setReport(null); if (result.status === 'ACCESS_DENIED') expired(); }
+        if (result.status === 'AVAILABLE') setObservation(old => ({report: result.report,
+          coreOwner: result.report.coreConnection === 'CONNECTED' ? result.report.instanceId : old.coreOwner, available: true, epoch}));
+        else { setObservation(old => ({...old, available: false})); if (result.status === 'ACCESS_DENIED') expired(); }
         setConnecting(false);
       } finally { busy = false; }
     }
@@ -34,17 +37,34 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, changePas
     void refresh();
     const timer = window.setInterval(() => { void refresh(); }, 5000);
     return () => { alive = false; refreshRef.current = null; window.clearInterval(timer); };
-  }, [expired, accountBusy]);
+  }, [expired, accountBusy, authUnavailable, epoch]);
+  const available = observation.available && (observation.epoch === epoch || accountBusy) && !authUnavailable;
+  const report = useMemo(() => observation.report && (available ? observation.report : {
+    ...observation.report, coreConnection: 'NOT_CONNECTED' as const, state: 'NO_ACTIVE_SESSION' as const,
+    sessionId: null, sessionViewId: null,
+  }), [observation.report, available]);
   const client = useMemo(() => report ? createStationClient(report, expired) : null, [report, expired]);
   const refresh = () => refreshRef.current?.();
-  if (!report || !client) return <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · {identity.role === 'operator' ? 'inspection operator' : 'read-only access'}</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? 'Connecting to VENTUNO' : 'Connection lost'}</h1></div><div className="window-body"><p role="status">{connecting ? 'Waiting for the station report…' : 'Station data is unavailable. Retrying automatically.'}</p><p>Signed in as {identity.username}.</p><div className="startup-actions"><button onClick={refresh} disabled={accountBusy}>Retry connection</button><button onClick={() => window.location.reload()} disabled={accountBusy}>Reload interface</button><button onClick={logout} disabled={accountBusy}>Sign out</button></div></div></section></main>;
+  function signOutDisconnected() {
+    if (document.querySelector('[data-editor-busy="true"]')) {
+      window.alert('A Core editor request is pending. Wait for its outcome before signing out.');
+      return;
+    }
+    if (!document.querySelector('[data-editor-dirty="true"]') || window.confirm('Discard unsaved ECU draft changes?')) logout();
+  }
+  const connectionPanel = <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · {identity.role === 'operator' ? 'inspection operator' : 'read-only access'}</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? 'Connecting to VENTUNO' : 'Connection lost'}</h1></div><div className="window-body"><p role="status">{connecting ? 'Waiting for the station report…' : 'Station data is unavailable. Retrying automatically.'}</p><p>Signed in as {identity.username}.</p><div className="startup-actions"><button onClick={refresh} disabled={accountBusy || authUnavailable}>Retry connection</button><button onClick={() => window.location.reload()} disabled={accountBusy}>Reload interface</button><button onClick={signOutDisconnected} disabled={accountBusy}>Sign out</button></div></div></section></main>;
+  if (!report || !client) return connectionPanel;
   const snapshot: Snapshot = {
-    schema: 'client-view-v1', source: 'real', connection: 'API_AVAILABLE', readiness: 'UNKNOWN', observedAt: null,
+    schema: 'client-view-v1', source: 'real', connection: available ? 'API_AVAILABLE' : 'UNAVAILABLE', readiness: 'UNKNOWN', observedAt: null,
     reportTime: report.capturedAt, reason: report.coreConnection === 'NOT_CONNECTED' ? 'Vision Core is not connected.' :
       report.state === 'NO_ACTIVE_SESSION' ? 'Vision Core is connected. No inspection session is active.' : 'Core session report available. Readiness is unknown.', components: [],
   };
-  const owner = `${identity.username}:${report.coreConnection}:${report.instanceId}:${report.sessionId ?? ''}:${report.sessionViewId ?? ''}`;
-  return <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout, accountBusy, changePassword}}/>;
+  // Authentication and a genuinely new Core own the editor. Session changes
+  // and the API's synthetic outage instance only invalidate live projections.
+  const owner = `${identity.username}:${identity.role}:${observation.coreOwner ?? 'unconnected'}`;
+  return <>{!available && connectionPanel}<div hidden={!available}>
+    <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout, accountBusy: accountBusy || authUnavailable, changePassword}}/>
+  </div></>;
 }
 
 /** A station build has real authentication and cannot switch to demo by URL. */
@@ -91,8 +111,12 @@ export function StationStartup() {
       control.current.identity = null; control.current.unavailable = false;
       setAuth({phase: 'SIGNED_OUT', identity: null, message: expired ? 'Your session ended. Sign in again.' : 'Sign in to the Vision workstation.'});
     } else {
-      control.current.identity = null; control.current.unavailable = true;
-      setAuth({phase: 'UNAVAILABLE', identity: null, message: 'Connection unavailable. Retrying automatically.'});
+      // Keep the same authenticated owner's working copy in memory during a
+      // transport outage. A real 401 above still destroys the entire desktop.
+      if (!control.current.unavailable) control.current.version++;
+      control.current.unavailable = true;
+      setAuth({phase: 'UNAVAILABLE', identity: control.current.identity, epoch: control.current.version,
+        message: 'Connection unavailable. Retrying automatically.'});
     }
   }, [logout]);
   useEffect(() => {
@@ -153,7 +177,7 @@ export function StationStartup() {
     }
   }
 
-  if ((auth.phase === 'SIGNED_IN' || auth.phase === 'CHANGING_PASSWORD') && auth.identity) return <StationDesktop identity={auth.identity} epoch={auth.epoch!} denied={denied} logout={() => { void logout(); }} accountBusy={auth.phase === 'CHANGING_PASSWORD'} changePassword={updatePassword}/>;
+  if ((auth.phase === 'SIGNED_IN' || auth.phase === 'CHANGING_PASSWORD' || auth.phase === 'UNAVAILABLE') && auth.identity) return <StationDesktop identity={auth.identity} epoch={auth.epoch!} denied={denied} logout={() => { void logout(); }} accountBusy={auth.phase === 'CHANGING_PASSWORD'} authUnavailable={auth.phase === 'UNAVAILABLE'} changePassword={updatePassword}/>;
   const busy = ['CHECKING','SIGNING_IN','SIGNING_OUT'].includes(auth.phase);
   const pendingLogout = auth.phase === 'LOGOUT_PENDING' || auth.phase === 'SIGNING_OUT';
   return <main className="startup station-startup">

@@ -1,19 +1,24 @@
 import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
+import {isDraftReport, isDraftValidation, isDraftAssetReport, isDraftAssetPreview} from './draftContract';
+import type {DraftAction, DraftReport, DraftValidation, DraftAssetReport, DraftAssetPreview} from './draftContract';
 import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport, InspectionReport } from './contract';
 
 export type StationResult<T> = Readonly<{status: 'AVAILABLE'; report: T}> | Readonly<{status: 'ACCESS_DENIED' | 'RATE_LIMITED' | 'UNAVAILABLE'; report: null}>;
 type PasswordError = 'CURRENT_PASSWORD_INVALID' | 'PASSWORD_REJECTED';
 type InspectionError = 'OPERATOR_REQUIRED' | 'INSPECTION_REJECTED';
+type DraftError = 'OPERATOR_REQUIRED' | 'DRAFT_CONFLICT' | 'DRAFT_NOT_FOUND' | 'BAD_REQUEST';
+export type DraftResult<T> = StationResult<T> | Readonly<{status: DraftError; report: null}>;
 export type InspectionCommandResult = StationResult<StationReport> | Readonly<{status: InspectionError; report: null}>;
 export type PasswordChangeResult = StationResult<PasswordChangeReport> | Readonly<{status: PasswordError; report: null}>;
 export const stationTimeoutMs = 5000;
+export const editorTimeoutMs = 35000;
 const maxBytes = 4096;
 const unavailable = {status: 'UNAVAILABLE', report: null} as const;
 
-async function request<T, E extends PasswordError | InspectionError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>, limit = maxBytes): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
+async function request<T, E extends PasswordError | InspectionError | DraftError = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>, limit = maxBytes, timeoutMs = stationTimeoutMs): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
   if (!globalThis.isSecureContext) return unavailable;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), stationTimeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response | undefined;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
@@ -81,4 +86,37 @@ export function startInspection(instanceId: string, selectionId: string, intentT
 export function closeInspection(instanceId: string, sessionId: string): Promise<InspectionCommandResult> {
   return request('/api/v1/inspection/close', isStationReport, JSON.stringify({instanceId, sessionId}),
     {403: 'OPERATOR_REQUIRED', 409: 'INSPECTION_REJECTED'} as const);
+}
+
+const draftErrors = {400: 'BAD_REQUEST', 403: 'OPERATOR_REQUIRED', 404: 'DRAFT_NOT_FOUND', 409: 'DRAFT_CONFLICT'} as const;
+function editorBody(args: Record<string,string>, document?: string): string {
+  const base = JSON.stringify(args);
+  return document === undefined ? base : base.slice(0,-1)+',"document":'+document+'}';
+}
+async function editorRequest<T extends DraftReport | DraftValidation | DraftAssetReport | DraftAssetPreview>(action: DraftAction, args: Record<string,string>,
+    validate: (value: unknown) => value is T, document?: string): Promise<DraftResult<T>> {
+  const body = editorBody(args,document);
+  const assetWire=3*1024*1024;
+  if (new TextEncoder().encode(body).length > (action==='asset_import'?assetWire:131072)) return {status:'BAD_REQUEST',report:null};
+  const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072,editorTimeoutMs);
+  if(result.status==='AVAILABLE'&&action==='asset_preview'&&(!('assetId' in result.report)||result.report.assetId!==args.assetId))return unavailable;
+  if (result.status === 'AVAILABLE' && (result.report.instanceId !== args.instanceId ||
+      result.report.key !== (action === 'clone' ? args.newKey : args.key))) return unavailable;
+  return result;
+}
+export function editDraft(action: Exclude<DraftAction,'validate'|'validate_structure'|'asset_import'|'asset_preview'>, args: Record<string,string>, document?: string): Promise<DraftResult<DraftReport>> {
+  return editorRequest(action,args,isDraftReport,document);
+}
+export function validateDraft(args: Record<string,string>, document: string): Promise<DraftResult<DraftValidation>> {
+  return editorRequest('validate',args,isDraftValidation,document);
+}
+
+export function validateDraftStructure(args:Record<string,string>, document:string):Promise<DraftResult<DraftValidation>> {
+  return editorRequest('validate_structure',args,isDraftValidation,document);
+}
+export function importDraftAsset(args:Record<string,string>):Promise<DraftResult<DraftAssetReport>> {
+  return editorRequest('asset_import',args,isDraftAssetReport);
+}
+export function previewDraftAsset(args:Record<string,string>):Promise<DraftResult<DraftAssetPreview>> {
+  return editorRequest('asset_preview',args,isDraftAssetPreview);
 }

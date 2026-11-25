@@ -1,10 +1,12 @@
 """Backend ownership outside the WebGUI/API process, including the idle state."""
 import threading
 
+from vision_api.access import ReportUnavailable
 from vision_api.station_owner import StationOwner
 from vision_modules.ecu_library_backend import ECULibraryService
 from vision_runtime import VisionRuntimeCoordinator
-from .inspection import InspectionOwner
+from .inspection import InspectionOwner, InspectionRejected
+from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 
 
 class CoreHost:
@@ -24,6 +26,7 @@ class CoreHost:
         self._lifecycle_lock = threading.RLock()
         self._runtime = None
         self._view_id = None
+        self._draft_editor = DraftEditor(self)
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
 
     def attach_runtime(self, runtime):
@@ -65,18 +68,42 @@ class CoreHost:
     def events_report(self, *, view, after, through):
         return self._reader.events_report(view=view, after=after, through=through)
 
+    # Do not queue operational requests behind a long library/editor operation.
+    # The bound applies only to admission, never to execution already admitted.
     def inspection_report(self):
-        with self._lifecycle_lock:
+        if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
+            raise ReportUnavailable()
+        try:
             return self._inspection.report()
+        finally:
+            self._lifecycle_lock.release()
 
     def start_inspection(self, **intent):
-        with self._lifecycle_lock:
+        if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
+            raise InspectionRejected()
+        try:
             return self._inspection.start(**intent)
+        finally:
+            self._lifecycle_lock.release()
 
     def close_inspection(self, **intent):
-        with self._lifecycle_lock:
+        if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
+            raise InspectionRejected()
+        try:
             return self._inspection.close(**intent)
+        finally:
+            self._lifecycle_lock.release()
 
     def shutdown_inspection(self):
         with self._lifecycle_lock:
             self._inspection.shutdown()
+
+    def draft_editor(self, action, args):
+        # Reject contention before dispatch; never queue a mutation for later
+        # execution after its caller has already lost the response deadline.
+        if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
+            raise DraftConflict()
+        try:
+            return self._draft_editor.dispatch(action, args)
+        finally:
+            self._lifecycle_lock.release()

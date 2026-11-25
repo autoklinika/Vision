@@ -21,6 +21,7 @@ from .server import EVENTS_PATH, LIBRARY_ENTRY, LIBRARY_HISTORY, LIBRARY_PAGE
 from .station_owner import NoActiveSession
 from .status import boot_status
 from vision_station.inspection import InspectionRejected, ID, HEX32
+from vision_station.draft_editor import DraftConflict, DraftNotFound, FIELDS, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 
 # Two 1024-byte passwords can each expand sixfold with JSON escaping.
 MAX_BODY = 16384
@@ -130,9 +131,9 @@ class StationApplication:
         start_response(f"{status} {HTTPStatus(status).phrase}", headers)
         return [b"" if head else body]
 
-    def _json(self, start_response, status, value, *, extra=(), head=False):
+    def _json(self, start_response, status, value, *, extra=(), head=False, limit=MAX_PROTECTED_BYTES):
         body = json.dumps(value, ensure_ascii=True, allow_nan=False, separators=(",", ":")).encode()
-        if len(body) > MAX_PROTECTED_BYTES:
+        if len(body) > limit:
             raise ReportUnavailable()
         return self._response(start_response, status, body, "application/json; charset=utf-8", extra=extra, head=head)
 
@@ -161,9 +162,9 @@ class StationApplication:
         return self.identity.session(token, touch=touch)
 
     @staticmethod
-    def _body(environ, expected):
+    def _body(environ, expected, limit=MAX_BODY):
         length = environ.get("CONTENT_LENGTH", "")
-        if (not re.fullmatch(r"[1-9][0-9]{0,4}", length) or int(length) > MAX_BODY
+        if (not re.fullmatch(r"[1-9][0-9]{0,6}", length) or int(length) > limit
                 or environ.get("CONTENT_TYPE", "") not in ("application/json", "application/json; charset=utf-8")
                 or environ.get("HTTP_CONTENT_ENCODING") or environ.get("HTTP_TRANSFER_ENCODING")):
             raise ValueError("invalid request")
@@ -194,6 +195,10 @@ class StationApplication:
             return self._error(start_response, 400, "PASSWORD_REJECTED", head=head)
         except AccessDenied:
             return self._error(start_response, 401, "ACCESS_DENIED", head=head)
+        except DraftConflict:
+            return self._error(start_response, 409, "DRAFT_CONFLICT", head=head)
+        except DraftNotFound:
+            return self._error(start_response, 404, "DRAFT_NOT_FOUND", head=head)
         except InspectionRejected:
             return self._error(start_response, 409, "INSPECTION_REJECTED", head=head)
         except NoActiveSession:
@@ -260,6 +265,18 @@ class StationApplication:
                 self.identity.logout(token)
             return self._json(start_response, 200, {"schema": "vision.api.logout.v1", "loggedOut": True},
                               extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
+        if method == "POST" and target in {"/api/v1/library/editor/" + action for action in FIELDS}:
+            if (environ.get("HTTP_ORIGIN") != origin
+                    or environ.get("HTTP_X_VISION_CLIENT") != "webgui"):
+                return self._error(start_response, 403, "ORIGIN_REJECTED")
+            identity = self._authorize(environ, touch=False)
+            if identity["role"] != "operator":
+                return self._error(start_response, 403, "OPERATOR_REQUIRED")
+            action = target.rsplit("/",1)[1]
+            body = self._body(environ, FIELDS[action], ASSET_WIRE_LIMIT if action=="asset_import" else EDITOR_WIRE_LIMIT)
+            report = self.owner.draft_editor(action, body)
+            return self._json(start_response, 200, report,
+                limit=ASSET_WIRE_LIMIT if action=="asset_preview" else MAX_PROTECTED_BYTES)
         if method == "POST" and target in ("/api/v1/inspection/start", "/api/v1/inspection/close"):
             if (environ.get("HTTP_ORIGIN") != origin
                     or environ.get("HTTP_X_VISION_CLIENT") != "webgui"):
@@ -328,7 +345,7 @@ def serve_application(application, *, port):
         raise ValueError("invalid loopback port")
     serve(application, host="127.0.0.1", port=port, threads=4,
           connection_limit=32, backlog=32, channel_timeout=10, cleanup_interval=2,
-          max_request_header_size=8192, max_request_body_size=MAX_BODY,
+          max_request_header_size=8192, max_request_body_size=ASSET_WIRE_LIMIT,
           outbuf_overflow=MAX_STATIC_FILE, outbuf_high_watermark=MAX_STATIC_FILE,
           inbuf_overflow=4096, expose_tracebacks=False, ident="Vision",
           clear_untrusted_proxy_headers=True, log_untrusted_proxy_headers=False)

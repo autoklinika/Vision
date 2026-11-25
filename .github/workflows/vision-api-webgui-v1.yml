@@ -20,6 +20,8 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: webgui/package-lock.json
+      - name: Install pinned reference image decoder
+        run: python -m pip install -r requirements-photography.txt
       - name: API wire contract and loopback tests
         run: PYTHONPATH=src python -B -m unittest discover -s tests/api -v
       - name: Install pinned station HTTP server
@@ -85,6 +87,13 @@ jobs:
         working-directory: webgui
         run: |
           npm run test:station -- --browser=firefox
+          test ! -e ../.station-test-auth.json
+      - name: Authenticated ECU editor in Chromium and Firefox
+        working-directory: webgui
+        run: |
+          npx playwright test --config playwright.editor.config.ts --browser=chromium
+          test ! -e ../.station-test-auth.json
+          npx playwright test --config playwright.editor.config.ts --browser=firefox
           test ! -e ../.station-test-auth.json
       - name: Dependency audit
         working-directory: webgui

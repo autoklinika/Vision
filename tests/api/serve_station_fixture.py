@@ -23,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--auth-file", type=Path, required=True)
+    parser.add_argument("--editor-operator", action="store_true", help="Use an explicit operator in this disposable fixture only.")
     args = parser.parse_args()
     created = False
     def stop(_signal, _frame):
@@ -32,7 +33,7 @@ def main():
         root = Path(directory)
         username, password = "operator", secrets.token_urlsafe(32)
         accounts = root / "accounts.json"
-        provision_account(accounts, username, password)
+        provision_account(accounts, username, password, role="operator" if args.editor_operator else "reader")
         owner = RemoteStationOwner(root / "ipc/core.sock")
         core = subprocess.Popen([sys.executable, "-B", "-m", "vision_station.service",
                                  "--socket", str(root / "ipc/core.sock"),

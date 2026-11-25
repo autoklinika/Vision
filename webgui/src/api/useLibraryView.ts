@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReadOnlyVisionClient } from './types';
 import type { LibraryDetail, LibraryEntry, LibraryHistory, LibraryReport } from './libraryContract';
 
@@ -15,13 +15,18 @@ export type LibraryControls = Readonly<{
 const empty = (status: LibraryView['status']): LibraryView => ({status, library: null, detail: null, history: null});
 
 /** Ephemeral presentation only: one list page and one detail/history page. */
-export function useLibraryView(client: ReadOnlyVisionClient, intervalMs = 0): LibraryControls {
+export function useLibraryView(client: ReadOnlyVisionClient, intervalMs = 0, owner = ''): LibraryControls {
   const enabled = client.mode === 'real' && !!client.readLibrary && !!client.readLibraryEntry && !!client.readLibraryHistory;
-  const [view, setView] = useState<LibraryView>(() => empty(enabled ? 'NOT_REQUESTED' : 'DISABLED'));
+  // A -> disconnected -> A is a new observation, even with the same IDs.
+  const ownerToken = useMemo(() => Symbol(owner), [owner]);
+  const [ownedView, setOwnedView] = useState(() => ({owner: ownerToken, view: empty(enabled ? 'NOT_REQUESTED' : 'DISABLED')}));
+  // Mask the old owner synchronously, before effects and late requests settle.
+  const view = ownedView.owner === ownerToken ? ownedView.view : empty(enabled ? 'NOT_REQUESTED' : 'DISABLED');
+  const setView = (next: LibraryView) => setOwnedView({owner: ownerToken, view: next});
   const busy = useRef(false);
   const generation = useRef(0);
   const refreshRef = useRef<() => void>(() => {});
-  useEffect(() => () => { generation.current++; }, []);
+  useEffect(() => () => { generation.current++; busy.current = false; }, [ownerToken, enabled]);
 
   async function run(read: () => Promise<LibraryView>, quiet = false) {
     if (!enabled || busy.current) return;
@@ -33,7 +38,7 @@ export function useLibraryView(client: ReadOnlyVisionClient, intervalMs = 0): Li
       if (current === generation.current) setView(result);
     } catch {
       if (current === generation.current) setView(empty('UNAVAILABLE'));
-    } finally { busy.current = false; }
+    } finally { if (current === generation.current) busy.current = false; }
   }
   function refreshLibrary(quiet = false) {
     const previous = view;
@@ -97,6 +102,6 @@ export function useLibraryView(client: ReadOnlyVisionClient, intervalMs = 0): Li
     const first = window.setTimeout(() => refreshRef.current(), 0);
     const timer = window.setInterval(() => refreshRef.current(), intervalMs);
     return () => { window.clearTimeout(first); window.clearInterval(timer); };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, ownerToken]);
   return {view, refreshLibrary: () => refreshLibrary(intervalMs > 0), browseEntry, libraryPage, historyPage, autoRefresh: intervalMs > 0};
 }

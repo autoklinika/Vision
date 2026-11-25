@@ -18,7 +18,7 @@ export function StationStatusContent({station, session}: {station: StationPresen
       report.state === 'NO_ACTIVE_SESSION' ? 'Vision Core is connected. No inspection session is active.' : 'The current session report comes from Vision Core.'}</p>
     <p><button onClick={station.refresh}>Refresh station</button></p>
     <p className="fine-print">Station information refreshes automatically. Closing this desktop leaves Vision running.</p>
-    <InspectionContent station={station}/>
+    <InspectionContent key={[report.instanceId,report.coreConnection,report.sessionId,report.sessionViewId,station.accountBusy].join(':')} station={station}/>
     <SessionContent section="summary" controls={session}/>
   </>;
 }

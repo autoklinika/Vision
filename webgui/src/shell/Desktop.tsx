@@ -15,14 +15,18 @@ export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
   return <svg className={small ? 'app-icon small' : 'app-icon'} viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges"><path d="M3 5h23v3h3v21H3z" fill="#000"/><path d="M4 6h21v3h3v19H4z" fill="#fff"/><path d="M6 9h19v16H6z" fill={['#008080','#b59c42','#487a48','#367ca5','#756198','#a65d5d','#488b8b','#777','#b38b45','#6a7484'][index]}/><path d="M6 9h19v3H6z" fill="#000080"/><text x="16" y="23" textAnchor="middle" fontSize="15" fill="white">{apps[index].glyph}</text><path d="M2 29h27v2H2z" fill="#004747"/></svg>;
 }
 export function Desktop({ client, snapshot, refresh, station }: { client: ReadOnlyVisionClient; snapshot: Snapshot | null; refresh: () => void; station?: StationPresentation }) {
-  const sessionRead = useSessionView(client, station?.report.state === 'SESSION_ACTIVE' ? 5000 : 0);
+  const projectionOwner = station ? [station.report.instanceId, station.report.coreConnection,
+    station.report.state, station.report.sessionId, station.report.sessionViewId].join(':') : '';
+  const sessionRead = useSessionView(client, station?.report.state === 'SESSION_ACTIVE' ? 5000 : 0, projectionOwner);
   const sessionControls = station?.report.coreConnection === 'NOT_CONNECTED'
     ? {...sessionRead, refreshSession: station.refresh, view: {status: 'UNAVAILABLE' as const, session: null, events: null}}
     : station?.report.state === 'NO_ACTIVE_SESSION' ? {...sessionRead, view: {status: 'NO_ACTIVE_SESSION' as const, session: null, events: null}} : sessionRead;
-  const libraryControls = useLibraryView(client, station ? 15000 : 0);
+  const libraryRead = useLibraryView(client, station ? 15000 : 0, projectionOwner);
+  const libraryControls = station?.report.coreConnection === 'NOT_CONNECTED'
+    ? {...libraryRead, view: {status: 'UNAVAILABLE' as const, library: null, detail: null, history: null}} : libraryRead;
   const mode = station ? 'CONNECTED · VENTUNO' : modeLabel(client.mode, snapshot);
   const connection = station ? 'Connected' : connectionLabel(snapshot);
-  const description = station ? `${station.identity.username} · ${station.report.coreConnection === 'CONNECTED' ? 'Core connected' : 'Core not connected'} · Read only` : modeDescription(client.mode, snapshot);
+  const description = station ? `${station.identity.username} · ${station.report.coreConnection === 'CONNECTED' ? 'Core connected' : 'Core not connected'} · ${station.identity.role==='operator'?'Operator':'Read only'}` : modeDescription(client.mode, snapshot);
   const [size, setSize] = useState(bounds);
   const [state, setState] = useState(() => { try { return decodeLayout(localStorage.getItem(storageKey), bounds()); } catch { return decodeLayout(null, bounds()); } });
   const [persistence, setPersistence] = useState('Layout preferences are local to this browser.');
@@ -67,7 +71,16 @@ export function Desktop({ client, snapshot, refresh, station }: { client: ReadOn
     const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
     dispatch({ type: 'rect', id: win.id, rect: kind === 'move' ? { ...win.rect, x: win.rect.x + dx, y: win.rect.y + dy } : { ...win.rect, width: win.rect.width + dx, height: win.rect.height + dy } });
   }
+  function allowEditorExit(id?:AppId) {
+    const root=id?windowsRef.current.get(id):document;
+    if(root?.querySelector('[data-editor-busy="true"]')) {
+      window.alert('A Core editor request is pending. Wait for its outcome before closing the editor.');
+      return false;
+    }
+    return !root?.querySelector('[data-editor-dirty="true"]')||window.confirm('Discard unsaved ECU draft changes?');
+  }
   function reset() {
+    if(!allowEditorExit())return;
     try { localStorage.removeItem(storageKey); setPersistence('Layout reset. Only desktop preferences were affected.'); } catch { setPersistence('Browser storage unavailable. Layout reset for this tab.'); }
     dispatch({ type: 'reset' });
   }
@@ -81,15 +94,15 @@ export function Desktop({ client, snapshot, refresh, station }: { client: ReadOn
         const rect = win.maximized ? { x: 0, y: 0, ...size } : clamp(win.rect, size);
         return <section role="dialog" aria-modal="false" aria-labelledby={`title-${win.id}`} tabIndex={-1} ref={node => { if (node) windowsRef.current.set(win.id, node); else windowsRef.current.delete(win.id); }} className={`window app-window ${state.active === win.id ? 'active' : ''}`} key={win.id} hidden={win.minimized} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, zIndex: z + 1 }} onPointerDown={() => { if (state.active !== win.id) dispatch({ type: 'focus', id: win.id }); }} onFocus={() => { if (state.active !== win.id) dispatch({ type: 'focus', id: win.id }); }}>
           <div className={`title-bar ${state.active !== win.id ? 'inactive' : ''}`} tabIndex={0} aria-label={`Move ${app.title} with arrow keys`} onKeyDown={e => keyboard(e, win, 'move')} onPointerDown={e => begin(e, win, 'move')} onPointerMove={move} onPointerUp={() => { gesture.current = null; }} onPointerCancel={() => { gesture.current = null; }} onDoubleClick={e => { if (!(e.target as HTMLElement).closest('button')) dispatch({ type: 'maximize', id: win.id }); }}>
-            <div className="title-bar-text" id={`title-${win.id}`}><Icon id={win.id} small/>{app.title}</div><div className="title-bar-controls"><button aria-label={`Minimize ${app.title}`} onClick={() => dispatch({ type: 'minimize', id: win.id })}/><button aria-label={`${win.maximized ? 'Restore' : 'Maximize'} ${app.title}`} className={win.maximized ? 'restore-button' : 'maximize-button'} onClick={() => dispatch({ type: 'maximize', id: win.id })}/><button aria-label={`Close ${app.title}`} onClick={() => dispatch({ type: 'close', id: win.id })}/></div>
+            <div className="title-bar-text" id={`title-${win.id}`}><Icon id={win.id} small/>{app.title}</div><div className="title-bar-controls"><button aria-label={`Minimize ${app.title}`} onClick={() => dispatch({ type: 'minimize', id: win.id })}/><button aria-label={`${win.maximized ? 'Restore' : 'Maximize'} ${app.title}`} className={win.maximized ? 'restore-button' : 'maximize-button'} onClick={() => dispatch({ type: 'maximize', id: win.id })}/><button aria-label={`Close ${app.title}`} onClick={() => {if(allowEditorExit(win.id))dispatch({type:'close',id:win.id});}}/></div>
           </div>
-          <div className="window-menubar"><span>Vision client</span><span>{mode}</span><span>{win.id === 'settings' ? 'Account settings' : 'Read only'}</span></div>
+          <div className="window-menubar"><span>Vision client</span><span>{mode}</span><span>{win.id === 'settings' ? 'Account settings' : win.id==='ecu'&&station?.identity.role==='operator'?'Draft editor':'Read only'}</span></div>
           <div className="window-body"><AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={persistence} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls} libraryControls={libraryControls} station={station}/></div>
           <footer className="status-bar"><p className="status-bar-field">{win.id === 'control' ? 'Local UI preferences' : win.id === 'settings' ? 'Your account security' : 'No operational commands'}</p><p className="status-bar-field">{connection}</p>{!win.maximized && <button className="resize-handle" aria-label={`Resize ${app.title} with arrow keys`} onKeyDown={e => keyboard(e, win, 'resize')} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); gesture.current = { id: win.id, kind: 'resize', x: e.clientX, y: e.clientY, rect: win.rect }; }} onPointerMove={move} onPointerUp={() => { gesture.current = null; }} onPointerCancel={() => { gesture.current = null; }}>◢</button>}</footer>
         </section>;
       })}
     </div>
-    {start && <div className="start-menu window" ref={menuRef} role="menu" aria-label="Start applications" onKeyDown={e => { const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')); const i = items.indexOf(document.activeElement as HTMLButtonElement); if (['ArrowDown','ArrowUp','Home','End'].includes(e.key)) { e.preventDefault(); items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); } }}><div className="start-brand">VISION <b>Desktop</b></div><div className="start-items">{station && <div className="station-account">Signed in as {station.identity.username}</div>}{apps.map(app => <button role="menuitem" key={app.id} onClick={() => launch(app.id)}><Icon id={app.id} small/>{app.title}</button>)}<hr/>{station ? <button role="menuitem" disabled={station.accountBusy} onClick={() => { setStart(false); station.logout(); }}>Sign out</button> : <button role="menuitem" disabled>Log in… · unavailable</button>}<button role="menuitem" disabled>Restart system… · unavailable</button><button role="menuitem" disabled>Shut down system… · unavailable</button></div></div>}
+    {start && <div className="start-menu window" ref={menuRef} role="menu" aria-label="Start applications" onKeyDown={e => { const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')); const i = items.indexOf(document.activeElement as HTMLButtonElement); if (['ArrowDown','ArrowUp','Home','End'].includes(e.key)) { e.preventDefault(); items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); } }}><div className="start-brand">VISION <b>Desktop</b></div><div className="start-items">{station && <div className="station-account">Signed in as {station.identity.username}</div>}{apps.map(app => <button role="menuitem" key={app.id} onClick={() => launch(app.id)}><Icon id={app.id} small/>{app.title}</button>)}<hr/>{station ? <button role="menuitem" disabled={station.accountBusy} onClick={() => { if(allowEditorExit()){setStart(false);station.logout();} }}>Sign out</button> : <button role="menuitem" disabled>Log in… · unavailable</button>}<button role="menuitem" disabled>Restart system… · unavailable</button><button role="menuitem" disabled>Shut down system… · unavailable</button></div></div>}
     <footer className="taskbar"><button className={`start-button ${start ? 'pressed' : ''}`} ref={startRef} aria-expanded={start} aria-haspopup="menu" onClick={() => setStart(!start)}><span className="start-symbol" aria-hidden="true">V</span>Start</button><span className="taskbar-divider"/><div className="task-buttons">{state.windows.map(win => <button key={win.id} className={state.active === win.id && !win.minimized ? 'pressed' : ''} aria-pressed={state.active === win.id && !win.minimized} onClick={() => dispatch({ type: state.active === win.id && !win.minimized ? 'minimize' : 'focus', id: win.id })}><Icon id={win.id} small/><span>{apps.find(a => a.id === win.id)!.title}</span></button>)}</div><div className="tray" role="status">{connection}<span>Client only</span></div></footer>
   </main>;
 }

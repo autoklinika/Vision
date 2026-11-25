@@ -1,5 +1,6 @@
 """Bounded private station server for one independently owned station backend."""
 import fcntl
+import json
 import os
 import socketserver
 import stat
@@ -9,8 +10,9 @@ import time
 from vision_api.access import Credentials, CursorRejected, ReportUnavailable
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
-from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
-                       check_peer, checked_path, checked_socket, receive, send)
+from .draft_editor import DraftConflict, DraftNotFound, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
+from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
+                       check_peer, checked_path, checked_socket, exchange_timeout, receive, send)
 
 
 def dispatch(host, request):
@@ -18,6 +20,13 @@ def dispatch(host, request):
             or request["schema"] != PROTOCOL or type(request["query"]) is not dict):
         raise ValueError("invalid station request")
     operation, query = request["operation"], request["query"]
+    if operation == "draft_editor" and set(query) == {"action", "args"}:
+        limit=ASSET_WIRE_LIMIT if query["action"]=="asset_import" else EDITOR_WIRE_LIMIT
+        if len(json.dumps(request,ensure_ascii=True,allow_nan=False,separators=(",",":")).encode("ascii"))>limit:
+            raise ValueError("editor request too large")
+        return host.draft_editor(query["action"], query["args"])
+    if len(json.dumps(request, ensure_ascii=True, allow_nan=False, separators=(",", ":")).encode("ascii")) > LEGACY_REQUEST_LIMIT:
+        raise ValueError("legacy request too large")
     if operation == "station" and not query:
         return host.station_report()
     if operation == "inspection" and not query:
@@ -41,12 +50,22 @@ def dispatch(host, request):
 
 class _Handler(socketserver.BaseRequestHandler):
     def handle(self):
-        deadline = time.monotonic() + EXCHANGE_TIMEOUT
+        started = time.monotonic()
+        deadline = started + EXCHANGE_TIMEOUT
+        response_limit=RESPONSE_LIMIT
         try:
             check_peer(self.request)
             request = receive(self.request, limit=REQUEST_LIMIT, deadline=deadline)
+            if type(request) is dict:
+                deadline = started + exchange_timeout(request.get("operation"))
             report = dispatch(self.server.host, request)
+            if request["operation"]=="draft_editor" and request["query"]["action"]=="asset_preview":
+                response_limit=ASSET_WIRE_LIMIT
             response = {"schema": PROTOCOL, "report": report}
+        except DraftConflict:
+            response = {"schema": PROTOCOL, "error": "DRAFT_CONFLICT"}
+        except DraftNotFound:
+            response = {"schema": PROTOCOL, "error": "DRAFT_NOT_FOUND"}
         except InspectionRejected:
             response = {"schema": PROTOCOL, "error": "INSPECTION_REJECTED"}
         except NoActiveSession:
@@ -60,7 +79,7 @@ class _Handler(socketserver.BaseRequestHandler):
         except Exception:
             response = {"schema": PROTOCOL, "error": "REPORT_UNAVAILABLE"}
         try:
-            send(self.request, response, limit=RESPONSE_LIMIT, deadline=deadline)
+            send(self.request, response, limit=response_limit, deadline=deadline)
         except Exception:
             pass  # No raw payload, path, credential or traceback is logged.
 

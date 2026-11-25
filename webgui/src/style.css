@@ -42,3 +42,52 @@
 .library-detail-scroll code { font-size: 10px; overflow-wrap: anywhere; }
 .library-detail .fine-print { margin: 7px 0; }
 .library-empty { color: #555; margin: 12px 8px; font-size: 11px; }
+
+.draft-editor { padding: 10px; margin: 8px 0 12px; background: #e6e6e6; overflow-wrap: anywhere; }
+.draft-editor .draft-fields { display: grid; grid-template-columns: minmax(80px,120px) minmax(0,1fr); gap: 6px; align-items:center; margin-bottom:8px; }
+.draft-editor input, .draft-editor select { min-width:0; max-width:100%; }
+.draft-editor .draft-tools { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.draft-editor textarea { display:block; width:100%; font:12px monospace; min-height:120px; resize:vertical; white-space:pre; }
+.draft-editor fieldset { margin: 8px 0; }
+.draft-diagnostic { background:white; padding:8px; margin-top:8px; max-height:200px; overflow:auto; }
+
+/* ECU editor: use the existing Win98 window, not a second desktop shell. */
+.editor-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.editor-heading h3{font-size:15px;margin:0}.editor-heading span{font-size:11px;color:#444}
+.editor-summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:6px 8px;background:white;border:1px inset #888}
+.editor-summary strong{font-size:13px}.editor-summary span{font-size:11px;overflow-wrap:anywhere}
+.editor-toolbar,.editor-section-nav{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 0}
+.editor-section-nav select{flex:1;min-width:100px;max-width:100%}
+.editor-feedback{background:white;border:1px inset #888;padding:8px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.editor-section-layout{display:grid;grid-template-columns:minmax(126px,28%) minmax(0,1fr);gap:9px;align-items:start}
+.editor-section-list{display:flex;flex-direction:column;gap:2px;align-self:start;position:sticky;top:0;min-width:0}
+.editor-section-list button{min-width:0;width:100%;font-size:11px;text-align:left;white-space:normal;line-height:1.25;padding:5px 6px;min-height:26px}
+.editor-section-current{background:#000080!important;color:white!important;font-weight:bold}
+.editor-section-form{min-width:0;background:#efefef;border:1px inset #888;padding:8px}
+.editor-section-form>h3{font-size:13px;margin:0}.editor-section-form>p{margin:5px 0 10px}
+.editor-section-form fieldset{min-width:0;margin:7px 0;padding:8px}
+.editor-section-form legend{font-weight:bold;font-size:11px;max-width:100%;overflow-wrap:anywhere}
+.editor-object-fields{display:flex;flex-direction:column;gap:5px;min-width:0}
+.editor-field{display:grid;grid-template-columns:minmax(86px,38%) minmax(0,1fr);gap:7px;align-items:start;min-width:0}
+.editor-field>label,.editor-field>span{font-size:11px;line-height:1.3;padding-top:4px}
+.editor-field input:not([type=checkbox]),.editor-field select{width:100%;min-width:0;max-width:100%}
+.editor-field-help,.editor-warning{display:block;font-size:10px;line-height:1.35;margin-top:3px}
+.editor-warning{color:#900}.editor-locked output{display:block;padding:3px 4px;background:#dedede;border:1px inset #aaa;font-size:11px}
+.editor-checkbox input{margin:3px 0}.editor-row{background:#e2e2e2;border:1px solid #999}
+.editor-row-toolbar{display:flex;justify-content:flex-end;margin:0 0 6px}
+.editor-row-toolbar button,.editor-collection button{font-size:11px;min-height:23px}
+.editor-vector-fields{display:grid;gap:5px;min-width:0}.editor-vector-fields label{min-width:0;font-size:11px}
+.editor-vector-fields input{display:block;width:100%;min-width:0;margin-top:2px}
+.editor-optional-toggle{display:flex;gap:4px;align-items:center;font-size:11px;margin-bottom:6px}
+.editor-list-row{display:flex;align-items:start;gap:4px;margin-bottom:5px}.editor-list-row>.editor-field{flex:1}
+.editor-threshold{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px;margin-bottom:7px}.editor-threshold label{flex:1;min-width:70px;font-size:11px}.editor-threshold input{width:100%;display:block}
+.editor-diagnostics{border:1px groove #aaa;margin-top:10px;padding:7px}.editor-diagnostics summary{cursor:pointer;font-weight:bold;padding:3px 0}.editor-diagnostics[open] summary{margin-bottom:6px}
+@media(max-width:760px){.editor-section-layout{grid-template-columns:minmax(0,1fr)}.editor-section-list{display:none}}
+
+.editor-asset-box{background:#e9e9e9}.editor-asset-box .draft-fields{grid-template-columns:minmax(80px,36%) minmax(0,1fr)}
+.editor-asset-preview{margin:8px 0;background:#fff;border:1px inset #999;padding:6px;overflow-wrap:anywhere}
+.editor-asset-preview img{display:block;max-width:100%;max-height:270px;object-fit:contain;margin:auto}
+
+.draft-editor {container-type:inline-size}
+@container (max-width: 660px){.editor-section-layout{grid-template-columns:minmax(0,1fr)}.editor-section-list{display:none}}
+@container (max-width: 440px){.editor-field,.draft-editor .draft-fields{grid-template-columns:minmax(0,1fr);gap:3px}.editor-section-form fieldset{padding:5px}.editor-field>label,.editor-field>span{padding-top:0}.editor-vector-fields{gap:3px}.editor-list-row{flex-wrap:wrap}.editor-list-row>.editor-field{min-width:100%}}

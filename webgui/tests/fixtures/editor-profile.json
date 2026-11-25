@@ -1,0 +1,397 @@
+{
+  "metadata": {
+    "kind": "ecu_reference_profile",
+    "schema_version": "1",
+    "template_only": false,
+    "profile_id": "fixture-reference",
+    "family_id": "fixture-family",
+    "variant_id": "fixture-variant",
+    "profile_revision": "r1",
+    "display_name": "Synthetic form fixture",
+    "status": "DRAFT",
+    "approval_scopes": [],
+    "content_sha256": null
+  },
+  "identity": {
+    "manufacturer": "Synthetic instrument lab",
+    "manufacturer_part_numbers": [
+      "TEST-01"
+    ],
+    "oem_part_numbers": [
+      "TEST-OEM"
+    ],
+    "aliases": [
+      "fixture"
+    ],
+    "variant_relations": [],
+    "distinguishing_features": [
+      "connector"
+    ],
+    "known_indistinguishable_variants": [
+      "fixture-other"
+    ],
+    "declared_by_operator": true
+  },
+  "physical_states": [
+    {
+      "state_id": "closed",
+      "display_name": "closed",
+      "geometry_id": "g_closed",
+      "required_recipe_ids": [],
+      "verified": true,
+      "source_id": "source"
+    },
+    {
+      "state_id": "pcb_exposed_top",
+      "display_name": "pcb_exposed_top",
+      "geometry_id": "g_pcb_exposed_top",
+      "required_recipe_ids": [
+        "photo"
+      ],
+      "verified": true,
+      "source_id": "source"
+    }
+  ],
+  "coordinate_systems": {
+    "ecu_local": {
+      "origin_description": "synthetic datum",
+      "datum_reference": "source",
+      "axis_definitions": "right-handed XYZ",
+      "handedness": "right",
+      "linear_unit": "mm",
+      "verified": true
+    },
+    "state_transforms": [
+      {
+        "from_state_id": "closed",
+        "to_state_id": "pcb_exposed_top",
+        "translation_mm": [
+          1,
+          -2,
+          0
+        ],
+        "quaternion_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "source_id": "source",
+        "verified": false
+      }
+    ]
+  },
+  "geometry": {
+    "per_physical_state": [
+      {
+        "geometry_id": "g_closed",
+        "state_id": "closed",
+        "envelope_xyz_mm": [
+          100,
+          80,
+          20
+        ],
+        "collision_asset_id": null,
+        "source_id": "source",
+        "uncertainty_mm": 0.1,
+        "verified": true
+      },
+      {
+        "geometry_id": "g_pcb_exposed_top",
+        "state_id": "pcb_exposed_top",
+        "envelope_xyz_mm": [
+          100,
+          80,
+          20
+        ],
+        "collision_asset_id": null,
+        "source_id": "source",
+        "uncertainty_mm": 0.1,
+        "verified": true
+      }
+    ],
+    "collision_geometry_requires_verified_envelope": true
+  },
+  "connectors_landmarks": {
+    "connectors": [
+      {
+        "feature_id": "connector",
+        "state_id": "pcb_exposed_top",
+        "color": "blue",
+        "position_mm": [
+          10,
+          10,
+          1
+        ],
+        "source_id": "source",
+        "uncertainty_mm": 0.1,
+        "required_for_identity": true,
+        "verified": true
+      }
+    ],
+    "landmarks": [
+      {
+        "feature_id": "test-landmark",
+        "state_id": "pcb_exposed_top",
+        "kind": "test-corner",
+        "position_mm": [
+          1.25,
+          2,
+          0
+        ],
+        "source_id": "source",
+        "uncertainty_mm": 0.2,
+        "verified": false
+      }
+    ],
+    "variant_disambiguation_uses_physical_features": true
+  },
+  "reference_assets": {
+    "storage_policy": "controlled_or_private",
+    "asset_manifest_revision": "assets-r1",
+    "assets": [
+      {
+        "asset_id": "image",
+        "kind": "photo",
+        "relative_path": "private/image.png",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bytes": 100,
+        "mime": "image/png",
+        "physical_state_id": "pcb_exposed_top",
+        "source_id": "source",
+        "verified": false,
+        "privacy_class": "private"
+      }
+    ]
+  },
+  "recognition_rules": {
+    "selected_variant_must_be_verified": true,
+    "features_to_check": [
+      {
+        "feature_id": "connector",
+        "state_id": "pcb_exposed_top",
+        "method": "rgb_landmark",
+        "required": true,
+        "tolerance_mm": 1,
+        "reference_asset_id": "image",
+        "source_id": "source"
+      }
+    ],
+    "required_sensor_capabilities": [
+      "rgb"
+    ],
+    "on_ambiguity": "BLOCK_AND_REQUIRE_OPERATOR_REVIEW",
+    "on_missing_required_evidence": "NOT_READY",
+    "accepted_policy_ref": "qa"
+  },
+  "localization_rules": {
+    "required_features": [
+      "connector"
+    ],
+    "required_sensor_capabilities": [],
+    "pose_output_frame": "ecu_local",
+    "requires_fresh_tf": true,
+    "requires_current_scene": true,
+    "pose_quality_policy_ref": "qa",
+    "methods": [
+      "rgbd_pose"
+    ]
+  },
+  "pcb_definition": {
+    "boards": [
+      {
+        "board_id": "board",
+        "state_id": "pcb_exposed_top",
+        "source_id": "source",
+        "verified": true
+      }
+    ],
+    "regions_of_interest": [
+      {
+        "roi_id": "roi",
+        "board_id": "board",
+        "state_id": "pcb_exposed_top",
+        "rectangle_xywh_mm": [
+          1,
+          2,
+          20,
+          30
+        ],
+        "source_id": "source",
+        "verified": true
+      }
+    ]
+  },
+  "photography_recipes": {
+    "recipes": [
+      {
+        "recipe_id": "photo",
+        "state_id": "pcb_exposed_top",
+        "views": [
+          {
+            "view_id": "view",
+            "roi_refs": [
+              "roi"
+            ],
+            "camera_goal": {
+              "frame": "ecu_local",
+              "translation_mm": [
+                0,
+                0,
+                100
+              ],
+              "quaternion_xyzw": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            "aim_point_mm": [
+              10,
+              10,
+              0
+            ],
+            "working_distance_range_mm": [
+              50,
+              150
+            ],
+            "required_capabilities": [
+              "camera"
+            ],
+            "quality_policy_ref": "qa",
+            "required": true,
+            "source_id": "source"
+          }
+        ],
+        "quality_policy_refs": [
+          "qa"
+        ]
+      }
+    ],
+    "quality_policy_refs": []
+  },
+  "thermal_recipes": {
+    "modality_optional_by_default": true,
+    "recipes": [
+      {
+        "recipe_id": "thermal-test",
+        "state_id": "pcb_exposed_top",
+        "roi_refs": [
+          "roi"
+        ],
+        "mode": "relative_intensity",
+        "required_calibration_refs": [
+          "camera_cal"
+        ],
+        "quality_policy_ref": "qa",
+        "required_capabilities": [
+          "thermal"
+        ]
+      }
+    ],
+    "radiometric_requires_calibration": true
+  },
+  "inspection_workflows": {
+    "recipes": [
+      {
+        "recipe_id": "photo",
+        "state_id": "pcb_exposed_top",
+        "scenario_ref": "inspection",
+        "required_view_ids": [
+          "view"
+        ],
+        "required_modules": [
+          "vision"
+        ],
+        "required_capabilities": [
+          "camera"
+        ],
+        "quality_policy_refs": [
+          "qa"
+        ],
+        "required_asset_ids": [
+          "image"
+        ],
+        "approval_scope": "photo_inspection"
+      },
+      {
+        "recipe_id": "thermal-test",
+        "state_id": "pcb_exposed_top",
+        "scenario_ref": "test",
+        "required_view_ids": [],
+        "required_modules": [],
+        "required_capabilities": [
+          "thermal"
+        ],
+        "quality_policy_refs": [
+          "qa"
+        ],
+        "required_asset_ids": [],
+        "approval_scope": "thermal_relative"
+      }
+    ],
+    "no_arbitrary_executable_code_in_profile": true,
+    "no_automatic_motion_after_failure": true
+  },
+  "validation_policies": {
+    "policies": [
+      {
+        "policy_id": "qa",
+        "kind": "quality",
+        "thresholds": {
+          "minimum": 1
+        },
+        "source_id": "source",
+        "verified": true
+      }
+    ],
+    "readiness_by_scope_and_physical_state": [
+      {
+        "state_id": "pcb_exposed_top",
+        "recipe_id": "photo",
+        "scope": "photo_inspection",
+        "approved": false,
+        "source_id": "source"
+      },
+      {
+        "state_id": "pcb_exposed_top",
+        "recipe_id": "thermal-test",
+        "scope": "thermal_relative",
+        "approved": false,
+        "source_id": "source"
+      }
+    ],
+    "missing_required_data": "NOT_READY",
+    "variant_not_unique": "AMBIGUOUS",
+    "automatic_variant_substitution": false
+  },
+  "provenance_release": {
+    "measurement_sources": [
+      {
+        "source_id": "source",
+        "date": "2026-01-01",
+        "status": "MEASURED",
+        "instrument": "synthetic",
+        "datum": "synthetic",
+        "uncertainty_mm": 0.1,
+        "reference": "synthetic"
+      }
+    ],
+    "calibration_dependencies": [
+      {
+        "name": "camera_cal",
+        "revision": "r1"
+      }
+    ],
+    "asset_hashes": [
+      {
+        "asset_id": "image",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "release_approval": null,
+    "released_snapshot_sha256": null,
+    "supersedes": null
+  }
+}
