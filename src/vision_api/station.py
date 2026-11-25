@@ -17,7 +17,7 @@ from .access import AccessDenied, Credentials, CursorRejected, ReportUnavailable
 from .identity import IdentityStore, InvalidIdentityStore, RateLimited, parse_session_cookie
 from .reports import MAX_PROTECTED_BYTES, MAX_SEQUENCE
 from .server import EVENTS_PATH, LIBRARY_ENTRY, LIBRARY_HISTORY, LIBRARY_PAGE
-from .station_owner import NoActiveSession, StationOwner
+from .station_owner import NoActiveSession
 from .status import boot_status
 
 # A 1024-byte password can expand sixfold when JSON escapes control bytes.
@@ -301,24 +301,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=18490)
     parser.add_argument("--accounts", required=True)
-    parser.add_argument("--library-root", required=True)
+    parser.add_argument("--core-socket", required=True)
     parser.add_argument("--dist", required=True)
     parser.add_argument("--https-origin", action="append", default=[])
     args = parser.parse_args()
     if not 1 <= args.port <= 65535 or any(not x.startswith("https://") for x in args.https_origin):
         parser.error("invalid station endpoint")
-    # Composition happens once at process startup, never during an HTTP read.
-    # No active Core exists until its actual backend owner explicitly binds it.
-    from vision_modules.ecu_library_backend import ECULibraryService
+    # The API owns browser identity and presentation only. The independently
+    # running Core host owns the library and any actual Runtime/Workflow.
+    from vision_station.client import RemoteStationOwner
     try:
         identity = IdentityStore(args.accounts, forbidden_roots=(args.dist,))
-        library = ECULibraryService(args.library_root)
-        owner = StationOwner(library)
+        owner = RemoteStationOwner(args.core_socket)
         application = StationApplication(identity=identity, owner=owner, dist_root=args.dist,
                                          origins=[f"http://127.0.0.1:{args.port}", *args.https_origin])
     except Exception:
         parser.exit(1, "Station configuration rejected; check private paths and station build.\n")
-    print("VISION_STATION_WEBGUI_STARTED core=NOT_CONNECTED", flush=True)
+    print("VISION_STATION_WEBGUI_STARTED core_transport=LOCAL_SOCKET", flush=True)
     serve_application(application, port=args.port)
 
 

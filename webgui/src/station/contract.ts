@@ -34,7 +34,8 @@ export function isStationReport(value: unknown): value is StationReport {
   if (!record(value, ['schema','source','instanceId','stationId','capturedAt','state','coreConnection','coreReadiness','sessionId','sessionViewId','libraryId']) ||
       value.schema !== 'vision.api.station.v1' || value.source !== 'STATION' || !hex32(value.instanceId) || value.stationId !== 'VENTUNO' || !utc(value.capturedAt) ||
       value.libraryId !== 'vision-ecu-library' || value.coreReadiness !== 'UNKNOWN' || (value.coreConnection !== 'NOT_CONNECTED' && value.coreConnection !== 'CONNECTED')) return false;
-  return value.state === 'NO_ACTIVE_SESSION' ? value.coreConnection === 'NOT_CONNECTED' && value.sessionId === null && value.sessionViewId === null :
+  // A running Core can be idle. Only an actual inspection has session IDs.
+  return value.state === 'NO_ACTIVE_SESSION' ? value.sessionId === null && value.sessionViewId === null :
     value.state === 'SESSION_ACTIVE' && value.coreConnection === 'CONNECTED' && typeof value.sessionId === 'string' && value.sessionId.length >= 1 && value.sessionId.length <= 128 &&
     !/[^A-Za-z0-9_.:-]/.test(value.sessionId) && hex32(value.sessionViewId);
 }

@@ -14,8 +14,8 @@ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 it('station and identity contracts are closed and do not turn missing Core into readiness', () => {
   expect(isIdentityReport(identityFixture())).toBe(true);
   expect(isStationReport(stationFixture())).toBe(true);
+  expect(isStationReport(stationFixture(false, true))).toBe(true);
   expect(isStationReport(stationFixture(true))).toBe(true);
-  expect(isStationReport({...stationFixture(), coreConnection: 'CONNECTED'})).toBe(false);
   expect(isLogoutReport({schema: 'vision.api.logout.v1', loggedOut: true})).toBe(true);
   for (const value of [
     {...identityFixture(), role: 'admin'}, {...identityFixture(), authenticated: false}, {...identityFixture(), token: 'private'},
@@ -23,6 +23,7 @@ it('station and identity contracts are closed and do not turn missing Core into 
   ]) expect(isIdentityReport(value)).toBe(false);
   for (const value of [
     {...stationFixture(), source: 'SYNTHETIC_TEST'}, {...stationFixture(), coreReadiness: 'READY'}, {...stationFixture(), state: 'SESSION_ACTIVE'},
+    {...stationFixture(false, true), sessionId: 'invented-session'}, {...stationFixture(false, true), sessionViewId: 'a'.repeat(32)},
     {...stationFixture(true), coreConnection: 'NOT_CONNECTED'}, {...stationFixture(), sessionId: 'old'}, {...stationFixture(), extra: true},
     {...stationFixture(), instanceId: 'a'.repeat(31) + '\n'}, {...stationFixture(), coreConnection: ['CONNECTED']},
     {...stationFixture(true), sessionId: 'session\n'}, {...stationFixture(), libraryId: 'another-library'},

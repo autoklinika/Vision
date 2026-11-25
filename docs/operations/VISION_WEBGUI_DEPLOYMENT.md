@@ -2,8 +2,9 @@
 
 ## Co uruchamia to wydanie
 
-Usługa udostępnia WebGUI w stylu Windows 98, lokalne logowanie oraz API odczytu
-trwałej biblioteki ECU. **WebGUI pozostaje klientem systemu Vision.** Nie tworzy
+Wydanie uruchamia niezależną usługę Core oraz WebGUI w stylu Windows 98 z lokalnym
+logowaniem. API odczytuje raporty Core przez prywatne połączenie lokalne.
+**WebGUI pozostaje klientem systemu Vision.** Nie tworzy
 sesji badanego egzemplarza i nie przejmuje logiki Core, walidacji wzorców ani
 sterowania urządzeniami.
 
@@ -11,13 +12,14 @@ Po uruchomieniu tego wydania poprawny stan stanowiska to:
 
 - GUI/API dostępne po zalogowaniu;
 - biblioteka ECU podłączona do rzeczywistego, trwałego backendu;
-- `coreConnection: NOT_CONNECTED`;
+- `coreConnection: CONNECTED`;
 - `state: NO_ACTIVE_SESSION`;
 - gotowość Core `UNKNOWN`.
 
-To jest działający interfejs biblioteki i stanów połączenia. Dopiero właściciel
-rzeczywistego backendu może później podłączyć istniejący Core i jego sesję. Widok
-nie zastępuje bramki sprzętowej ani nie oznacza gotowości ruchu, zdjęć czy pomiarów.
+Core działa w stanie bezczynności i posiada trwałą bibliotekę. Podłączenie sesji
+rzeczywistego egzemplarza wymaga zatwierdzonych wejść Runtime. Stan `CONNECTED`
+potwierdza odpowiedź procesu Core, a nie gotowość ruchu, zdjęć czy pomiarów.
+Restart GUI/API, wylogowanie i zamknięcie przeglądarki pozostawiają Core działający.
 
 ## Układ plików i właściciel
 
@@ -38,8 +40,10 @@ autologowania ani istniejącego ustawienia linger.
 | Profil kiosku Firefox | `/srv/vision-data/state/vision-webgui/browser/` |
 | Natywny Firefox Mozilla, gdy potrzebny | `/srv/vision-data/tools/vision-webgui/firefox/firefox` |
 | Pliki tymczasowe | `/srv/vision-data/run/vision-webgui/` |
+| Prywatny socket Core | `/srv/vision-data/run/vision-core/core.sock` |
 | Kopie poprzedniej konfiguracji | `/srv/vision-data/state/vision-webgui/deployment-backups/` |
 | Usługa użytkownika | `~/.config/systemd/user/vision-webgui.service` |
+| Niezależna usługa Core | `~/.config/systemd/user/vision-core.service` |
 | Skrót aplikacji | `~/.local/share/applications/vision-webgui.desktop` |
 | Autostart pulpitu | `~/.config/autostart/vision-webgui.desktop` |
 
@@ -109,9 +113,16 @@ aktualnego użytkownika i nie może mieć symlinków w ścieżce.
 
 `--validate-only` wykonuje odczytowy preflight. Domyślny tryb przygotowuje pliki,
 środowisko, konto początkowe i integrację pulpitu, po czym wywołuje `daemon-reload`;
-nie uruchamia ani nie zatrzymuje usługi. `--start` wykonuje `enable --now`. Jeżeli
-zarządzana usługa już działała, dodatkowo ją restartuje, aby proces korzystał
-z wybranego wydania. Instalator nie otwiera okna Firefox w bieżącej sesji pulpitu.
+nie uruchamia ani nie zatrzymuje usług. `--start` włącza automatyczny start obu
+usług, uruchamia Core, sprawdza rzeczywistą odpowiedź i uruchamia GUI/API.
+Przy pierwszym przeniesieniu biblioteki ze starego API do Core zatrzymuje stare
+API przed startem nowego właściciela. Działający już GUI/API jest przełączany na
+wybrane wydanie. Instalator nie otwiera okna Firefox w bieżącej sesji pulpitu.
+
+Instalator **nie restartuje działającego Core**. Gdy jednostka Core wskazuje inne
+wydanie, odmawia automatycznej podmiany. Przed aktualizacją Core należy potwierdzić
+`CONNECTED` i `NO_ACTIVE_SESSION`, a następnie jawnie zatrzymać jego usługę.
+Aktywna inspekcja wymaga oddzielnej procedury zakończenia lub uzgodnienia stanu.
 
 Wymagane są zamontowane `/srv/vision-data`, istniejący bus użytkownika oraz dostępne
 `git`, `systemctl`, `mountpoint`, Firefox i moduł Python `venv`. Instalator sam nie
@@ -123,10 +134,10 @@ tego środowiska przez `pip install --require-hashes` z przypiętego pliku wymag
 bez przebudowy pakietów systemowych. Nie instalujemy sterowników ani zależności
 ROS. Przy niezmienionym hashu wymagań instalator zachowuje istniejące środowisko.
 Zmiana zależności współdzielonego środowiska wymaga wcześniejszego jawnego
-zatrzymania zarządzanej usługi:
+zatrzymania GUI/API i bezczynnego Core:
 
 ```bash
-systemctl --user stop vision-webgui.service
+systemctl --user stop vision-webgui.service vision-core.service
 ```
 
 Pliki zarządzane przez instalator mają własny znacznik w pierwszej linii.
@@ -142,12 +153,25 @@ Jednostka użytkownika wywołuje bezwzględną ścieżkę interpretera środowis
 /srv/vision-data/tools/vision-webgui/venv/bin/python -B -m vision_api.station
 ```
 
-Argumenty wskazują port `18490`, prywatny plik kont, trwały katalog biblioteki
+Argumenty wskazują port `18490`, prywatny plik kont, socket Core przez `--core-socket`
 i `webgui/dist` konkretnego wydania. `PYTHONPATH` wskazuje jego `src`, a katalogiem
 roboczym jest to samo wydanie. Usługa przed startem sprawdza mountpoint NVMe.
 Ma `UMask=0077`, `Restart=on-failure`, `RestartSec=5s`, `NoNewPrivileges=yes`,
 `TasksMax=32` i `MemoryMax=512M`. Nie konfiguruje uprzywilejowanych przestrzeni
 nazw. Sprawdzenie mountpointu przy starcie nie jest pełnym sprzętowym Write Guard.
+
+Oddzielna jednostka `vision-core.service` uruchamia `python -B -m vision_station.service`
+z `--socket /srv/vision-data/run/vision-core/core.sock` i
+`--library-root /srv/vision-data/data/ecu-library`. Core posiada bibliotekę oraz
+opcjonalny rzeczywisty Runtime. GUI/API nie otwiera magazynu biblioteki.
+Obie usługi mają osobne PID i automatyczny start. Jednostka GUI ma tylko `Wants`
+i `After` względem Core: zatrzymanie lub restart GUI nie zatrzymuje Core,
+a niedostępność Core nie zamyka serwera logowania.
+
+Socket ma uprawnienia `0600`, katalog `0700`; sprawdzany jest UID obu procesów.
+Lokalny protokół dopuszcza wyłącznie odczyt raportów. Brak odpowiedzi Core daje
+`NOT_CONNECTED`, czytelny brak dostępnych danych i automatyczne ponawianie.
+Nie oznacza to, że inspekcja została zatrzymana — jej stan jest wtedy nieznany.
 
 Skrót i autostart uruchamiają wybrany przez `--browser` natywny Firefox; dla
 opisanego wariantu Mozilla jest to:
@@ -234,13 +258,14 @@ do publicznego wystawienia portu. Zasady polecenia i TLS opisuje oficjalna
 ## Sprawdzenie po uruchomieniu
 
 ```bash
-systemctl --user status vision-webgui.service --no-pager
-journalctl --user -u vision-webgui.service -n 50 --no-pager
+systemctl --user status vision-core.service vision-webgui.service --no-pager
+journalctl --user -u vision-core.service -u vision-webgui.service -n 50 --no-pager
 ```
 
 Następnie należy sprawdzić lokalny adres w przeglądarce, zalogować się i otworzyć
-bibliotekę. Oczekiwany jest rzeczywisty katalog/drafty z prywatnego magazynu oraz
-czytelny brak aktywnej sesji Core. Brak danych lub niegotowość wzorca pozostaje
+bibliotekę. Oczekiwany jest rzeczywisty katalog/drafty z prywatnego magazynu,
+Core połączony oraz brak aktywnej inspekcji w bezczynnym stanowisku.
+Brak danych lub niegotowość wzorca pozostaje
 widoczna; interfejs nie uzupełnia jej symulacją. Test HTTPS wykonujemy dopiero po
 oddzielnej konfiguracji Serve.
 
@@ -250,12 +275,12 @@ Punktem wycofania jest wcześniejszy zachowany katalog wydania i kopia zarządza
 plików w `deployment-backups`. W kopii jednostki komentarz `# Release:` wskazuje
 poprzednią ścieżkę. Nie usuwamy starego wydania przed potwierdzeniem nowego.
 
-Najprostszy powrót to ponowne uruchomienie instalatora z poprzednim rzeczywistym
-SHA. Przy zmianie zależności najpierw zatrzymujemy wyłącznie tę usługę. Zachowujemy
-ten sam wymagany origin HTTPS:
+Powrót wymaga wcześniejszego potwierdzenia braku aktywnej inspekcji w połączonym
+Core. Następnie zatrzymujemy obie zarządzane usługi i uruchamiamy instalator
+poprzedniego rzeczywistego SHA. Zachowujemy ten sam wymagany origin HTTPS:
 
 ```bash
-systemctl --user stop vision-webgui.service
+systemctl --user stop vision-webgui.service vision-core.service
 VISION_PREVIOUS_RELEASE=/srv/vision-data/releases/vision-webgui/<POPRZEDNI_PELNY_SHA>
 python3 -B "$VISION_PREVIOUS_RELEASE/scripts/deploy/install_webgui.py" \
   --release "$VISION_PREVIOUS_RELEASE" --browser "$VISION_BROWSER" --start
@@ -265,6 +290,7 @@ Jeśli używany był HTTPS, do ostatniego polecenia należy ponownie dodać wła
 `--https-origin`. Instalator odtworzy zależności z pliku wymagań poprzedniego
 wydania, jeśli ich hash się różni. Konta, biblioteka ECU oraz profil Firefox
 pozostają w tych samych katalogach danych. Restart wymaga ponownego logowania.
-Przy pierwszym wdrożeniu, bez wcześniejszego wydania, zatrzymanie i wyłączenie
-`vision-webgui.service` wycofuje uruchomienie tej usługi; nie wymaga zmian ROS
-ani istniejącego checkoutu projektu.
+Jeżeli poprzednie wydanie pochodzi sprzed oddzielenia Core, należy także wyłączyć
+autostart `vision-core.service`, ponieważ stary serwer sam posiada bibliotekę.
+Nie uruchamiamy równocześnie dwóch właścicieli tego samego magazynu. Wycofanie
+tych usług nie wymaga zmian ROS ani istniejącego checkoutu projektu.

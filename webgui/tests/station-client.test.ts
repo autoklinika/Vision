@@ -6,8 +6,8 @@ import { sessionFixture, eventsFixture } from './fixtures/session';
 import { libraryFixture } from './fixtures/library';
 vi.mock('../src/api/realAdapter', () => ({realAdapter: {mode: 'real', readSnapshot: vi.fn(), readSession: vi.fn(), readEvents: vi.fn(), readLibrary: vi.fn(), readLibraryEntry: vi.fn(), readLibraryHistory: vi.fn()}}));
 
-it('idle station exposes no session request capability while its library remains available', async () => {
-  const client = createStationClient(stationFixture(), vi.fn());
+it.each([false, true])('idle station with Core connection %s exposes no session request capability', connected => {
+  const client = createStationClient(stationFixture(false, connected), vi.fn());
   expect(client.readSession).toBeUndefined(); expect(client.readEvents).toBeUndefined();
   expect(client.readLibrary).toBeTypeOf('function');
 });

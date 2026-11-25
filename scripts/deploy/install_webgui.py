@@ -33,9 +33,12 @@ LIBRARY = NVME / 'data/ecu-library'
 BROWSER = STATE / 'browser'
 NATIVE_FIREFOX = TOOLS / 'firefox/firefox'
 RUN = NVME / 'run/vision-webgui'
+CORE_RUN = NVME / 'run/vision-core'
+CORE_SOCKET = CORE_RUN / 'core.sock'
 BACKUPS = STATE / 'deployment-backups'
 ENVIRONMENT_RECORD = TOOLS / 'environment.json'
 UNIT_NAME = 'vision-webgui.service'
+CORE_UNIT_NAME = 'vision-core.service'
 DESKTOP_NAME = 'vision-webgui.desktop'
 MANAGED = '# Managed by Vision WebGUI installer v1\n'
 STATION_MARKER = b'<meta name="vision-deployment" content="station">'
@@ -56,11 +59,13 @@ class Plan:
     username: str
     home: Path
     unit: Path
+    core_unit: Path
     launcher: Path
     autostart: Path
     bus_environment: dict
     environment: dict
     was_active: bool
+    core_was_active: bool
     requirements_hash: str
     server_version: str
     install_dependencies: bool
@@ -217,6 +222,7 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
     if _run([*git, 'ls-files', '--others', '--exclude-standard'], label='verify release extras').stdout.strip():
         raise InstallError('untracked release files are not allowed outside ignored build output')
     for name in ('requirements-station.txt', 'src/vision_api/station.py', 'src/vision_api/identity.py',
+                 'src/vision_station/service.py', 'src/vision_station/client.py',
                  'config/ecu_profiles/etc3_poc_v1.json', 'docs/templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json'):
         _read_regular(release / name, 512 * 1024, owner=uid)
         _run([*git, 'ls-files', '--error-unmatch', '--', name], label='verify tracked station input')
@@ -227,14 +233,15 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
         raise InstallError('an exact hashed Waitress release is required')
     server_version = server_pin.group(1).decode('ascii')
     validate_static(release, uid)
-    for path in (TOOLS, VENV, STATE, IDENTITY, LIBRARY, BROWSER, RUN, BACKUPS):
+    for path in (TOOLS, VENV, STATE, IDENTITY, LIBRARY, BROWSER, RUN, CORE_RUN, BACKUPS):
         _no_symlinks(path)
         if path.exists() and (not path.is_dir() or path.stat().st_uid != uid):
             raise InstallError('application directories must belong to the current user')
     unit = home / '.config/systemd/user' / UNIT_NAME
+    core_unit = home / '.config/systemd/user' / CORE_UNIT_NAME
     launcher = home / '.local/share/applications' / DESKTOP_NAME
     autostart = home / '.config/autostart' / DESKTOP_NAME
-    for path in (unit, launcher, autostart):
+    for path in (unit, core_unit, launcher, autostart):
         _existing_managed(path, uid)
     bus_environment = environment.copy()
     runtime = Path('/run/user') / str(uid)
@@ -252,6 +259,14 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
                       label='inspect service state', env=bus_environment, accepted=(0, 3, 4)).returncode == 0
     if was_active and _existing_managed(unit, uid) is None:
         raise InstallError('an active unit without its managed file cannot be replaced')
+    core_fragment = _run(['/usr/bin/systemctl', '--user', 'show', '--property=FragmentPath', '--value', CORE_UNIT_NAME],
+                         label='inspect existing Core unit', env=bus_environment, accepted=(0, 1)).stdout.strip()
+    if core_fragment and core_fragment != str(core_unit):
+        raise InstallError('a same-name Core unit exists outside the managed user-unit path')
+    core_was_active = _run(['/usr/bin/systemctl', '--user', 'is-active', '--quiet', CORE_UNIT_NAME],
+                          label='inspect Core service state', env=bus_environment, accepted=(0, 3, 4)).returncode == 0
+    if core_was_active and _existing_managed(core_unit, uid) is None:
+        raise InstallError('an active Core without its managed file cannot be replaced')
     install_dependencies = True
     if ENVIRONMENT_RECORD.exists():
         record = json.loads(_read_regular(ENVIRONMENT_RECORD, owner=uid))
@@ -266,10 +281,15 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
             raise InstallError('the managed virtual environment is incomplete')
     else:
         install_dependencies = True
-    if install_dependencies and was_active:
-        raise InstallError('stop the owned WebGUI service explicitly before replacing its shared dependencies')
-    return Plan(release, origin, browser, uid, account.pw_name, home, unit, launcher, autostart,
-                bus_environment, environment, was_active, requirements_hash, server_version, install_dependencies)
+    if install_dependencies and (was_active or core_was_active):
+        raise InstallError('stop the owned WebGUI and idle Core services explicitly before replacing their shared dependencies')
+    plan = Plan(release, origin, browser, uid, account.pw_name, home, unit, core_unit, launcher, autostart,
+                bus_environment, environment, was_active, core_was_active, requirements_hash, server_version, install_dependencies)
+    # A WebGUI update may never implicitly terminate an inspection owner.
+    # A Core release switch requires a separate, explicit idle-service stop.
+    if core_was_active and _existing_managed(core_unit, uid) != _core_unit(plan):
+        raise InstallError('Core is running a different release; verify NO_ACTIVE_SESSION and stop Core explicitly before switching its release')
+    return plan
 
 
 def _mkdir(path, *, private=False):
@@ -304,12 +324,14 @@ def _write(path, body, mode=0o600):
 
 def _unit(plan):
     command = [str(VENV / 'bin/python'), '-B', '-m', 'vision_api.station', '--port', '18490',
-               '--accounts', str(ACCOUNTS), '--library-root', str(LIBRARY),
+               '--accounts', str(ACCOUNTS), '--core-socket', str(CORE_SOCKET),
                '--dist', str(plan.release / 'webgui/dist')]
     if plan.origin:
         command.extend(('--https-origin', plan.origin))
     return (MANAGED + f'# Release: {plan.release}\n' + f'''[Unit]
 Description=Vision WebGUI reader ({plan.release.name[:12]})
+Wants={CORE_UNIT_NAME}
+After={CORE_UNIT_NAME}
 
 [Service]
 Type=simple
@@ -321,6 +343,33 @@ Environment="PYTHONDONTWRITEBYTECODE=1"
 Environment="TMPDIR={RUN}"
 ExecStartPre=/usr/bin/mountpoint --quiet {NVME}
 ExecStart={' '.join(command)}
+UMask=0077
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+TasksMax=32
+MemoryMax=512M
+TimeoutStopSec=15s
+
+[Install]
+WantedBy=default.target
+''').encode('utf-8')
+
+
+def _core_unit(plan):
+    return (MANAGED + f'# Release: {plan.release}\n' + f'''[Unit]
+Description=Vision Core host ({plan.release.name[:12]})
+
+[Service]
+Type=simple
+WorkingDirectory={plan.release}
+Environment="HOME={plan.home}"
+Environment="PYTHONPATH={plan.release}/src"
+Environment="PYTHONNOUSERSITE=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+Environment="TMPDIR={CORE_RUN}"
+ExecStartPre=/usr/bin/mountpoint --quiet {NVME}
+ExecStart={VENV}/bin/python -B -m vision_station.service --socket {CORE_SOCKET} --library-root {LIBRARY}
 UMask=0077
 Restart=on-failure
 RestartSec=5s
@@ -350,7 +399,7 @@ X-GNOME-Autostart-enabled=true
 
 def install(plan, *, start=False):
     os.umask(0o077)
-    for path in (TOOLS, STATE, IDENTITY, LIBRARY, BROWSER, RUN, BACKUPS):
+    for path in (TOOLS, STATE, IDENTITY, LIBRARY, BROWSER, RUN, CORE_RUN, BACKUPS):
         _mkdir(path, private=True)
     environment = dict(plan.environment, PYTHONPATH=str(plan.release / 'src'))
     if not VENV.exists():
@@ -381,7 +430,8 @@ def install(plan, *, start=False):
           'IdentityStore(sys.argv[1], forbidden_roots=(sys.argv[2],)); _load_static(sys.argv[2])',
           str(ACCOUNTS), str(plan.release / 'webgui/dist')],
          label='validate account store and station build', env=environment)
-    replacements = ((plan.unit, _unit(plan)), (plan.launcher, _desktop(plan)), (plan.autostart, _desktop(plan)))
+    replacements = ((plan.core_unit, _core_unit(plan)), (plan.unit, _unit(plan)),
+                    (plan.launcher, _desktop(plan)), (plan.autostart, _desktop(plan)))
     changes = [(path, body, _existing_managed(path, plan.uid)) for path, body in replacements]
     changes = [(path, body, old) for path, body, old in changes if body != old]
     previous = [(path, old) for path, _, old in changes if old is not None]
@@ -400,18 +450,33 @@ def install(plan, *, start=False):
         _write(path, body)
     _run(['/usr/bin/systemctl', '--user', 'daemon-reload'], label='reload user manager', env=plan.bus_environment)
     if start:
+        # First migration transfers the library away from the old API process.
+        # A running Core is never restarted by this installer.
+        migrating = plan.was_active and not plan.core_was_active
+        if migrating:
+            _run(['/usr/bin/systemctl', '--user', 'stop', UNIT_NAME],
+                 label='transfer library ownership to Core', env=plan.bus_environment)
+        _run(['/usr/bin/systemctl', '--user', 'enable', '--now', CORE_UNIT_NAME],
+             label='enable and start independent Core', env=plan.bus_environment)
+        _run([python, '-B', '-c',
+              'import sys,time; from vision_station.client import RemoteStationOwner; '
+              'owner=RemoteStationOwner(sys.argv[1]); deadline=time.monotonic()+5; '
+              '\nwhile time.monotonic()<deadline:\n'
+              ' if owner.station_report()["coreConnection"]=="CONNECTED": sys.exit(0)\n'
+              ' time.sleep(0.1)\n'
+              'sys.exit(1)', str(CORE_SOCKET)], label='verify live Core connection', env=environment)
         _run(['/usr/bin/systemctl', '--user', 'enable', '--now', UNIT_NAME],
              label='enable and start owned WebGUI', env=plan.bus_environment)
-        if plan.was_active:
+        if plan.was_active and not migrating:
             _run(['/usr/bin/systemctl', '--user', 'restart', UNIT_NAME],
                  label='switch active owned WebGUI release', env=plan.bus_environment)
         _run(['/usr/bin/systemctl', '--user', 'is-active', '--quiet', UNIT_NAME],
              label='verify owned WebGUI is active', env=plan.bus_environment)
-    print('WebGUI started.' if start else 'WebGUI prepared. Service start/stop state was not changed.')
+    print('WebGUI and independent Core started.' if start else 'WebGUI and Core prepared. Service start/stop state was not changed.')
     print(f'Pinned release: {plan.release.name}')
     print('Local URL: http://127.0.0.1:18490/')
     print(f'Reader: operator; initial password file: {INITIAL_PASSWORD} (existing accounts are preserved).')
-    print('Core: NOT_CONNECTED; active specimen session: none.')
+    print('Core reads use the private local socket; browser/API lifetime does not own Core.')
     if plan.origin:
         print(f'Configured private HTTPS origin: {plan.origin}')
         print('Tailscale Serve was not changed. Review its existing routes and permissions before running:')
