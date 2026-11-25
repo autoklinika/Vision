@@ -119,3 +119,23 @@ client login attempts per minute. The test retains all readiness and password
 assertions; production authentication limits and application behavior are
 unchanged. The fixture uses its own Core process, temporary accounts/data and
 port 18491, separate from the operational station.
+
+
+## Pre-merge audit (2026-11-25)
+
+Independent review covered session persistence/concurrency, Runtime binding,
+API authorization, legacy account compatibility and frontend state handling.
+The review found and corrected three boundary cases before merge:
+
+- Journal failure while invalidating a closing inspection now marks recovery
+  required, retains its journal/marker and disables start/close eligibility.
+- An owned session detached by a trusted backend caller now reports recovery
+  required instead of offering an unusable new start.
+- Receipt-source independence checks both the authenticated username and the
+  normalized Runtime operator identifier. A verified receipt from the same
+  operator cannot pass S01; the original trusted verifier remains required.
+
+Three synthetic regressions cover these cases. The orchestration module now
+has 17 passing tests on VENTUNO; the full API suite passed 158/158 after the
+corrections. No device command, profile approval, account promotion or
+production data migration is part of these corrections.

@@ -1,6 +1,8 @@
 """Synthetic-only vertical slice. No production socket or equipment."""
+from dataclasses import replace
 import json
 from pathlib import Path
+import sqlite3
 import sys
 import threading
 import time
@@ -185,6 +187,47 @@ class InspectionTests(unittest.TestCase):
         self.start()
         self.assertEqual(self.host._runtime.engine.states["S01"], State.FAILED)
         self.assertEqual(self.host._runtime.engine.states["S02"], State.BLOCKED)
+
+    def test_close_journal_failure_requires_recovery(self):
+        station = self.start()
+        engine = self.host._runtime.engine
+        with patch.object(engine.journal, "append", side_effect=sqlite3.OperationalError("synthetic journal failure")):
+            with self.assertRaises(InspectionRejected):
+                self.close()
+        self.assertTrue(engine._journal_uncertain)
+        report = self.host.inspection_report()
+        self.assertTrue(validate_inspection_report(report))
+        self.assertIn("RECOVERY_REQUIRED", report["blockers"])
+        self.assertFalse(report["closeAllowed"])
+        self.assertFalse(report["startAllowed"])
+        self.assertEqual(self.host.station_report()["state"], "SESSION_ACTIVE")
+        self.assertEqual(report["sessionId"], station["sessionId"])
+        self.assertEqual((self.session_root / "active-session").read_text().strip(), station["sessionId"])
+        with self.assertRaises(InspectionRejected):
+            self.close()
+
+    def test_detached_owned_session_requires_recovery(self):
+        station = self.start()
+        self.assertTrue(self.host.clear_runtime(station["sessionViewId"]))
+        report = self.host.inspection_report()
+        self.assertTrue(validate_inspection_report(report))
+        self.assertIn("RECOVERY_REQUIRED", report["blockers"])
+        self.assertFalse(report["startAllowed"])
+        self.assertFalse(report["closeAllowed"])
+        self.assertIsNone(report["sessionId"])
+        self.assertEqual(self.host._inspection.owned_id, station["sessionId"])
+        self.assertEqual((self.session_root / "active-session").read_text().strip(), station["sessionId"])
+        with self.assertRaises(InspectionRejected):
+            self.start()
+
+    def test_readiness_source_cannot_be_authenticated_operator(self):
+        original_receipt = self.receipt
+        self.receipt = lambda request: replace(original_receipt(request), source="operator")
+        self.assertTrue(self.trusted)
+        self.start(operator="operator")
+        self.assertEqual(self.host._runtime.engine.states["S01"], State.FAILED)
+        self.assertEqual(self.host._runtime.engine.states["S02"], State.BLOCKED)
+        self.assertTrue(self.host.inspection_report()["closeAllowed"])
 
     def test_old_start_token_cannot_restart_closed_inspection(self):
         old = self.host.inspection_report()["intentToken"]

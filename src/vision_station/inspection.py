@@ -176,6 +176,12 @@ class RuntimeComposition:
         # Keep the browser identity exact in the private intent record. A stable
         # namespaced digest is used in the stricter Runtime identifier grammar.
         operator_id = "op-" + hashlib.sha256(operator.encode("utf-8")).hexdigest()[:48]
+        def independent_verifier(kind, receipt):
+            # Runtime also rejects its normalized operator id. Preserve the
+            # same independence rule for the authenticated browser identity.
+            if receipt.source == operator:
+                return False
+            return self.trust_verifier(kind, receipt)
         return VisionRuntimeCoordinator(
             journal, Context(session_id, {k:p.revision for k,p in profiles.items()}),
             profiles, self.calibrations, self.requirements, self.max_age,
@@ -183,7 +189,7 @@ class RuntimeComposition:
             record=record, catalog=library.catalog, release_store=self.release_store,
             reference_profile=reference, physical_state=choice.physical_state, recipe=choice.recipe,
             capabilities=self.capabilities, asset_store=self.asset_store,
-            reference_release_store=self.reference_release_store, trust_verifier=self.trust_verifier,
+            reference_release_store=self.reference_release_store, trust_verifier=independent_verifier,
             sensor_frame=self.sensor_frame, scene_frame=self.scene_frame, known_transforms=self.known_transforms,
             max_skew=self.max_skew, clock=self.clock, library=self.reference_library, strict_planning=True)
 
@@ -273,10 +279,12 @@ class InspectionOwner:
             blockers.append("DEVICES_NOT_VERIFIED")
         if station["state"] == "SESSION_ACTIVE":
             blockers.append("SESSION_ACTIVE")
-        if self._poisoned or (self._marker_exists() and self.owned_id is None):
+        recovery_required = self._poisoned or (self._marker_exists() and
+            (self.owned_id is None or station["sessionId"] != self.owned_id))
+        if recovery_required:
             blockers.append("RECOVERY_REQUIRED")
         closable = False
-        if not self._poisoned and self.owned_id is not None and self.host._runtime is not None:
+        if not recovery_required and self.owned_id is not None and self.host._runtime is not None:
             engine = self.host._runtime.engine
             with engine.owner_operation():
                 closable = _can_close(engine)
@@ -348,9 +356,9 @@ class InspectionOwner:
         with engine.owner_operation():
             if not _can_close(engine):
                 raise InspectionRejected()
-            if engine.states["S11"] != State.SUCCEEDED:
-                engine.invalidate("operator closed pre-localization inspection")
             try:
+                if engine.states["S11"] != State.SUCCEEDED:
+                    engine.invalidate("operator closed pre-localization inspection")
                 _create_private(self.root / session_id / "closed.json",
                                 json.dumps({"operator":operator,"sessionId":session_id}, sort_keys=True).encode("ascii"))
                 if not self.host.clear_runtime(station["sessionViewId"]):
