@@ -92,6 +92,7 @@ export function StationStartup() {
     }
   }, [logout]);
   useEffect(() => {
+    const state = control.current;
     let alive = true;
     let timer: number | undefined;
     async function poll() {
@@ -99,7 +100,7 @@ export function StationStartup() {
       if (alive) timer = window.setTimeout(() => { void poll(); }, control.current.unavailable || control.current.pendingLogout ? 5000 : 15000);
     }
     void poll();
-    return () => { alive = false; window.clearTimeout(timer); control.current.version++; control.current.busy = false; };
+    return () => { alive = false; window.clearTimeout(timer); state.version++; state.busy = false; };
   }, [checkSession]);
 
   async function login() {
