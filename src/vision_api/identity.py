@@ -7,6 +7,7 @@ It never logs passwords, cookies, session tokens, or account-file contents.
 """
 import argparse
 from collections import deque
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import fcntl
@@ -39,6 +40,8 @@ IDLE_SECONDS = 30 * 60
 LOGIN_WINDOW_SECONDS = 60
 MAX_GLOBAL_ATTEMPTS = 20
 MAX_CLIENT_ATTEMPTS = 5
+MAX_PASSWORD_CHANGE_ATTEMPTS = 5
+PASSWORD_CHANGE_LOCK_SECONDS = 1
 MAX_COOKIE_BYTES = 4096
 _KDF = 'scrypt-n32768-r8-p1'
 _SCRYPT_LOCK = threading.Lock()
@@ -59,6 +62,16 @@ class RateLimited(Exception):
     def __init__(self, retry_after):
         self.retry_after = max(1, min(LOGIN_WINDOW_SECONDS, int(math.ceil(retry_after))))
         super().__init__('authentication rate limited')
+
+
+class CurrentPasswordInvalid(Exception):
+    """The authenticated account's current password did not match."""
+
+
+class PasswordRejected(ValueError):
+    """A fixed policy error; neither password is included in diagnostics."""
+    def __init__(self):
+        super().__init__('new password rejected')
 
 
 @dataclass(frozen=True)
@@ -254,6 +267,38 @@ def _publish_accounts(parent_fd, filename, data, *, existing):
             pass
 
 
+@contextmanager
+def _account_transaction(path, *, timeout=5):
+    """Serialize credential publication with local provisioning processes."""
+    parent_fd = lock_fd = None
+    locked = False
+    try:
+        parent_fd = _open_parent(path)
+        lock_fd = os.open(path.name + '.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC,
+                          0o600, dir_fd=parent_fd)
+        _private_regular(lock_fd)
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise InvalidIdentityStore()
+                time.sleep(0.01)
+        yield parent_fd
+    except OSError:
+        raise InvalidIdentityStore() from None
+    finally:
+        if lock_fd is not None:
+            if locked:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
 def provision_account(accounts_path, username, password, *, replace=False, forbidden_roots=()):
     """Create/reset a reader locally; the private parent must already exist.
 
@@ -265,23 +310,7 @@ def provision_account(accounts_path, username, password, *, replace=False, forbi
         raise ValueError('invalid account request')
     encoded = _password(password)
     path = _safe_path(accounts_path, forbidden_roots)
-    parent_fd = lock_fd = None
-    locked = False
-    try:
-        parent_fd = _open_parent(path)
-        lock_fd = os.open(path.name + '.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC,
-                          0o600, dir_fd=parent_fd)
-        _private_regular(lock_fd)
-        deadline = time.monotonic() + 5
-        while True:
-            try:
-                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                locked = True
-                break
-            except BlockingIOError:
-                if time.monotonic() >= deadline:
-                    raise InvalidIdentityStore()
-                time.sleep(0.01)
+    with _account_transaction(path) as parent_fd:
         accounts = _read_accounts(path, allow_missing=True)
         exists = username in accounts
         if exists != replace:
@@ -296,15 +325,6 @@ def provision_account(accounts_path, username, password, *, replace=False, forbi
         except FileNotFoundError:
             existing = False
         _publish_accounts(parent_fd, path.name, _encoded_accounts(accounts), existing=existing)
-    except OSError:
-        raise InvalidIdentityStore() from None
-    finally:
-        if lock_fd is not None:
-            if locked:
-                fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            os.close(lock_fd)
-        if parent_fd is not None:
-            os.close(parent_fd)
 
 
 def parse_session_cookie(header, *, name=COOKIE_NAME):
@@ -342,6 +362,8 @@ class IdentityStore:
         self._accounts = _read_accounts(self._path)
         self._attempts = deque()
         self._client_attempts = {}
+        self._change_attempts = deque()
+        self._account_change_attempts = {}
         self._dummy_salt = secrets.token_bytes(32)
         self._dummy_hash = secrets.token_bytes(32)
         self._last_now = None
@@ -398,6 +420,29 @@ class IdentityStore:
         self._attempts.append(now)
         attempts.append(now)
         self._client_attempts[client_key] = attempts
+
+    def _change_attempt(self, username, now):
+        # Authenticated account identity is supplied by the existing session,
+        # not a browser-selected key. This budget is independent of login.
+        cutoff = now - LOGIN_WINDOW_SECONDS
+        while self._change_attempts and self._change_attempts[0] <= cutoff:
+            self._change_attempts.popleft()
+        for key, attempts in tuple(self._account_change_attempts.items()):
+            while attempts and attempts[0] <= cutoff:
+                attempts.popleft()
+            if not attempts:
+                del self._account_change_attempts[key]
+        attempts = self._account_change_attempts.get(username, deque())
+        deadlines = []
+        if len(self._change_attempts) >= MAX_GLOBAL_ATTEMPTS:
+            deadlines.append(self._change_attempts[0] + LOGIN_WINDOW_SECONDS)
+        if len(attempts) >= MAX_PASSWORD_CHANGE_ATTEMPTS:
+            deadlines.append(attempts[0] + LOGIN_WINDOW_SECONDS)
+        if deadlines:
+            raise RateLimited(max(deadlines) - now)
+        self._change_attempts.append(now)
+        attempts.append(now)
+        self._account_change_attempts[username] = attempts
 
     @staticmethod
     def _report(session):
@@ -465,6 +510,55 @@ class IdentityStore:
             raise AccessDenied()
         with self._lock:
             self._sessions.pop(hashlib.sha256(token.encode('ascii')).digest(), None)
+
+    def change_password(self, token, current_password, new_password):
+        """Rotate only the authenticated account, without touching Vision Core.
+
+        Current-password verification is followed by a credential compare and
+        revalidation under the same file lock used by local provisioning. A
+        competing reset/removal or expired session cannot overwrite its winner.
+        All old sessions fail after publication, including other API owners.
+        """
+        with self._lock:
+            session = self.session(token, touch=False)
+            username = session['username']
+            account = self._accounts[username]
+            self._change_attempt(username, self._now())
+            try:
+                new_encoded = _password(new_password)
+            except ValueError:
+                raise PasswordRejected() from None
+            try:
+                current_encoded = _password(current_password)
+            except ValueError:
+                raise CurrentPasswordInvalid() from None
+            if not hmac.compare_digest(_derive(current_encoded, account.salt), account.password_hash):
+                raise CurrentPasswordInvalid()
+            if hmac.compare_digest(new_encoded, current_encoded):
+                raise PasswordRejected()
+            salt = secrets.token_bytes(32)
+            replacement = _Account(username, salt, _derive(new_encoded, salt))
+            path = _safe_path(self._path, self._forbidden_roots)
+            with _account_transaction(path, timeout=PASSWORD_CHANGE_LOCK_SECONDS) as parent_fd:
+                # Hashing and lock acquisition may have crossed expiry, a
+                # password reset or an account removal in another process.
+                self.session(token, touch=False)
+                current = self._accounts.get(username)
+                if current is None or not hmac.compare_digest(current.fingerprint, account.fingerprint):
+                    raise AccessDenied()
+                accounts = dict(self._accounts)
+                accounts[username] = replacement
+                try:
+                    _publish_accounts(parent_fd, path.name, _encoded_accounts(accounts), existing=True)
+                except (OSError, InvalidIdentityStore):
+                    # replace may already have committed before directory fsync
+                    # failed. Reload the actual file; never roll back credentials
+                    # or retain a known-stale session after an ambiguous result.
+                    self._reload()
+                    raise InvalidIdentityStore() from None
+                self._reload()
+                self.revoke_user(username)
+            return {'schema': 'vision.api.password-change.v1', 'changed': True}
 
     def revoke_user(self, username):
         if not _username(username):

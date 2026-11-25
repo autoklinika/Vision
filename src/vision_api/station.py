@@ -14,14 +14,15 @@ import stat
 from urllib.parse import urlsplit
 
 from .access import AccessDenied, Credentials, CursorRejected, ReportUnavailable
-from .identity import IdentityStore, InvalidIdentityStore, RateLimited, parse_session_cookie
+from .identity import (CurrentPasswordInvalid, IdentityStore, InvalidIdentityStore,
+                       PasswordRejected, RateLimited, parse_session_cookie)
 from .reports import MAX_PROTECTED_BYTES, MAX_SEQUENCE
 from .server import EVENTS_PATH, LIBRARY_ENTRY, LIBRARY_HISTORY, LIBRARY_PAGE
 from .station_owner import NoActiveSession
 from .status import boot_status
 
-# A 1024-byte password can expand sixfold when JSON escapes control bytes.
-MAX_BODY = 8192
+# Two 1024-byte passwords can each expand sixfold with JSON escaping.
+MAX_BODY = 16384
 MAX_STATIC_FILE = 4 * 1024 * 1024
 MAX_STATIC_TOTAL = 24 * 1024 * 1024
 ASSET = re.compile(r"/assets/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(js|css|woff2?|ttf|svg|png|ico)", re.ASCII)
@@ -161,7 +162,7 @@ class StationApplication:
     @staticmethod
     def _body(environ, expected):
         length = environ.get("CONTENT_LENGTH", "")
-        if (not re.fullmatch(r"[1-9][0-9]{0,3}", length) or int(length) > MAX_BODY
+        if (not re.fullmatch(r"[1-9][0-9]{0,4}", length) or int(length) > MAX_BODY
                 or environ.get("CONTENT_TYPE", "") not in ("application/json", "application/json; charset=utf-8")
                 or environ.get("HTTP_CONTENT_ENCODING") or environ.get("HTTP_TRANSFER_ENCODING")):
             raise ValueError("invalid request")
@@ -186,6 +187,10 @@ class StationApplication:
             return self._dispatch(environ, start_response)
         except RateLimited as error:
             return self._error(start_response, 429, "RATE_LIMITED", extra=[("Retry-After", str(error.retry_after))], head=head)
+        except CurrentPasswordInvalid:
+            return self._error(start_response, 403, "CURRENT_PASSWORD_INVALID", head=head)
+        except PasswordRejected:
+            return self._error(start_response, 400, "PASSWORD_REJECTED", head=head)
         except AccessDenied:
             return self._error(start_response, 401, "ACCESS_DENIED", head=head)
         except NoActiveSession:
@@ -231,7 +236,7 @@ class StationApplication:
                 or environ.get("HTTP_SEC_FETCH_SITE") not in (None, "same-origin", "none")):
             return self._error(start_response, 403, "ORIGIN_REJECTED", head=head)
         secure = origin.startswith("https://")
-        if method == "POST" and target in ("/api/v1/auth/login", "/api/v1/auth/logout"):
+        if method == "POST" and target in ("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/password"):
             if (environ.get("HTTP_ORIGIN") != origin
                     or environ.get("HTTP_X_VISION_CLIENT") != "webgui"):
                 return self._error(start_response, 403, "ORIGIN_REJECTED")
@@ -239,6 +244,13 @@ class StationApplication:
                 value = self._body(environ, {"username", "password"})
                 token, report = self.identity.login(value["username"], value["password"], "station-browser")
                 return self._json(start_response, 200, report, extra=[("Set-Cookie", self._cookie(token, secure=secure))])
+            if target.endswith("/password"):
+                self._authorize(environ, touch=False)
+                value = self._body(environ, {"currentPassword", "newPassword"})
+                report = self.identity.change_password(self._credentials(environ),
+                                                       value["currentPassword"], value["newPassword"])
+                return self._json(start_response, 200, report,
+                                  extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
             self._body(environ, set())
             token = self._credentials(environ)
             if token:

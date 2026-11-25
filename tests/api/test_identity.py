@@ -13,8 +13,8 @@ from unittest.mock import patch
 
 from vision_api import identity
 from vision_api.access import AccessDenied
-from vision_api.identity import (IdentityStore, InvalidIdentityStore, RateLimited,
-                                 parse_session_cookie, provision_account)
+from vision_api.identity import (CurrentPasswordInvalid, IdentityStore, InvalidIdentityStore,
+                                 PasswordRejected, RateLimited, parse_session_cookie, provision_account)
 
 PASSWORD = 'synthetic-reader-password-only'
 
@@ -379,6 +379,194 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(stdout.getvalue(), '')
         self.assertNotIn(PASSWORD, stderr.getvalue())
+
+    def test_self_change_persists_and_revokes_all_old_account_sessions_only(self):
+        provision_account(self.path, 'second', PASSWORD)
+        other_owner = IdentityStore(self.path, clock=self.clock)
+        first, _ = self.login()
+        second, _ = self.login()
+        other_token, _ = other_owner.login('operator', PASSWORD, 'peer')
+        unaffected, _ = self.login(username='second')
+        original = json.loads(self.path.read_text())
+        new_password = 'new-synthetic-self-service-password'
+        report = self.store.change_password(first, PASSWORD, new_password)
+        self.assertEqual(report, {'schema': 'vision.api.password-change.v1', 'changed': True})
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
+        replacement = json.loads(self.path.read_text())
+        self.assertEqual(original['accounts'][1], replacement['accounts'][1])
+        self.assertNotEqual(original['accounts'][0]['salt'], replacement['accounts'][0]['salt'])
+        for owner, token in ((self.store, first), (self.store, second), (other_owner, other_token)):
+            with self.assertRaises(AccessDenied):
+                owner.session(token)
+        self.assertTrue(self.store.session(unaffected)['authenticated'])
+        with self.assertRaises(AccessDenied):
+            other_owner.login('operator', PASSWORD, 'peer')
+        self.assertTrue(IdentityStore(self.path).login('operator', new_password, 'peer')[1]['authenticated'])
+        self.assertNotIn(new_password, self.path.read_text())
+        self.assertNotIn(PASSWORD, repr(report))
+
+    def test_wrong_current_password_preserves_accounts_and_authenticated_session(self):
+        token, _ = self.login()
+        before = self.path.read_bytes()
+        for wrong in ('short', 'wrong-synthetic-current-password'):
+            with self.assertRaises(CurrentPasswordInvalid):
+                self.store.change_password(token, wrong, 'new-synthetic-reader-password')
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertTrue(self.store.session(token)['authenticated'])
+
+    def test_new_password_policy_and_unchanged_password_never_modify_store(self):
+        token, _ = self.login()
+        before = self.path.read_bytes()
+        for new in (None, 'short', 'x' * 1025, 'ą' * 513, 'x\ud800' * 12, PASSWORD):
+            self.clock.advance(identity.LOGIN_WINDOW_SECONDS)
+            with self.assertRaises(PasswordRejected):
+                self.store.change_password(token, PASSWORD, new)
+            self.assertEqual(self.path.read_bytes(), before)
+            self.assertTrue(self.store.session(token)['authenticated'])
+        new = 'ąęćłńóśźż-new-password-2026'
+        self.store.change_password(token, PASSWORD, new)
+        self.assertTrue(self.login(password=new)[1]['authenticated'])
+
+    def test_self_change_authenticates_before_hashing_and_expires_during_hashing(self):
+        token, _ = self.login()
+        before = self.path.read_bytes()
+        with patch.object(identity, '_derive', side_effect=AssertionError('unauthenticated hash')):
+            with self.assertRaises(AccessDenied):
+                self.store.change_password('x' * 43, PASSWORD, 'new-synthetic-password')
+        original_derive = identity._derive
+        advanced = False
+        def slow_derive(encoded, salt):
+            nonlocal advanced
+            result = original_derive(encoded, salt)
+            if not advanced:
+                advanced = True
+                self.clock.advance(identity.IDLE_SECONDS)
+            return result
+        with patch.object(identity, '_derive', side_effect=slow_derive):
+            with self.assertRaises(AccessDenied):
+                self.store.change_password(token, PASSWORD, 'new-synthetic-password')
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_password_change_throttle_is_shared_by_account_sessions_but_separate_from_login(self):
+        first, _ = self.login()
+        second, _ = self.login()
+        for index in range(identity.MAX_PASSWORD_CHANGE_ATTEMPTS):
+            with self.assertRaises(CurrentPasswordInvalid):
+                self.store.change_password((first, second)[index % 2], 'wrong-synthetic-password', 'new-synthetic-password')
+        with patch.object(identity, '_derive', side_effect=AssertionError('throttled hash')):
+            with self.assertRaises(RateLimited) as error:
+                self.store.change_password(second, PASSWORD, 'new-synthetic-password')
+        self.assertEqual(error.exception.retry_after, identity.LOGIN_WINDOW_SECONDS)
+        self.assertTrue(self.login()[1]['authenticated'])
+        self.clock.advance(identity.LOGIN_WINDOW_SECONDS)
+        self.assertTrue(self.store.change_password(first, PASSWORD, 'new-synthetic-password')['changed'])
+
+    def test_external_reset_during_current_password_verification_wins(self):
+        token, _ = self.login()
+        original_derive = identity._derive
+        reset = False
+        reset_document = None
+        def concurrent_reset(encoded, salt):
+            nonlocal reset, reset_document
+            result = original_derive(encoded, salt)
+            if not reset:
+                reset = True
+                provision_account(self.path, 'operator', 'external-reset-password', replace=True)
+                reset_document = self.path.read_bytes()
+            return result
+        with patch.object(identity, '_derive', side_effect=concurrent_reset):
+            with self.assertRaises(AccessDenied):
+                self.store.change_password(token, PASSWORD, 'losing-self-service-password')
+        self.assertEqual(self.path.read_bytes(), reset_document)
+        self.assertTrue(self.login(password='external-reset-password')[1]['authenticated'])
+
+    def test_external_account_removal_cannot_be_undone_by_self_change(self):
+        token, _ = self.login()
+        original_derive = identity._derive
+        removed = False
+        def concurrent_remove(encoded, salt):
+            nonlocal removed
+            result = original_derive(encoded, salt)
+            if not removed:
+                removed = True
+                self.path.write_text(json.dumps({'schema': identity.ACCOUNT_SCHEMA, 'accounts': []}))
+            return result
+        with patch.object(identity, '_derive', side_effect=concurrent_remove):
+            with self.assertRaises(AccessDenied):
+                self.store.change_password(token, PASSWORD, 'new-synthetic-password')
+        self.assertEqual(json.loads(self.path.read_text())['accounts'], [])
+
+    def test_other_account_added_during_hashing_is_preserved(self):
+        token, _ = self.login()
+        original_derive = identity._derive
+        added = False
+        def concurrent_provision(encoded, salt):
+            nonlocal added
+            result = original_derive(encoded, salt)
+            if not added:
+                added = True
+                provision_account(self.path, 'second', PASSWORD)
+            return result
+        with patch.object(identity, '_derive', side_effect=concurrent_provision):
+            self.store.change_password(token, PASSWORD, 'new-synthetic-password')
+        self.assertEqual({row['username'] for row in json.loads(self.path.read_text())['accounts']}, {'operator', 'second'})
+        self.assertTrue(self.login(username='second')[1]['authenticated'])
+
+    def test_concurrent_self_changes_have_one_winner_without_lost_updates(self):
+        other = IdentityStore(self.path, clock=self.clock)
+        first, _ = self.login()
+        second, _ = other.login('operator', PASSWORD, 'peer')
+        barrier = threading.Barrier(2)
+        original_derive = identity._derive
+        def synchronized_current(encoded, salt):
+            result = original_derive(encoded, salt)
+            if encoded == PASSWORD.encode():
+                barrier.wait(timeout=3)
+            return result
+        outcomes = []
+        def change(owner, token, password):
+            try:
+                owner.change_password(token, PASSWORD, password)
+                outcomes.append(('changed', password))
+            except AccessDenied:
+                outcomes.append(('denied', password))
+            except Exception as error:
+                outcomes.append((type(error).__name__, password))
+        with patch.object(identity, '_derive', side_effect=synchronized_current):
+            threads = [threading.Thread(target=change, args=(owner, token, password))
+                       for owner, token, password in ((self.store, first, 'first-synthetic-password'),
+                                                      (other, second, 'second-synthetic-password'))]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(5)
+                self.assertFalse(thread.is_alive())
+        self.assertEqual(sorted(status for status, _ in outcomes), ['changed', 'denied'])
+        winner = next(password for status, password in outcomes if status == 'changed')
+        self.assertTrue(self.login(password=winner)[1]['authenticated'])
+
+    def test_failed_publish_preserves_original_and_post_replace_failure_revokes_old_sessions(self):
+        provision_account(self.path, 'second', PASSWORD)
+        token, _ = self.login()
+        before = self.path.read_bytes()
+        with patch.object(identity.os, 'replace', side_effect=OSError('private path')):
+            with self.assertRaises(InvalidIdentityStore):
+                self.store.change_password(token, PASSWORD, 'new-synthetic-password')
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertTrue(self.store.session(token)['authenticated'])
+        fsync = identity.os.fsync
+        def fail_directory(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise OSError('private directory failed')
+            return fsync(fd)
+        with patch.object(identity.os, 'fsync', side_effect=fail_directory):
+            with self.assertRaises(InvalidIdentityStore):
+                self.store.change_password(token, PASSWORD, 'new-synthetic-password')
+        with self.assertRaises(AccessDenied):
+            self.store.session(token)
+        self.assertTrue(self.login(password='new-synthetic-password')[1]['authenticated'])
+        self.assertEqual(json.loads(before)['accounts'][1], json.loads(self.path.read_text())['accounts'][1])
+        self.assertEqual(list(self.root.glob('.identity-*')), [])
 
 
 class CookieTests(unittest.TestCase):

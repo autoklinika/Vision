@@ -124,6 +124,23 @@ wydanie, odmawia automatycznej podmiany. Przed aktualizacją Core należy potwie
 `CONNECTED` i `NO_ACTIVE_SESSION`, a następnie jawnie zatrzymać jego usługę.
 Aktywna inspekcja wymaga oddzielnej procedury zakończenia lub uzgodnienia stanu.
 
+Aktualizację samego GUI/API wykonujemy z `--core-release`, wskazując dotychczasowe
+wydanie Core. Dzięki temu jego jednostka, proces i dane pozostają niezależne od
+aktualizacji interfejsu. Obie ścieżki muszą wskazywać czyste wydania przypięte do
+pełnego SHA, a pliki zależności współdzielonego środowiska muszą być identyczne:
+
+```bash
+python3 -B "$VISION_RELEASE/scripts/deploy/install_webgui.py" \
+  --release "$VISION_RELEASE" --core-release "$VISION_CORE_RELEASE" \
+  --browser "$VISION_BROWSER" --https-origin "$VISION_HTTPS_ORIGIN" --start
+```
+
+`VISION_CORE_RELEASE` należy ustawić na faktyczne bieżące wydanie z jednostki
+`vision-core.service`, a origin na skonfigurowany adres HTTPS. Instalator nadal
+odmawia nadpisania odmiennej konfiguracji działającego Core. Restart GUI/API
+unieważnia jego sesje przeglądarkowe. Po aktualizacji otwarta karta powinna
+wczytać dokument ponownie, aby korzystać z nowego kodu interfejsu.
+
 Wymagane są zamontowane `/srv/vision-data`, istniejący bus użytkownika oraz dostępne
 `git`, `systemctl`, `mountpoint`, Firefox i moduł Python `venv`. Instalator sam nie
 uzyskuje uprawnień administracyjnych. Korzysta z busa przez `XDG_RUNTIME_DIR` równy
@@ -197,8 +214,21 @@ kont i nie generują ponownie hasła.
 Uprawnienia tego konta obejmują odczyt. Konto nie jest użytkownikiem systemowym,
 administratorem Ubuntu ani upoważnieniem do ruchu lub akwizycji.
 
-Zmiana hasła jest jawną lokalną czynnością. Poniższy proces pyta o nowe hasło przez
-`getpass`; nie przekazujemy hasła w argumentach polecenia:
+Zalogowany użytkownik zmienia własne hasło przez **Settings → Change password**.
+Wpisuje obecne hasło, nowe hasło i jego potwierdzenie. Nowe hasło musi mieć co
+najmniej 12 znaków, mieścić się w 1024 bajtach UTF-8 i różnić się od obecnego.
+Backend zapisuje zmianę atomowo i unieważnia wszystkie sesje tego konta; po
+potwierdzeniu należy zalogować się nowym hasłem. Błędne obecne hasło nie wylogowuje
+użytkownika. Zmiana hasła nie uruchamia ani nie zatrzymuje Core.
+
+Gdy po wysłaniu formularza połączenie zostanie przerwane, wynik może być
+niepotwierdzony. Interfejs nie powtarza zapisu automatycznie. Należy wrócić do
+logowania i sprawdzić nowe hasło. Odpowiedź API ani pliki przeglądarki nie zawierają
+nowego hasła.
+
+Lokalny reset konta pozostaje dostępny jako czynność administracyjna. Poniższy
+proces pyta o nowe hasło przez `getpass`; nie przekazujemy hasła w argumentach
+polecenia:
 
 ```bash
 PYTHONPATH="$VISION_RELEASE/src" \
@@ -209,7 +239,9 @@ PYTHONPATH="$VISION_RELEASE/src" \
 
 Opcja `--generate-to /prywatna/nowa/sciezka` po `reset operator` zamiast tego
 generuje hasło do nowego prywatnego pliku. Nie nadpisuje istniejącego pliku.
-Po resecie wcześniejszy plik pierwszego hasła nie jest aktualizowany. Można też
+Po zmianie w Settings lub lokalnym resecie wcześniejszy plik pierwszego hasła nie
+jest aktualizowany i nie reprezentuje już obecnego hasła. Narzędzia odbioru i
+monitoringu nie powinny traktować go jako stałego poświadczenia. Można też
 utworzyć kolejne konto `reader`, używając `provision NAZWA` zamiast `reset operator`.
 
 Sesja ma limit **8 godzin od logowania** oraz **30 minut bez żądań podtrzymujących
@@ -275,9 +307,23 @@ Punktem wycofania jest wcześniejszy zachowany katalog wydania i kopia zarządza
 plików w `deployment-backups`. W kopii jednostki komentarz `# Release:` wskazuje
 poprzednią ścieżkę. Nie usuwamy starego wydania przed potwierdzeniem nowego.
 
-Powrót wymaga wcześniejszego potwierdzenia braku aktywnej inspekcji w połączonym
-Core. Następnie zatrzymujemy obie zarządzane usługi i uruchamiamy instalator
-poprzedniego rzeczywistego SHA. Zachowujemy ten sam wymagany origin HTTPS:
+Przy wycofaniu samego GUI/API używamy instalatora obsługującego `--core-release`,
+wskazując poprzednie wydanie GUI i nadal bieżące wydanie Core. Identyczne
+zależności oraz zgodna jednostka Core pozwalają pozostawić jego proces działający:
+
+```bash
+python3 -B "$VISION_RELEASE/scripts/deploy/install_webgui.py" \
+  --release "$VISION_PREVIOUS_RELEASE" --core-release "$VISION_CORE_RELEASE" \
+  --browser "$VISION_BROWSER" --https-origin "$VISION_HTTPS_ORIGIN" --start
+```
+
+Wycofanie interfejsu zachowuje aktualny magazyn kont. Nie przywracamy jego starszej
+kopii wraz z wydaniem aplikacji, ponieważ cofnęłoby to późniejsze zmiany haseł.
+
+Powrót obejmujący także zmianę Core wymaga wcześniejszego potwierdzenia braku
+aktywnej inspekcji w połączonym Core. Następnie zatrzymujemy obie zarządzane
+usługi i uruchamiamy instalator poprzedniego rzeczywistego SHA. Zachowujemy ten
+sam wymagany origin HTTPS:
 
 ```bash
 systemctl --user stop vision-webgui.service vision-core.service

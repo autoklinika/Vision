@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from projection_support import memory_fixture
 from vision_api.access import Credentials, CursorRejected
-from vision_api.identity import IdentityStore, provision_account
+from vision_api.identity import IdentityStore, MAX_PASSWORD_CHANGE_ATTEMPTS, provision_account
 from vision_api.station import StationApplication, STATION_MARKER, _load_static, _origins
 from vision_api.station_owner import NoActiveSession, StationOwner
 from vision_modules.ecu_library_backend import ECULibraryService
@@ -213,6 +213,86 @@ class StationTests(unittest.TestCase):
         with patch.object(engine, "read_snapshot", side_effect=cutover):
             with self.assertRaises(CursorRejected):
                 self.owner.session_report()
+
+    def password_change(self, cookie, *, current=None, new="new-test-only-password-2026", host="127.0.0.1:18490"):
+        return self.request("/api/v1/auth/password", method="POST", host=host, cookie=cookie,
+                            value={"currentPassword": self.password if current is None else current, "newPassword": new},
+                            headers={"HTTP_ORIGIN": self.app.origins[host], "HTTP_X_VISION_CLIENT": "webgui"})
+
+    def test_password_change_is_self_service_and_never_reads_core(self):
+        _, cookie = self.login(host="station.example")
+        _, other = self.login(host="station.example")
+        with patch.object(self.owner, "station_report", side_effect=AssertionError("Core accessed")), \
+             patch.object(self.owner.library_reader, "library_report", side_effect=AssertionError("library accessed")):
+            result = self.password_change(cookie, host="station.example")
+        self.assertEqual(result["status"], 200)
+        self.assertEqual(result["json"], {"schema": "vision.api.password-change.v1", "changed": True})
+        self.assertEqual(set(result["headers"]["Set-Cookie"].split("; ")[1:]),
+                         {"Path=/", "HttpOnly", "SameSite=Strict", "Max-Age=0", "Secure"})
+        self.assertEqual(result["headers"]["Cache-Control"], "no-store")
+        self.assertNotIn(self.password.encode(), result["body"])
+        for token in (cookie, other):
+            self.assertEqual(self.request("/api/v1/auth/session", cookie=token)["status"], 401)
+        self.password = "new-test-only-password-2026"
+        self.login()
+
+    def test_password_change_authentication_csrf_and_exact_payload(self):
+        before = self.accounts.read_bytes()
+        with patch.object(self.identity, "change_password", side_effect=AssertionError("unauthorized change")):
+            self.assertEqual(self.password_change(None)["status"], 401)
+            _, cookie = self.login()
+            for headers in ({}, {"HTTP_ORIGIN": "http://127.0.0.1:18490"},
+                            {"HTTP_ORIGIN": "https://evil.example", "HTTP_X_VISION_CLIENT": "webgui"}):
+                result = self.request("/api/v1/auth/password", method="POST", cookie=cookie,
+                                      value={"currentPassword": self.password, "newPassword": "new-test-only-password"},
+                                      headers=headers)
+                self.assertEqual(result["status"], 403)
+            headers = {"HTTP_ORIGIN": "http://127.0.0.1:18490", "HTTP_X_VISION_CLIENT": "webgui"}
+            for value in ({"username": "other", "currentPassword": self.password, "newPassword": "new-test-only-password"},
+                          {"currentPassword": self.password}, {"newPassword": "new-test-only-password"}):
+                self.assertEqual(self.request("/api/v1/auth/password", method="POST", cookie=cookie,
+                                              value=value, headers=headers)["status"], 400)
+        self.assertEqual(self.accounts.read_bytes(), before)
+        self.assertEqual(self.request("/api/v1/auth/password", cookie=cookie)["status"], 404)
+        self.assertEqual(self.request("/api/v1/auth/password?username=other", method="POST", cookie=cookie)["status"], 405)
+
+    def test_password_errors_are_distinct_and_wrong_current_preserves_session(self):
+        _, cookie = self.login()
+        before = self.accounts.read_bytes()
+        result = self.password_change(cookie, current="incorrect-test-password")
+        self.assertEqual(result["status"], 403)
+        self.assertEqual(result["json"], {"schema": "vision.api.error.v1", "code": "CURRENT_PASSWORD_INVALID"})
+        self.assertNotIn("Set-Cookie", result["headers"])
+        self.assertEqual(self.request("/api/v1/auth/session", cookie=cookie)["status"], 200)
+        for new in ("short", self.password):
+            result = self.password_change(cookie, new=new)
+            self.assertEqual(result["status"], 400)
+            self.assertEqual(result["json"]["code"], "PASSWORD_REJECTED")
+        self.assertEqual(self.accounts.read_bytes(), before)
+
+    def test_password_change_throttling_and_storage_failure_are_sanitized(self):
+        _, cookie = self.login()
+        for _ in range(MAX_PASSWORD_CHANGE_ATTEMPTS):
+            self.assertEqual(self.password_change(cookie, current="incorrect-test-password")["status"], 403)
+        limited = self.password_change(cookie)
+        self.assertEqual(limited["status"], 429)
+        self.assertEqual(limited["json"]["code"], "RATE_LIMITED")
+        self.assertTrue(1 <= int(limited["headers"]["Retry-After"]) <= 60)
+        self.accounts.write_text("private-corrupt-content")
+        unavailable = self.password_change(cookie)
+        self.assertEqual(unavailable["status"], 503)
+        self.assertEqual(unavailable["json"], {"schema": "vision.api.error.v1", "code": "REPORT_UNAVAILABLE"})
+
+    def test_maximum_escaped_password_pair_fits_bounded_request(self):
+        self.password = "\x01" * 1024
+        new = "\x02" * 1024
+        provision_account(self.accounts, "operator", self.password, replace=True)
+        _, cookie = self.login()
+        value = {"currentPassword": self.password, "newPassword": new}
+        self.assertGreater(len(json.dumps(value).encode()), 12000)
+        self.assertEqual(self.password_change(cookie, new=new)["status"], 200)
+        self.password = new
+        self.login()
 
 
 if __name__ == "__main__":

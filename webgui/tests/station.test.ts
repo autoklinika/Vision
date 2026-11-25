@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { isIdentityReport, isLogoutReport, isStationReport } from '../src/station/contract';
-import { readIdentity, readStation, signIn, signOut, stationTimeoutMs } from '../src/station/transport';
+import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport } from '../src/station/contract';
+import { changePassword, readIdentity, readStation, signIn, signOut, stationTimeoutMs } from '../src/station/transport';
+import { passwordChangeProblem } from '../src/station/password';
 import { identityFixture, stationFixture } from './fixtures/station';
 
 const origin = 'http://127.0.0.1:18491';
@@ -89,4 +90,46 @@ it('authentication body reads keep a deadline and an aggregate byte bound', asyn
   }));
   const pending = readIdentity(); await vi.advanceTimersByTimeAsync(stationTimeoutMs);
   expect(await pending).toEqual({status: 'UNAVAILABLE', report: null});
+});
+
+it('password changes send only the two secrets to the same-origin protected endpoint', async () => {
+  secure();
+  const report = {schema: 'vision.api.password-change.v1', changed: true};
+  expect(isPasswordChangeReport(report)).toBe(true);
+  for (const invalid of [{...report, changed: false}, {...report, username: 'operator'}, {...report, password: 'private'}]) expect(isPasswordChangeReport(invalid)).toBe(false);
+  const network = vi.fn().mockResolvedValue(response(report, '/api/v1/auth/password'));
+  vi.stubGlobal('fetch', network);
+  expect(await changePassword('test-current-password', 'test-next-password')).toEqual({status: 'AVAILABLE', report});
+  expect(String(network.mock.calls[0][0])).toBe(origin + '/api/v1/auth/password');
+  expect(network.mock.calls[0][1]).toMatchObject({method: 'POST', mode: 'same-origin', credentials: 'same-origin', redirect: 'error', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Vision-Client': 'webgui'}});
+  expect(JSON.parse(network.mock.calls[0][1].body)).toEqual({currentPassword: 'test-current-password', newPassword: 'test-next-password'});
+});
+
+it('only a closed, exact password error identifies the wrong current password', async () => {
+  secure();
+  for (const [status, code, expected] of [
+    [403, 'CURRENT_PASSWORD_INVALID', 'CURRENT_PASSWORD_INVALID'], [400, 'PASSWORD_REJECTED', 'PASSWORD_REJECTED'],
+    [403, 'ACCESS_DENIED', 'UNAVAILABLE'], [403, 'HOST_REJECTED', 'UNAVAILABLE'],
+    [400, 'CURRENT_PASSWORD_INVALID', 'UNAVAILABLE'], [401, 'ACCESS_DENIED', 'ACCESS_DENIED'],
+    [429, 'RATE_LIMITED', 'RATE_LIMITED'], [503, 'REPORT_UNAVAILABLE', 'UNAVAILABLE'],
+  ] as const) {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({schema: 'vision.api.error.v1', code}, '/api/v1/auth/password', status)));
+    expect(await changePassword('test-current-password', 'test-next-password')).toEqual({status: expected, report: null});
+  }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({schema: 'vision.api.error.v1', code: 'CURRENT_PASSWORD_INVALID', detail: 'private'}, '/api/v1/auth/password', 403)));
+  expect(await changePassword('test-current-password', 'test-next-password')).toEqual({status: 'UNAVAILABLE', report: null});
+  const network = vi.fn().mockRejectedValue(new Error('unconfirmed write'));
+  vi.stubGlobal('fetch', network);
+  expect(await changePassword('test-current-password', 'test-next-password')).toEqual({status: 'UNAVAILABLE', report: null});
+  expect(network).toHaveBeenCalledTimes(1);
+});
+
+it('password form validation matches Unicode character and UTF-8 byte policy', () => {
+  expect(passwordChangeProblem('previous-password', '😀'.repeat(12), '😀'.repeat(12))).toBeNull();
+  expect(passwordChangeProblem('previous-password', '😀'.repeat(11), '😀'.repeat(11))).toContain('12 characters');
+  expect(passwordChangeProblem('previous-password', '😀'.repeat(256), '😀'.repeat(256))).toBeNull();
+  expect(passwordChangeProblem('previous-password', '😀'.repeat(257), '😀'.repeat(257))).toContain('1024 UTF-8 bytes');
+  expect(passwordChangeProblem('previous-password', 'next-long-password', 'different-password')).toContain('do not match');
+  expect(passwordChangeProblem('previous-password', 'previous-password', 'previous-password')).toContain('different password');
+  expect(passwordChangeProblem('', 'next-long-password', 'next-long-password')).toContain('current password');
 });

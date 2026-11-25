@@ -2,9 +2,11 @@ import { realAdapter } from '../api/realAdapter';
 import type { ReadOnlyVisionClient } from '../api/types';
 import type { ProtectedResult } from '../api/protectedAdapter';
 import type { IdentityReport, StationReport } from './contract';
+import type { PasswordChangeResult } from './transport';
 
 export type StationPresentation = Readonly<{
   identity: IdentityReport; report: StationReport; refresh: () => void; logout: () => void;
+  accountBusy: boolean; changePassword: (currentPassword: string, newPassword: string) => Promise<PasswordChangeResult>;
 }>;
 
 /** Authenticated composition pins every projection to this station and owner. */
