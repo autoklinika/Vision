@@ -7,11 +7,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from .status import boot_status, validate_boot_status
 from .access import AccessDenied, Credentials, CursorRejected, ReportUnavailable
 from .reports import MAX_PROTECTED_BYTES, MAX_SEQUENCE, SessionReadService
+from .library_reports import LibraryReadService
 
 MAX_RESPONSE_BYTES = 4096
 PATH = "/api/v1/status"
 SESSION_PATH = "/api/v1/session"
 EVENTS_PATH = re.compile(r"/api/v1/events\?view=([0-9a-f]{32})&after=(0|[1-9][0-9]{0,15})&through=(0|[1-9][0-9]{0,15})", re.ASCII)
+LIBRARY_PATH = "/api/v1/library"
+LIBRARY_PAGE = re.compile(r"/api/v1/library\?view=([0-9a-f]{64})&after=(0|[1-9][0-9]{0,3})", re.ASCII)
+LIBRARY_ENTRY = re.compile(r"/api/v1/library/entries/([0-9a-f]{32})\?view=([0-9a-f]{64})", re.ASCII)
+LIBRARY_HISTORY = re.compile(r"/api/v1/library/entries/([0-9a-f]{32})/history\?view=([0-9a-f]{64})&after=(0|[1-9][0-9]{0,3})", re.ASCII)
 LOOPBACK = "127.0.0.1"
 
 
@@ -93,7 +98,9 @@ class Handler(BaseHTTPRequestHandler):
         if len(words) != 3 or words[1] != self.path or len(self.path) > 256:
             self._error(404, "NOT_FOUND")
             return
-        if self.path == SESSION_PATH or EVENTS_PATH.fullmatch(self.path):
+        if (self.path in (SESSION_PATH, LIBRARY_PATH) or EVENTS_PATH.fullmatch(self.path)
+                or LIBRARY_PAGE.fullmatch(self.path) or LIBRARY_ENTRY.fullmatch(self.path)
+                or LIBRARY_HISTORY.fullmatch(self.path)):
             self._protected()
             return
         if self.path != PATH:
@@ -122,6 +129,17 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == SESSION_PATH:
                 value = self.server.read_service.session_report(credentials)
+            elif self.path == LIBRARY_PATH:
+                value = self.server.library_read_service.library_report(credentials)
+            elif match := LIBRARY_PAGE.fullmatch(self.path):
+                view, after = match.groups()
+                value = self.server.library_read_service.library_report(credentials, view=view, after=int(after))
+            elif match := LIBRARY_ENTRY.fullmatch(self.path):
+                entry_id, view = match.groups()
+                value = self.server.library_read_service.entry_report(credentials, entry_id=entry_id, view=view)
+            elif match := LIBRARY_HISTORY.fullmatch(self.path):
+                entry_id, view, after = match.groups()
+                value = self.server.library_read_service.history_report(credentials, entry_id=entry_id, view=view, after=int(after))
             else:
                 match = EVENTS_PATH.fullmatch(self.path)
                 view, after, through = match.groups()
@@ -145,14 +163,16 @@ class Handler(BaseHTTPRequestHandler):
     do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = do_TRACE = do_CONNECT = _deny_method
 
 
-def make_server(port=18491, *, provider=None, authorizer=None):
+def make_server(port=18491, *, provider=None, authorizer=None, library_provider=None, library_authorizer=None):
     if type(port) is not int or not 0 <= port <= 65535:
         raise ValueError("invalid port")
     # Programmatic composition only. CLI intentionally has no auth bypass,
     # token option, provider factory, file/journal path, or hardware endpoint.
     read_service = SessionReadService(provider=provider, authorizer=authorizer)
+    library_read_service = LibraryReadService(provider=library_provider, authorizer=library_authorizer)
     server = LabServer((LOOPBACK, port), Handler)
     server.read_service = read_service
+    server.library_read_service = library_read_service
     return server
 
 

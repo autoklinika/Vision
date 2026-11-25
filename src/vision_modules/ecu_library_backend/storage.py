@@ -10,6 +10,8 @@ import re
 import secrets
 import stat
 import threading
+import time
+from dataclasses import dataclass
 
 from vision_modules.ecu_reference import canonical_json, load_json
 from vision_modules.ecu_reference.models import thaw
@@ -22,6 +24,43 @@ MAX_DOCUMENT_BYTES = 512 * 1024
 MAX_IMAGE_PIXELS = 30_000_000
 MAX_IMAGE_DIMENSION = 30_000
 MAX_HISTORY_REVISIONS = 4096
+MAX_READ_PROFILES = 256
+MAX_READ_BYTES = 8 * 1024 * 1024
+READ_LOCK_TIMEOUT = 0.25
+
+
+class DraftReadUnavailable(RuntimeError):
+    """A fixed, transport-safe reason without filesystem exception text."""
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(reason)
+
+
+@dataclass(frozen=True)
+class SavedRevision:
+    snapshot_id: str
+    etag: str
+    revision: str
+
+
+@dataclass(frozen=True)
+class DraftReadSnapshot:
+    key: str
+    profile: object
+    etag: str
+    history: tuple[SavedRevision, ...]
+
+
+class _ReadBudget:
+    """One aggregate budget for all pointer and history reads in a view."""
+    def __init__(self):
+        self.bytes_left = MAX_READ_BYTES
+        self.revisions_left = MAX_HISTORY_REVISIONS
+
+    def revision(self):
+        if self.revisions_left <= 0:
+            raise DraftReadUnavailable('LIBRARY_LIMIT_EXCEEDED')
+        self.revisions_left -= 1
 
 
 def _snapshot_hash(snapshot):
@@ -84,12 +123,17 @@ class DraftStore:
         if p.exists() and not stat.S_ISREG(p.stat().st_mode): raise ValueError('regular file required')
         return p
 
-    def _read(self, area, name, limit=512*1024):
+    def _read(self, area, name, limit=512*1024, *, budget=None):
         p = self._path(area, name)
         fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         try:
             if not stat.S_ISREG(os.fstat(fd).st_mode): raise ValueError('regular file required')
-            with os.fdopen(fd, 'rb', closefd=False) as f: data = f.read(limit + 1)
+            read_limit = limit if budget is None else min(limit, budget.bytes_left)
+            with os.fdopen(fd, 'rb', closefd=False) as f: data = f.read(read_limit + 1)
+            if budget is not None:
+                if len(data) > budget.bytes_left:
+                    raise DraftReadUnavailable('LIBRARY_LIMIT_EXCEEDED')
+                budget.bytes_left -= len(data)
             if len(data) > limit: raise ValueError('stored file too large')
             return data
         finally: os.close(fd)
@@ -113,9 +157,9 @@ class DraftStore:
     @staticmethod
     def etag(data): return '"' + hashlib.sha256(data).hexdigest() + '"'
 
-    def _pointer(self, key):
+    def _pointer(self, key, *, budget=None):
         try:
-            pointer = json.loads(self._read('drafts', key + '.json'))
+            pointer = json.loads(self._read('drafts', key + '.json', budget=budget))
             if (not isinstance(pointer, dict) or set(pointer) != {'key', 'generation'}
                     or pointer['key'] != key or not isinstance(pointer['generation'], str)
                     or not GENERATION.fullmatch(pointer['generation'])):
@@ -124,9 +168,11 @@ class DraftStore:
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
             raise ValueError('invalid draft pointer') from exc
 
-    def _snapshot(self, key, generation):
+    def _snapshot(self, key, generation, *, budget=None):
         try:
-            raw = self._read('history', key + '--' + generation + '.json')
+            if budget is not None:
+                budget.revision()
+            raw = self._read('history', key + '--' + generation + '.json', budget=budget)
             snapshot = json.loads(raw)
             if (not isinstance(snapshot, dict) or set(snapshot) != {'key', 'generation', 'previous', 'sha256', 'profile', 'snapshot_sha256'}
                     or snapshot['key'] != key or snapshot['generation'] != generation
@@ -147,15 +193,15 @@ class DraftStore:
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError, KeyError) as exc:
             raise ValueError('invalid snapshot') from exc
 
-    def _chain(self, key):
-        generation = self._pointer(key)
+    def _chain(self, key, *, budget=None):
+        generation = self._pointer(key, budget=budget)
         result = []
         seen = set()
         while generation is not None:
             if generation in seen: raise ValueError('snapshot cycle')
             if len(result) >= MAX_HISTORY_REVISIONS: raise ValueError('history too long')
             seen.add(generation)
-            profile, previous = self._snapshot(key, generation)
+            profile, previous = self._snapshot(key, generation, budget=budget)
             result.append((generation, profile))
             generation = previous
         return result
@@ -218,6 +264,95 @@ class DraftStore:
             if p.name.endswith('.json') and IDENT.fullmatch(p.name[:-5]):
                 self._path('drafts', p.name); result.append(p.name[:-5])
         return sorted(result)
+
+    def _read_keys(self):
+        """Bound directory enumeration before loading any profile history."""
+        result = []
+        examined = 0
+        directory = _check_path(self.root / 'drafts')
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                examined += 1
+                if examined > MAX_READ_PROFILES * 2:
+                    raise DraftReadUnavailable('LIBRARY_LIMIT_EXCEEDED')
+                if entry.name.endswith('.json') and IDENT.fullmatch(entry.name[:-5]):
+                    self._path('drafts', entry.name)
+                    result.append(entry.name[:-5])
+                    if len(result) > MAX_READ_PROFILES:
+                        raise DraftReadUnavailable('LIBRARY_LIMIT_EXCEEDED')
+        return tuple(sorted(result))
+
+    def read_snapshot(self):
+        """Read a bounded, immutable committed view without initializing files.
+
+        Writers use the same owner lock and ``.lock`` inode. A missing lock is
+        accepted only as an empty initial store and returns that empty snapshot
+        directly; no later directory traversal can accidentally read a first
+        publication without its lock. The complete lineage is verified before
+        any projected data is returned. An over-budget view fails as a whole.
+        """
+        if not self.lock.acquire(timeout=READ_LOCK_TIMEOUT):
+            raise DraftReadUnavailable('LIBRARY_BUSY')
+        fd = None
+        locked = False
+        try:
+            # Re-entrant reads cannot observe the middle of an owner mutation.
+            if getattr(self._transaction_state, 'active', False):
+                raise DraftReadUnavailable('LIBRARY_BUSY')
+            path = _check_path(self.root / '.lock')
+            try:
+                fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            except FileNotFoundError:
+                if self._read_keys():
+                    raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
+                return ()
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
+            deadline = time.monotonic() + READ_LOCK_TIMEOUT
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                    locked = True
+                    break
+                except BlockingIOError:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise DraftReadUnavailable('LIBRARY_BUSY')
+                    time.sleep(min(0.01, remaining))
+            budget = _ReadBudget()
+            result = []
+            identities = set()
+            for key in self._read_keys():
+                chain = self._chain(key, budget=budget)
+                current_generation, current = chain[0]
+                metadata = current.data['metadata']
+                identity = tuple(metadata[k] for k in ('profile_id', 'family_id', 'variant_id', 'profile_revision'))
+                if identity[1:] in identities:
+                    raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
+                identities.add(identity[1:])
+                history = []
+                for generation, profile in reversed(chain):
+                    m = profile.data['metadata']; p = profile.data['provenance_release']
+                    if (tuple(m[k] for k in ('profile_id', 'family_id', 'variant_id', 'profile_revision')) != identity
+                            or m['schema_version'] != '1' or m['template_only'] is not False
+                            or m['status'] != 'DRAFT' or m['content_sha256'] is not None
+                            or m['approval_scopes'] or p['release_approval'] is not None
+                            or p['released_snapshot_sha256'] is not None):
+                        raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
+                    history.append(SavedRevision(generation, self.etag(generation.encode('ascii')), m['profile_revision']))
+                result.append(DraftReadSnapshot(key, current,
+                    self.etag(current_generation.encode('ascii')), tuple(history)))
+            return tuple(result)
+        except DraftReadUnavailable:
+            raise
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            raise DraftReadUnavailable('LIBRARY_UNAVAILABLE') from exc
+        finally:
+            if fd is not None:
+                if locked:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                os.close(fd)
+            self.lock.release()
 
     def put_asset(self, data):
         if len(data) > 8*1024*1024: raise ValueError('asset too large')

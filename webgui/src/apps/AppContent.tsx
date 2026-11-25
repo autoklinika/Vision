@@ -1,16 +1,18 @@
 import type { Snapshot } from '../api/types';
 import type { SessionControls } from '../api/useSessionView';
 import { SessionContent } from './SessionContent';
+import type { LibraryControls } from '../api/useLibraryView';
+import { LibraryContent } from './LibraryContent';
 import { connectionLabel } from '../api/presentation';
 import type { AppId } from '../shell/model';
-const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 'events'>, { heading: string; columns: string[]; message: string; action: string }> = {
-  ecu: { heading: 'Reference profile catalog', columns: ['Manufacturer / family', 'Variant', 'Revision', 'Approval'], message: 'No profiles loaded. Reference profiles are separate from specimen records. The 15-section editor, evidence provenance and revision review are proposed for GUI-03; approval belongs to Vision.', action: 'Open reference editor' },
+const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 'events' | 'ecu'>, { heading: string; columns: string[]; message: string; action: string }> = {
   luxonis: { heading: 'RGB-D observation', columns: ['RGB', 'Depth', 'Point cloud', 'Timestamp'], message: 'No sensor media available. Frames, geometry and measurements must come from the Vision interface.', action: 'Acquire frame' },
   nero: { heading: 'Motion & planning', columns: ['Robot report', 'Scene', 'Plan', 'Operation'], message: 'No robot or planner report available. No local kinematics, trajectory generation or motion execution.', action: 'Request motion' },
   sony: { heading: 'Camera acquisition', columns: ['Camera', 'Parameters', 'Capture', 'Transfer'], message: 'No acquisition report or photographs available. This client has no camera connection.', action: 'Capture photograph' },
   images: { heading: 'Image archive', columns: ['Asset', 'Source', 'Timestamp', 'Metadata'], message: 'No archive connected. Image browsing, A/B comparison and overlays are proposed for GUI-06.', action: 'Open image' },
 };
-export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls }) {
+export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls }) {
+  if (id === 'ecu') return libraryControls ? <LibraryContent controls={libraryControls}/> : <p>Protected library reads are unavailable in this view.</p>;
   if (id === 'inspection' || id === 'events') return sessionControls
     ? <SessionContent section={id} controls={sessionControls}/>
     : <p>Protected session reads are unavailable in this view.</p>;

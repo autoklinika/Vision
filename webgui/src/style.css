@@ -12,3 +12,33 @@
 .session-summary .session-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
 .session-summary h2 { font-size: 14px; margin: 0; }
 .session-summary .protected-read-status { min-height: 0; margin: 8px 0; }
+
+.library-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.library-heading h2 { margin: 0; }
+.library-heading span { color: #444; font-size: 11px; }
+.library-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.library-purpose { margin: 8px 0; }
+.library-content .synthetic-label { margin: 8px 0; padding: 4px 8px; }
+.library-report-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 10px; margin: 6px 0; overflow-wrap: anywhere; }
+.library-list { max-height: 152px; overflow: auto; background: #fff; }
+.library-list td { vertical-align: top; overflow-wrap: anywhere; }
+.library-list td small { display: block; }
+.library-selected td { background: #e8e8ff; }
+.library-entry-link { text-align: left; min-width: 0; min-height: 0; padding: 0; background: none; box-shadow: none; color: #000080; text-decoration: underline; font-weight: bold; }
+.library-entry-link:active { box-shadow: none; }
+.library-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 6px 0; font-size: 10px; }
+.library-pagination > span { margin-right: auto; }
+.library-pagination button { font-size: 10px; min-height: 23px; }
+.library-detail { margin-top: 10px; border-top: 1px solid #888; padding-top: 8px; }
+.library-detail-title { display: flex; gap: 12px; justify-content: space-between; align-items: center; overflow-wrap: anywhere; }
+.library-content h3 { font-size: 12px; margin: 0; }
+.library-detail-key { margin: 3px 0 8px; color: #444; font-size: 10px; overflow-wrap: anywhere; }
+.library-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #888; padding-bottom: 5px; }
+.library-tabs button[aria-selected="true"] { font-weight: bold; background: #dfdfdf; }
+.library-not-ready { margin: 7px 0; font-size: 11px; }
+.library-detail-scroll { max-height: 190px; overflow: auto; background: #fff; }
+.library-detail-scroll h3, .library-detail-scroll p { margin: 6px 8px; }
+.library-detail-scroll td { vertical-align: top; }
+.library-detail-scroll code { font-size: 10px; overflow-wrap: anywhere; }
+.library-detail .fine-print { margin: 7px 0; }
+.library-empty { color: #555; margin: 12px 8px; font-size: 11px; }
