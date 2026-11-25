@@ -7,6 +7,7 @@ const messages = {
   ACCESS_DENIED: 'Access denied. A server-authorized session is required; no protected report is retained.',
   UNAVAILABLE: 'Session report unavailable. The provider, connection or response could not be verified. No protected report is retained.',
   DISABLED: 'Protected session reads are disabled for this client mode. No session request is sent.',
+  NO_ACTIVE_SESSION: 'No active inspection session is connected.',
 } as const;
 
 export function SessionContent({section, controls}: {section: 'summary' | 'inspection' | 'events'; controls: SessionControls}) {
@@ -14,12 +15,13 @@ export function SessionContent({section, controls}: {section: 'summary' | 'inspe
   const {session, events} = view;
   const summary = section === 'summary';
   const message = summary && view.status === 'DISABLED' ? 'Protected reports are disabled in this client mode.' :
-    summary && view.status === 'NOT_REQUESTED' ? 'No report loaded. Refresh session reads the authorized Core report.' : messages[view.status];
-  const refresh = <button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING'}>Refresh session</button>;
+    summary && view.status === 'NOT_REQUESTED' ? 'No report loaded. Refresh session reads the authorized Core report.' :
+    controls.autoRefresh && view.status === 'AVAILABLE' ? 'Session information refreshes automatically from Vision.' : messages[view.status];
+  const refresh = <button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING' || view.status === 'NO_ACTIVE_SESSION' || view.refreshing}>Refresh session</button>;
   return <section className={`session-report${summary ? ' session-summary' : ''}`} aria-label="Protected Core report">
     <div className="session-heading"><h2>{summary ? 'Core / Runtime session' : section === 'inspection' ? 'Inspection session report' : 'Session event journal'}</h2>{summary && refresh}</div>
     <p className="protected-read-status" role="status">{message}</p>
-    {!summary && <div className="app-actions">{refresh}{section === 'events' && <button onClick={nextEvents} disabled={!events || events.nextAfterSequence === null || view.status !== 'AVAILABLE'}>Load more events</button>}</div>}
+    {!summary && <div className="app-actions">{refresh}{section === 'events' && <button onClick={nextEvents} disabled={!events || events.nextAfterSequence === null || view.status !== 'AVAILABLE' || view.refreshing}>Load more events</button>}</div>}
     {session && <>
       {session.source === 'SYNTHETIC_TEST' && <p className="synthetic-label"><strong>SYNTHETIC TEST · no station session</strong></p>}
       <div className="report sunken-panel"><dl>

@@ -3,6 +3,8 @@ import type { SessionControls } from '../api/useSessionView';
 import { SessionContent } from './SessionContent';
 import type { LibraryControls } from '../api/useLibraryView';
 import { LibraryContent } from './LibraryContent';
+import type { StationPresentation } from '../station/client';
+import { StationStatusContent } from '../station/StationStatusContent';
 import { connectionLabel } from '../api/presentation';
 import type { AppId } from '../shell/model';
 const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 'events' | 'ecu'>, { heading: string; columns: string[]; message: string; action: string }> = {
@@ -11,7 +13,8 @@ const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 
   sony: { heading: 'Camera acquisition', columns: ['Camera', 'Parameters', 'Capture', 'Transfer'], message: 'No acquisition report or photographs available. This client has no camera connection.', action: 'Capture photograph' },
   images: { heading: 'Image archive', columns: ['Asset', 'Source', 'Timestamp', 'Metadata'], message: 'No archive connected. Image browsing, A/B comparison and overlays are proposed for GUI-06.', action: 'Open image' },
 };
-export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls }) {
+export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation }) {
+  if (id === 'status' && station && sessionControls) return <StationStatusContent station={station} session={sessionControls}/>;
   if (id === 'ecu') return libraryControls ? <LibraryContent controls={libraryControls}/> : <p>Protected library reads are unavailable in this view.</p>;
   if (id === 'inspection' || id === 'events') return sessionControls
     ? <SessionContent section={id} controls={sessionControls}/>
