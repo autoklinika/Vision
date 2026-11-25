@@ -53,6 +53,7 @@ class InstallError(RuntimeError):
 @dataclass(frozen=True)
 class Plan:
     release: Path
+    core_release: Path
     origin: str | None
     browser: Path
     uid: int
@@ -190,10 +191,31 @@ def _environment(home):
     return environment
 
 
-def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox'):
+def _verify_release(release, uid):
+    """Both independently pinned services use a clean, owned release."""
+    if not isinstance(release, Path) or not RELEASE_PATH.fullmatch(str(release)):
+        raise InstallError('release must be /srv/vision-data/releases/vision-webgui/<full 40-character SHA>')
+    _no_symlinks(release)
+    if not release.is_dir() or release.stat().st_uid != uid:
+        raise InstallError('the pinned release must belong to the current user')
+    git = ['/usr/bin/git', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', str(release)]
+    head = _run([*git, 'rev-parse', '--verify', 'HEAD^{commit}'], label='verify release HEAD').stdout.strip()
+    top = _run([*git, 'rev-parse', '--show-toplevel'], label='verify release root').stdout.strip()
+    if head != release.name or top != str(release):
+        raise InstallError('release directory, Git root and exact HEAD must agree')
+    _run([*git, 'diff', '--quiet', '--no-ext-diff', 'HEAD', '--'], label='verify clean tracked release')
+    if _run([*git, 'ls-files', '--others', '--exclude-standard'], label='verify release extras').stdout.strip():
+        raise InstallError('untracked release files are not allowed outside ignored build output')
+    return git
+
+
+def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox', core_release_value=None):
     if not isinstance(release_value, str) or not RELEASE_PATH.fullmatch(release_value):
         raise InstallError('release must be /srv/vision-data/releases/vision-webgui/<full 40-character SHA>')
     release = _no_symlinks(Path(release_value))
+    if core_release_value is not None and (not isinstance(core_release_value, str) or not RELEASE_PATH.fullmatch(core_release_value)):
+        raise InstallError('Core release must be an explicit pinned release path')
+    core_release = _no_symlinks(Path(core_release_value)) if core_release_value is not None else release
     origin = validate_origin(origin_value)
     uid = os.getuid()
     if uid == 0 or os.geteuid() != uid:
@@ -210,17 +232,8 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
     for executable in ('/usr/bin/git', '/usr/bin/systemctl', '/usr/bin/mountpoint'):
         if not os.access(executable, os.X_OK):
             raise InstallError(f'required executable is unavailable: {Path(executable).name}')
-    if not release.is_dir() or release.stat().st_uid != uid:
-        raise InstallError('the pinned release must belong to the current user')
     environment = _environment(home)
-    git = ['/usr/bin/git', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', str(release)]
-    head = _run([*git, 'rev-parse', '--verify', 'HEAD^{commit}'], label='verify release HEAD').stdout.strip()
-    top = _run([*git, 'rev-parse', '--show-toplevel'], label='verify release root').stdout.strip()
-    if head != release.name or top != str(release):
-        raise InstallError('release directory, Git root and exact HEAD must agree')
-    _run([*git, 'diff', '--quiet', '--no-ext-diff', 'HEAD', '--'], label='verify clean tracked release')
-    if _run([*git, 'ls-files', '--others', '--exclude-standard'], label='verify release extras').stdout.strip():
-        raise InstallError('untracked release files are not allowed outside ignored build output')
+    git = _verify_release(release, uid)
     for name in ('requirements-station.txt', 'src/vision_api/station.py', 'src/vision_api/identity.py',
                  'src/vision_station/service.py', 'src/vision_station/client.py',
                  'config/ecu_profiles/etc3_poc_v1.json', 'docs/templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json'):
@@ -228,6 +241,14 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
         _run([*git, 'ls-files', '--error-unmatch', '--', name], label='verify tracked station input')
     requirements = _read_regular(release / 'requirements-station.txt', owner=uid)
     requirements_hash = hashlib.sha256(requirements).hexdigest()
+    if core_release != release:
+        core_git = _verify_release(core_release, uid)
+        for name in ('src/vision_station/service.py', 'src/vision_station/host.py',
+                     'config/ecu_profiles/etc3_poc_v1.json', 'docs/templates/ECU_REFERENCE_PROFILE_V1_TEMPLATE.json'):
+            _read_regular(core_release / name, 512 * 1024, owner=uid)
+            _run([*core_git, 'ls-files', '--error-unmatch', '--', name], label='verify tracked Core input')
+        if _read_regular(core_release / 'requirements-station.txt', owner=uid) != requirements:
+            raise InstallError('independent GUI/Core releases must share identical dependency pins')
     server_pin = re.search(rb'^waitress==([0-9]+\.[0-9]+\.[0-9]+) --hash=sha256:[0-9a-f]{64}$', requirements, re.MULTILINE)
     if server_pin is None:
         raise InstallError('an exact hashed Waitress release is required')
@@ -283,7 +304,7 @@ def validate_plan(release_value, origin_value, browser_value='/usr/bin/firefox')
         install_dependencies = True
     if install_dependencies and (was_active or core_was_active):
         raise InstallError('stop the owned WebGUI and idle Core services explicitly before replacing their shared dependencies')
-    plan = Plan(release, origin, browser, uid, account.pw_name, home, unit, core_unit, launcher, autostart,
+    plan = Plan(release, core_release, origin, browser, uid, account.pw_name, home, unit, core_unit, launcher, autostart,
                 bus_environment, environment, was_active, core_was_active, requirements_hash, server_version, install_dependencies)
     # A WebGUI update may never implicitly terminate an inspection owner.
     # A Core release switch requires a separate, explicit idle-service stop.
@@ -357,14 +378,14 @@ WantedBy=default.target
 
 
 def _core_unit(plan):
-    return (MANAGED + f'# Release: {plan.release}\n' + f'''[Unit]
-Description=Vision Core host ({plan.release.name[:12]})
+    return (MANAGED + f'# Release: {plan.core_release}\n' + f'''[Unit]
+Description=Vision Core host ({plan.core_release.name[:12]})
 
 [Service]
 Type=simple
-WorkingDirectory={plan.release}
+WorkingDirectory={plan.core_release}
 Environment="HOME={plan.home}"
-Environment="PYTHONPATH={plan.release}/src"
+Environment="PYTHONPATH={plan.core_release}/src"
 Environment="PYTHONNOUSERSITE=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
 Environment="TMPDIR={CORE_RUN}"
@@ -474,6 +495,7 @@ def install(plan, *, start=False):
              label='verify owned WebGUI is active', env=plan.bus_environment)
     print('WebGUI and independent Core started.' if start else 'WebGUI and Core prepared. Service start/stop state was not changed.')
     print(f'Pinned release: {plan.release.name}')
+    print(f'Pinned Core release: {plan.core_release.name}')
     print('Local URL: http://127.0.0.1:18490/')
     print(f'Reader: operator; initial password file: {INITIAL_PASSWORD} (existing accounts are preserved).')
     print('Core reads use the private local socket; browser/API lifetime does not own Core.')
@@ -488,6 +510,7 @@ def install(plan, *, start=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--release', required=True)
+    parser.add_argument('--core-release', help='Keep Core on this independently pinned release during a GUI/API update.')
     parser.add_argument('--https-origin')
     parser.add_argument('--browser', default='/usr/bin/firefox', help='Native Firefox executable; Snap wrappers are rejected.')
     mode = parser.add_mutually_exclusive_group()
@@ -495,7 +518,7 @@ def main(argv=None):
     mode.add_argument('--validate-only', action='store_true', help='Read-only preflight; create or change nothing.')
     args = parser.parse_args(argv)
     try:
-        plan = validate_plan(args.release, args.https_origin, args.browser)
+        plan = validate_plan(args.release, args.https_origin, args.browser, args.core_release)
         if args.validate_only:
             print(f'Validated pinned station release {plan.release.name}; no changes made.')
             return 0

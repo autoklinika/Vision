@@ -1,12 +1,14 @@
-import { isIdentityReport, isLogoutReport, isStationReport, usernameValid } from './contract';
-import type { IdentityReport, LogoutReport, StationReport } from './contract';
+import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, record, usernameValid } from './contract';
+import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport } from './contract';
 
 export type StationResult<T> = Readonly<{status: 'AVAILABLE'; report: T}> | Readonly<{status: 'ACCESS_DENIED' | 'RATE_LIMITED' | 'UNAVAILABLE'; report: null}>;
+type PasswordError = 'CURRENT_PASSWORD_INVALID' | 'PASSWORD_REJECTED';
+export type PasswordChangeResult = StationResult<PasswordChangeReport> | Readonly<{status: PasswordError; report: null}>;
 export const stationTimeoutMs = 5000;
 const maxBytes = 4096;
 const unavailable = {status: 'UNAVAILABLE', report: null} as const;
 
-async function request<T>(path: string, validate: (value: unknown) => value is T, body?: string): Promise<StationResult<T>> {
+async function request<T, E extends string = never>(path: string, validate: (value: unknown) => value is T, body?: string, errorCodes?: Partial<Record<number, E>>): Promise<StationResult<T> | Readonly<{status: E; report: null}>> {
   if (!globalThis.isSecureContext) return unavailable;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), stationTimeoutMs);
@@ -21,9 +23,9 @@ async function request<T>(path: string, validate: (value: unknown) => value is T
       ...(body === undefined ? {} : {body}),
     });
     if (response.redirected || response.url !== url.href) return unavailable;
-    if (response.status === 401 || response.status === 403) return {status: 'ACCESS_DENIED', report: null};
+    if (response.status === 401 || response.status === 403 && !errorCodes) return {status: 'ACCESS_DENIED', report: null};
     if (response.status === 429) return {status: 'RATE_LIMITED', report: null};
-    if (response.status !== 200 || !/^application\/json\s*;\s*charset=utf-8$/i.test(response.headers.get('Content-Type') ?? '') || !response.body) return unavailable;
+    if (response.status !== 200 && !errorCodes?.[response.status] || !/^application\/json\s*;\s*charset=utf-8$/i.test(response.headers.get('Content-Type') ?? '') || !response.body) return unavailable;
     const length = response.headers.get('Content-Length');
     if (length !== null && (!/^[0-9]+$/.test(length) || Number(length) > maxBytes)) return unavailable;
     reader = response.body.getReader();
@@ -40,6 +42,10 @@ async function request<T>(path: string, validate: (value: unknown) => value is T
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     const value: unknown = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
     controller.signal.throwIfAborted();
+    if (response.status !== 200) {
+      const code = errorCodes?.[response.status];
+      return code && record(value, ['schema','code']) && value.schema === 'vision.api.error.v1' && value.code === code ? {status: code, report: null} : unavailable;
+    }
     return validate(value) ? {status: 'AVAILABLE', report: value} : unavailable;
   } catch { return unavailable; }
   finally {
@@ -54,4 +60,8 @@ export function signOut(): Promise<StationResult<LogoutReport>> { return request
 export function signIn(username: string, password: string): Promise<StationResult<IdentityReport>> {
   if (!usernameValid(username) || typeof password !== 'string' || password.length === 0 || new TextEncoder().encode(password).length > 1024) return Promise.resolve({status: 'ACCESS_DENIED', report: null});
   return request('/api/v1/auth/login', isIdentityReport, JSON.stringify({username, password}));
+}
+export function changePassword(currentPassword: string, newPassword: string): Promise<PasswordChangeResult> {
+  return request('/api/v1/auth/password', isPasswordChangeReport, JSON.stringify({currentPassword, newPassword}),
+    {400: 'PASSWORD_REJECTED', 403: 'CURRENT_PASSWORD_INVALID'} as const);
 }

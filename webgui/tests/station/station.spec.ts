@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { identityFixture, stationFixture } from '../fixtures/station';
 import { libraryFixture, libraryDetailFixture, libraryHistoryFixture, draftEntry } from '../fixtures/library';
@@ -14,9 +15,16 @@ async function login(page: Page, username: string, password: string) {
   await page.getByRole('button', {name: 'Sign in', exact: true}).click();
   await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toBeVisible();
 }
+async function fillPasswordChange(page: Page, current: string, next: string, confirmation = next) {
+  const settings = page.getByRole('dialog', {name: 'Settings', exact: true});
+  await settings.getByLabel('Current password', {exact: true}).fill(current);
+  await settings.getByLabel('New password', {exact: true}).fill(next);
+  await settings.getByLabel('Confirm new password', {exact: true}).fill(confirmation);
+}
 async function mockStation(page: Page) {
   const state = {authenticated: false, offline: false, coreConnected: true, active: false, revoked: false, logoutOffline: false,
-    libraryCount: 2, libraryView: 'c'.repeat(64), reads: [] as string[], writes: [] as string[], holdDetail: null as null | (() => Promise<void>)};
+    libraryCount: 2, libraryView: 'c'.repeat(64), reads: [] as string[], writes: [] as string[], holdDetail: null as null | (() => Promise<void>),
+    holdPassword: null as null | (() => Promise<void>), passwordResult: 'success' as 'success' | 'wrong' | 'rejected' | 'limited' | 'unconfirmed'};
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname;
     if (route.request().method() === 'POST') state.writes.push(path); else state.reads.push(path + url.search);
@@ -25,6 +33,15 @@ async function mockStation(page: Page) {
     if (path === '/api/v1/auth/login') { state.authenticated = true; state.revoked = false; return reply(identityFixture()); }
     if (path === '/api/v1/auth/logout') { state.authenticated = false; return reply({schema: 'vision.api.logout.v1', loggedOut: true}); }
     if (!state.authenticated || state.revoked) return reply({schema: 'vision.api.error.v1', code: 'ACCESS_DENIED'}, 401);
+    if (path === '/api/v1/auth/password') {
+      if (state.holdPassword) await state.holdPassword();
+      if (state.passwordResult === 'wrong') return reply({schema: 'vision.api.error.v1', code: 'CURRENT_PASSWORD_INVALID'}, 403);
+      if (state.passwordResult === 'rejected') return reply({schema: 'vision.api.error.v1', code: 'PASSWORD_REJECTED'}, 400);
+      if (state.passwordResult === 'limited') return reply({schema: 'vision.api.error.v1', code: 'RATE_LIMITED'}, 429);
+      if (state.passwordResult === 'unconfirmed') return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
+      state.authenticated = false;
+      return reply({schema: 'vision.api.password-change.v1', changed: true});
+    }
     if (path === '/api/v1/auth/session') return reply(identityFixture());
     if (path === '/api/v1/station') return reply(stationFixture(state.coreConnected && state.active, state.coreConnected));
     const session = {...sessionFixture(), source: 'STATION', sessionId: 'station-session'} as const;
@@ -198,7 +215,101 @@ test('unconfirmed logout hides protected data and retries without restoring the 
   expect(state.authenticated).toBe(false);
 });
 
-test('TEST actual station: login, cookie resume, two independent clients and logout', async ({page, browser, context}) => {
+test('Settings validates locally, preserves login for a wrong current password and never stores form secrets', async ({page}) => {
+  const state = await mockStation(page);
+  state.passwordResult = 'wrong';
+  await page.goto('/'); await login(page, 'operator', 'mock-password');
+  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  const settings = page.getByRole('dialog', {name: 'Settings', exact: true});
+  await expect(settings).toContainText('Signed in as operator');
+  await page.getByRole('button', {name: 'Start', exact: true}).click();
+  await page.getByRole('menuitem', {name: 'Settings', exact: true}).click();
+  await expect(settings).toHaveCount(1);
+  await fillPasswordChange(page, 'test-current-password', 'short');
+  await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+  await expect(settings).toContainText('Use at least 12 characters');
+  await fillPasswordChange(page, 'test-current-password', 'test-next-password', 'mismatched-password');
+  await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+  await expect(settings).toContainText('The new passwords do not match');
+  await fillPasswordChange(page, 'test-current-password', 'test-current-password');
+  await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+  await expect(settings).toContainText('Choose a different password');
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+  await fillPasswordChange(page, 'test-current-password', 'test-next-password');
+  await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+  await expect(settings).toContainText('The current password is incorrect');
+  await expect(page.locator('.desktop')).toBeVisible();
+  for (const field of ['Current password', 'New password', 'Confirm new password']) await expect(settings.getByLabel(field, {exact: true})).toHaveValue('');
+  for (const [result, message] of [['rejected', 'The new password was not accepted'], ['limited', 'Too many attempts']] as const) {
+    state.passwordResult = result;
+    await fillPasswordChange(page, 'test-current-password', 'test-next-password');
+    await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+    await expect(settings).toContainText(message);
+    await expect(page.locator('.desktop')).toBeVisible();
+  }
+  await fillPasswordChange(page, 'test-current-password', 'test-next-password');
+  const stored = await page.evaluate(() => JSON.stringify({...localStorage, ...sessionStorage}));
+  expect(stored).not.toContain('test-current-password'); expect(stored).not.toContain('test-next-password');
+  await settings.getByRole('button', {name: 'Close Settings', exact: true}).click();
+  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  for (const field of ['Current password', 'New password', 'Confirm new password']) await expect(settings.getByLabel(field, {exact: true})).toHaveValue('');
+});
+
+test('a pending password change survives closing Settings and late protected denial preserves its success message', async ({page}) => {
+  await page.clock.install();
+  const state = await mockStation(page);
+  let releasePassword: (() => void) | undefined, releaseDetail: (() => void) | undefined;
+  state.holdPassword = () => new Promise<void>(resolve => { releasePassword = resolve; });
+  state.holdDetail = () => new Promise<void>(resolve => { releaseDetail = resolve; });
+  await page.goto('/'); await login(page, 'operator', 'mock-password');
+  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  const settings = page.getByRole('dialog', {name: 'Settings', exact: true});
+  await fillPasswordChange(page, 'test-current-password', 'test-next-password');
+  await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+  await expect.poll(() => releasePassword !== undefined).toBe(true);
+  await page.getByRole('button', {name: 'Start', exact: true}).click();
+  await expect(page.getByRole('menuitem', {name: 'Sign out', exact: true})).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await settings.getByRole('button', {name: 'Close Settings', exact: true}).click();
+  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  await expect(settings.getByLabel('Current password', {exact: true})).toHaveValue('');
+  await expect(settings.getByRole('button', {name: 'Changing password…', exact: true})).toBeDisabled();
+  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
+  await page.getByRole('button', {name: 'Browse API-03 synthetic reference r1', exact: true}).click();
+  await expect.poll(() => releaseDetail !== undefined).toBe(true);
+  releasePassword!();
+  const signIn = page.getByRole('dialog', {name: 'Welcome to Vision'});
+  await expect(signIn).toContainText('Password changed. Sign in with your new password.');
+  const denial = page.waitForResponse(response => new URL(response.url()).pathname.endsWith(draftEntry.entryId) && response.status() === 401);
+  releaseDetail!(); await denial;
+  await page.clock.fastForward(15100);
+  await expect(signIn).toContainText('Password changed. Sign in with your new password.');
+  await expect(page.locator('.desktop')).toHaveCount(0);
+  expect(state.writes.filter(path => path === '/api/v1/auth/password')).toHaveLength(1);
+});
+
+test('an unconfirmed password change requests explicit sign-in and never retries or resumes an old cookie', async ({page}) => {
+  await page.clock.install();
+  const state = await mockStation(page);
+  state.passwordResult = 'unconfirmed';
+  await page.goto('/'); await login(page, 'operator', 'mock-password');
+  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  await fillPasswordChange(page, 'test-current-password', 'test-next-password');
+  await page.getByRole('button', {name: 'Change password', exact: true}).click();
+  const signIn = page.getByRole('dialog', {name: 'Welcome to Vision'});
+  await expect(signIn).toContainText('The password change could not be confirmed');
+  await expect(signIn).toContainText('if it was not saved, use your previous password');
+  expect(state.authenticated).toBe(true);
+  const sessionReads = state.reads.filter(path => path === '/api/v1/auth/session').length;
+  await page.clock.fastForward(45100);
+  await expect(signIn).toContainText('The password change could not be confirmed');
+  await expect(page.locator('.desktop')).toHaveCount(0);
+  expect(state.reads.filter(path => path === '/api/v1/auth/session')).toHaveLength(sessionReads);
+  expect(state.writes.filter(path => path === '/api/v1/auth/password')).toHaveLength(1);
+  await expect(page.getByLabel('Password', {exact: true})).toHaveValue('');
+});
+
+test('TEST actual station: own password change revokes both clients and leaves Core running', async ({page, browser, context}) => {
   const credentials = JSON.parse(readFileSync('../.station-test-auth.json', 'utf8'));
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -228,8 +339,11 @@ test('TEST actual station: login, cookie resume, two independent clients and log
   await expect(status).toBeVisible();
   await expect(page.getByLabel('Password', {exact: true})).toHaveCount(0);
   const secondContext = await browser.newContext({baseURL: 'http://127.0.0.1:18491'});
+  const nextPassword = randomBytes(32).toString('base64url');
+  let second: Page | undefined, passwordChanged = false;
+  const jsonHeaders = {Origin: 'http://127.0.0.1:18491', 'X-Vision-Client': 'webgui'};
   try {
-    const second = await secondContext.newPage();
+    second = await secondContext.newPage();
     await second.goto('/'); await login(second, credentials.username, credentials.password);
     await page.getByRole('button', {name: 'Start', exact: true}).click();
     await page.getByRole('menuitem', {name: 'Sign out', exact: true}).click();
@@ -238,9 +352,48 @@ test('TEST actual station: login, cookie resume, two independent clients and log
     const secondReport = await second.request.get('/api/v1/station');
     expect(secondReport.status()).toBe(200);
     expect(await secondReport.json()).toMatchObject({instanceId: core.instanceId, coreConnection: 'CONNECTED', state: 'NO_ACTIVE_SESSION'});
-    await second.getByRole('button', {name: 'Start', exact: true}).click();
-    await second.getByRole('menuitem', {name: 'Sign out', exact: true}).click();
-    await expect(second.getByLabel('User name', {exact: true})).toBeEnabled();
-  } finally { await secondContext.close(); }
+    // Reopen the first client so the change must revoke two independent cookies.
+    await login(page, credentials.username, credentials.password);
+    await second.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+    const settings = second.getByRole('dialog', {name: 'Settings', exact: true});
+    await second.screenshot({path: 'test-results/station-settings.png'});
+    await fillPasswordChange(second, 'wrong-test-password', nextPassword);
+    await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+    await expect(settings).toContainText('The current password is incorrect');
+    expect((await second.request.get('/api/v1/auth/session')).status()).toBe(200);
+    second.on('response', response => {
+      if (new URL(response.url()).pathname === '/api/v1/auth/password' && response.status() === 200) passwordChanged = true;
+    });
+    await fillPasswordChange(second, credentials.password, nextPassword);
+    await settings.getByRole('button', {name: 'Change password', exact: true}).click();
+    await expect(second.getByRole('dialog', {name: 'Welcome to Vision'})).toContainText('Password changed. Sign in with your new password.');
+    expect(passwordChanged).toBe(true);
+    expect((await second.request.get('/api/v1/auth/session')).status()).toBe(401);
+    expect((await page.request.get('/api/v1/auth/session')).status()).toBe(401);
+    await page.reload();
+    await expect(page.getByLabel('User name', {exact: true})).toBeEnabled();
+    await second.getByLabel('User name', {exact: true}).fill(credentials.username);
+    await second.getByLabel('Password', {exact: true}).fill(credentials.password);
+    await second.getByRole('button', {name: 'Sign in', exact: true}).click();
+    await expect(second.getByRole('dialog', {name: 'Welcome to Vision'})).toContainText('Incorrect user name or password.');
+    await login(second, credentials.username, nextPassword);
+    expect(await (await second.request.get('/api/v1/station')).json()).toMatchObject({instanceId: core.instanceId, coreConnection: 'CONNECTED', state: 'NO_ACTIVE_SESSION'});
+    const afterChange = await second.evaluate(() => JSON.stringify({...localStorage, ...sessionStorage}));
+    expect(afterChange.includes(credentials.password)).toBe(false);
+    expect(afterChange.includes(nextPassword)).toBe(false);
+  } finally {
+    try {
+      // This is the generated, temporary fixture account. Restore it even if a
+      // UI assertion fails after the write, so retries retain the same fixture.
+      if (passwordChanged && second) {
+        if ((await second.request.get('/api/v1/auth/session')).status() !== 200) {
+          const recovery = await second.request.post('/api/v1/auth/login', {headers: jsonHeaders, data: {username: credentials.username, password: nextPassword}});
+          expect(recovery.status()).toBe(200);
+        }
+        const restored = await second.request.post('/api/v1/auth/password', {headers: jsonHeaders, data: {currentPassword: nextPassword, newPassword: credentials.password}});
+        expect(restored.status()).toBe(200);
+      }
+    } finally { await secondContext.close(); }
+  }
   expect(errors).toEqual([]);
 });

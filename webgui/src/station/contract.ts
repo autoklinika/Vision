@@ -4,6 +4,7 @@ export type IdentityReport = Readonly<{
   role: 'reader'; expiresAt: string;
 }>;
 export type LogoutReport = Readonly<{schema: 'vision.api.logout.v1'; loggedOut: true}>;
+export type PasswordChangeReport = Readonly<{schema: 'vision.api.password-change.v1'; changed: true}>;
 export type StationReport = Readonly<{
   schema: 'vision.api.station.v1'; source: 'STATION'; instanceId: string;
   stationId: 'VENTUNO'; capturedAt: string; state: 'NO_ACTIVE_SESSION' | 'SESSION_ACTIVE';
@@ -29,6 +30,9 @@ export function isIdentityReport(value: unknown): value is IdentityReport {
 }
 export function isLogoutReport(value: unknown): value is LogoutReport {
   return record(value, ['schema','loggedOut']) && value.schema === 'vision.api.logout.v1' && value.loggedOut === true;
+}
+export function isPasswordChangeReport(value: unknown): value is PasswordChangeReport {
+  return record(value, ['schema','changed']) && value.schema === 'vision.api.password-change.v1' && value.changed === true;
 }
 export function isStationReport(value: unknown): value is StationReport {
   if (!record(value, ['schema','source','instanceId','stationId','capturedAt','state','coreConnection','coreReadiness','sessionId','sessionViewId','libraryId']) ||
