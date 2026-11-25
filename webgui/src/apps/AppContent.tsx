@@ -17,7 +17,7 @@ const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 
 export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation }) {
   if (id === 'settings') return <SettingsContent station={station}/>;
   if (id === 'status' && station && sessionControls) return <StationStatusContent station={station} session={sessionControls}/>;
-  if (id === 'ecu') return libraryControls ? <LibraryContent controls={libraryControls}/> : <p>Protected library reads are unavailable in this view.</p>;
+  if (id === 'ecu') return libraryControls ? <LibraryContent controls={libraryControls} station={station}/> : <p>Protected library reads are unavailable in this view.</p>;
   if (id === 'inspection' || id === 'events') return sessionControls
     ? <SessionContent section={id} controls={sessionControls}/>
     : <p>Protected session reads are unavailable in this view.</p>;

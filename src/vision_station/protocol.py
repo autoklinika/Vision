@@ -10,11 +10,12 @@ import time
 
 from vision_api.reports import MAX_PROTECTED_BYTES, _utc
 
-REQUEST_LIMIT = 8192
+LEGACY_REQUEST_LIMIT = 8192
+REQUEST_LIMIT = 128 * 1024
 RESPONSE_LIMIT = MAX_PROTECTED_BYTES + 256
 EXCHANGE_TIMEOUT = 2.0
 PROTOCOL = "vision.station.ipc.v1"
-ERRORS = frozenset({"NO_ACTIVE_SESSION", "CURSOR_REJECTED", "REPORT_UNAVAILABLE", "BAD_REQUEST", "INSPECTION_REJECTED"})
+ERRORS = frozenset({"NO_ACTIVE_SESSION", "CURSOR_REJECTED", "REPORT_UNAVAILABLE", "BAD_REQUEST", "INSPECTION_REJECTED", "DRAFT_CONFLICT", "DRAFT_NOT_FOUND"})
 FIELDS = {"schema", "source", "instanceId", "stationId", "capturedAt", "libraryId",
           "state", "coreConnection", "coreReadiness", "sessionId", "sessionViewId"}
 

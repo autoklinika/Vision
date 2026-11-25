@@ -86,6 +86,13 @@ jobs:
         run: |
           npm run test:station -- --browser=firefox
           test ! -e ../.station-test-auth.json
+      - name: Authenticated ECU editor in Chromium and Firefox
+        working-directory: webgui
+        run: |
+          npx playwright test --config playwright.editor.config.ts --browser=chromium
+          test ! -e ../.station-test-auth.json
+          npx playwright test --config playwright.editor.config.ts --browser=firefox
+          test ! -e ../.station-test-auth.json
       - name: Dependency audit
         working-directory: webgui
         run: npm audit --registry=https://registry.npmjs.org/

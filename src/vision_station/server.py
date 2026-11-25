@@ -1,5 +1,6 @@
 """Bounded private station server for one independently owned station backend."""
 import fcntl
+import json
 import os
 import socketserver
 import stat
@@ -9,7 +10,8 @@ import time
 from vision_api.access import Credentials, CursorRejected, ReportUnavailable
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
-from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
+from .draft_editor import DraftConflict, DraftNotFound
+from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send)
 
 
@@ -18,6 +20,10 @@ def dispatch(host, request):
             or request["schema"] != PROTOCOL or type(request["query"]) is not dict):
         raise ValueError("invalid station request")
     operation, query = request["operation"], request["query"]
+    if operation == "draft_editor" and set(query) == {"action", "args"}:
+        return host.draft_editor(query["action"], query["args"])
+    if len(json.dumps(request, ensure_ascii=True, allow_nan=False, separators=(",", ":")).encode("ascii")) > LEGACY_REQUEST_LIMIT:
+        raise ValueError("legacy request too large")
     if operation == "station" and not query:
         return host.station_report()
     if operation == "inspection" and not query:
@@ -47,6 +53,10 @@ class _Handler(socketserver.BaseRequestHandler):
             request = receive(self.request, limit=REQUEST_LIMIT, deadline=deadline)
             report = dispatch(self.server.host, request)
             response = {"schema": PROTOCOL, "report": report}
+        except DraftConflict:
+            response = {"schema": PROTOCOL, "error": "DRAFT_CONFLICT"}
+        except DraftNotFound:
+            response = {"schema": PROTOCOL, "error": "DRAFT_NOT_FOUND"}
         except InspectionRejected:
             response = {"schema": PROTOCOL, "error": "INSPECTION_REJECTED"}
         except NoActiveSession:

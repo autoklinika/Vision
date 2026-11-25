@@ -9,6 +9,7 @@ from vision_api.library_reports import (validate_library_report, validate_librar
 from vision_api.reports import _timestamp, validate_session_report, validate_events_report
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
+from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, FIELDS
 from .protocol import (ERRORS, EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
                        validate_station_report)
@@ -71,6 +72,12 @@ class RemoteStationOwner:
                 code = response["error"]
                 if not isinstance(code, str) or code not in ERRORS:
                     raise ValueError("invalid station error")
+                if code == "DRAFT_CONFLICT":
+                    raise DraftConflict()
+                if code == "DRAFT_NOT_FOUND":
+                    raise DraftNotFound()
+                if code == "BAD_REQUEST" and operation == "draft_editor":
+                    raise DraftRequestInvalid()
                 if code == "INSPECTION_REJECTED":
                     raise InspectionRejected()
                 if code == "NO_ACTIVE_SESSION":
@@ -86,7 +93,7 @@ class RemoteStationOwner:
             if operation in ("library", "entry", "history") and report["libraryId"] != "vision-ecu-library":
                 raise ValueError("station library identity mismatch")
             return report
-        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected):
+        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected, DraftConflict, DraftNotFound, DraftRequestInvalid):
             raise
         except Exception:
             raise ReportUnavailable() from None
@@ -123,3 +130,13 @@ class RemoteStationOwner:
 
     def close_inspection(self, **intent):
         return self._read("inspection_close", intent, validate_station_report)
+
+    def draft_editor(self, action, args):
+        if action not in FIELDS:
+            raise ValueError("unknown draft operation")
+        validator = validate_diagnostic_report if action == "validate" else validate_draft_report
+        report = self._read("draft_editor", {"action":action,"args":args}, validator)
+        expected = args["newKey"] if action == "clone" else args["key"]
+        if report["instanceId"] != args["instanceId"] or report["key"] != expected:
+            raise ReportUnavailable()
+        return report

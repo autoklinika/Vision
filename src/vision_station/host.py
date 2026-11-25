@@ -5,6 +5,7 @@ from vision_api.station_owner import StationOwner
 from vision_modules.ecu_library_backend import ECULibraryService
 from vision_runtime import VisionRuntimeCoordinator
 from .inspection import InspectionOwner
+from .draft_editor import DraftEditor
 
 
 class CoreHost:
@@ -24,6 +25,7 @@ class CoreHost:
         self._lifecycle_lock = threading.RLock()
         self._runtime = None
         self._view_id = None
+        self._draft_editor = DraftEditor(self)
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
 
     def attach_runtime(self, runtime):
@@ -80,3 +82,7 @@ class CoreHost:
     def shutdown_inspection(self):
         with self._lifecycle_lock:
             self._inspection.shutdown()
+
+    def draft_editor(self, action, args):
+        with self._lifecycle_lock:
+            return self._draft_editor.dispatch(action, args)

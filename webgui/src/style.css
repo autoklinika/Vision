@@ -42,3 +42,11 @@
 .library-detail-scroll code { font-size: 10px; overflow-wrap: anywhere; }
 .library-detail .fine-print { margin: 7px 0; }
 .library-empty { color: #555; margin: 12px 8px; font-size: 11px; }
+
+.draft-editor { padding: 10px; margin: 8px 0 12px; background: #e6e6e6; overflow-wrap: anywhere; }
+.draft-editor .draft-fields { display: grid; grid-template-columns: minmax(80px,120px) minmax(0,1fr); gap: 6px; align-items:center; margin-bottom:8px; }
+.draft-editor input, .draft-editor select { min-width:0; max-width:100%; }
+.draft-editor .draft-tools { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.draft-editor textarea { display:block; width:100%; font:12px monospace; min-height:120px; resize:vertical; white-space:pre; }
+.draft-editor fieldset { margin: 8px 0; }
+.draft-diagnostic { background:white; padding:8px; margin-top:8px; max-height:200px; overflow:auto; }

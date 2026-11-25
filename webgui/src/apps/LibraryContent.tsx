@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { LibraryControls, LibraryView } from '../api/useLibraryView';
-import type { LibraryDetail, LibrarySectionName } from '../api/libraryContract';
+import type { LibraryDetail, LibrarySectionName, LibraryEntry } from '../api/libraryContract';
+import type {StationPresentation} from '../station/client';
+import {DraftEditorContent} from '../station/DraftEditorContent';
 
 const labels: Record<LibrarySectionName, string> = {
   metadata: 'Profile metadata', identity: 'Declared identity', physical_states: 'Physical states',
@@ -63,13 +65,17 @@ function Detail({controls, tab, setTab}: {controls: LibraryControls; tab: Detail
   </section>;
 }
 
-export function LibraryContent({controls}: {controls: LibraryControls}) {
+export function LibraryContent({controls,station}: {controls: LibraryControls; station?: StationPresentation}) {
+  const [editorEntry,setEditorEntry] = useState<LibraryEntry|null>(null);
   const [tab, setTab] = useState<DetailTab>('overview');
   const {view, refreshLibrary, browseEntry, libraryPage} = controls;
   const {library, detail} = view;
+  const editorAvailable = station?.identity.role === "operator" && station.report.coreConnection === "CONNECTED" && !station.accountBusy && view.status === "AVAILABLE";
   return <div className="library-content">
-    <div className="library-heading"><div><h2>ECU Library</h2><span>Catalog records & reference drafts</span></div><div className="library-tools"><button onClick={refreshLibrary} disabled={view.status === 'LOADING' || view.status === 'DISABLED' || view.refreshing}>Refresh library</button><button disabled>Open reference editor</button></div></div>
+    <div className="library-heading"><div><h2>ECU Library</h2><span>Catalog records & reference drafts</span></div><div className="library-tools"><button onClick={refreshLibrary} disabled={view.status === 'LOADING' || view.status === 'DISABLED' || view.refreshing}>Refresh library</button><button disabled={!editorAvailable || !detail || editorEntry!==null} onClick={()=>{if(detail)setEditorEntry(detail.entry);}}>Open reference editor</button></div></div>
     <p className="fine-print library-purpose">Reference profiles describe ECU types. Browsing does not select an ECU or create a specimen inspection.</p>
+    {station && station.identity.role === "reader" && <p className="fine-print">Reference editing requires operator permission.</p>}
+    {editorEntry && station?.identity.role === "operator" && station.report.coreConnection === "CONNECTED" && !station.accountBusy && <DraftEditorContent key={station.report.instanceId+":"+editorEntry.entryId} entry={editorEntry} station={station} onClose={()=>setEditorEntry(null)} refreshLibrary={refreshLibrary}/>}
     {view.status !== 'AVAILABLE' && <p role="status" className="protected-read-status">{messages[view.status]}</p>}
     {library && <>
       {library.source === 'SYNTHETIC_TEST' && <p className="synthetic-label">SYNTHETIC TEST · no station library</p>}
