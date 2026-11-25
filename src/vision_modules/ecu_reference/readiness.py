@@ -9,20 +9,46 @@ class ReadinessReport:
     blockers: tuple
 
 def evaluate_readiness(profile, state_id, recipe_id, scope, *, capabilities, calibrations, asset_ids_verified=frozenset()):
+    """Public execution readiness always requires an approved release snapshot."""
+    return _evaluate(profile, state_id, recipe_id, scope, capabilities=capabilities,
+                     calibrations=calibrations, asset_ids_verified=asset_ids_verified, review=False)
+
+
+def _evaluate_review_requirements(profile, state_id, recipe_id, scope, *, capabilities, calibrations, asset_ids_verified):
+    """Internal, non-execution preflight of an unsigned REVIEW_READY candidate.
+
+    An author cannot set the approval flags. The prospective reviewer checks
+    the proposed scope and evidence; the actual approval is published later.
+    """
+    d = profile.data
+    m, pr = d['metadata'], d['provenance_release']
+    if (m['status'] != 'REVIEW_READY' or m['template_only'] is not False
+            or m['approval_scopes'] or m['content_sha256'] is not None
+            or pr['release_approval'] is not None or pr['released_snapshot_sha256'] is not None
+            or any(x['approved'] for x in d['validation_policies']['readiness_by_scope_and_physical_state'])):
+        raise ValueError('unsigned review candidate required')
+    return _evaluate(profile, state_id, recipe_id, scope, capabilities=capabilities,
+                     calibrations=calibrations, asset_ids_verified=asset_ids_verified, review=True)
+
+
+def _evaluate(profile, state_id, recipe_id, scope, *, capabilities, calibrations, asset_ids_verified, review):
     if not isinstance(profile, ReferenceProfile): raise ValueError('reference profile required')
     d=thaw(profile.data); blockers=[]
     def need(condition, message):
         if not condition: blockers.append(message)
     m=d['metadata']; pr=d['provenance_release']
-    need(m['schema_version']=='1' and m['status']=='APPROVED', 'profile is not approved V1')
-    digest=content_sha256(profile)
-    need(m['content_sha256'] == digest, 'content digest missing or mismatched')
-    approval=pr['release_approval']
-    need(bool(approval and approval['content_sha256']==digest), 'release approval missing or mismatched')
-    need(pr['released_snapshot_sha256']==digest, 'released snapshot digest missing or mismatched')
     match=lambda x: x['state_id']==state_id and x['recipe_id']==recipe_id and x['scope']==scope
-    need(any(match(x) for x in m['approval_scopes']), 'approval scope missing')
-    entries=[x for x in d['validation_policies']['readiness_by_scope_and_physical_state'] if match(x) and x['approved']]
+    if not review:
+        need(m['schema_version']=='1' and m['status']=='APPROVED', 'profile is not approved V1')
+        digest=content_sha256(profile)
+        need(m['content_sha256'] == digest, 'content digest missing or mismatched')
+        approval=pr['release_approval']
+        need(bool(approval and approval['content_sha256']==digest), 'release approval missing or mismatched')
+        need(pr['released_snapshot_sha256']==digest, 'released snapshot digest missing or mismatched')
+        need(any(match(x) for x in m['approval_scopes']), 'approval scope missing')
+    entries=[x for x in d['validation_policies']['readiness_by_scope_and_physical_state'] if match(x) and (review or x['approved'])]
+    if review:
+        need(len(entries)==1, 'exactly one proposed readiness entry required')
     sources={x['source_id']:x for x in pr['measurement_sources']}
     verified_source=lambda sid: sid in sources and sources[sid]['status']=='VERIFIED'
     need(any(verified_source(x['source_id']) for x in entries), 'verified readiness entry missing')
@@ -98,4 +124,4 @@ def evaluate_readiness(profile, state_id, recipe_id, scope, *, capabilities, cal
             x,y,w,h=r['rectangle_xywh_mm']; ex,ey,_=geos[0]['envelope_xyz_mm']; need(x>=0 and y>=0 and x+w<=ex and y+h<=ey, 'ROI outside envelope: '+rid)
     ambiguous=bool(d['identity']['known_indistinguishable_variants'])
     if ambiguous: blockers.append('variant is not unique')
-    return ReadinessReport('NOT_READY' if m['status'] != 'APPROVED' else 'AMBIGUOUS' if ambiguous else 'NOT_READY' if blockers else 'PASS', tuple(blockers))
+    return ReadinessReport('NOT_READY' if not review and m['status'] != 'APPROVED' else 'AMBIGUOUS' if ambiguous else 'NOT_READY' if blockers else 'REVIEW_READY' if review else 'PASS', tuple(blockers))
