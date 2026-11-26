@@ -24,7 +24,7 @@
 - [Thermal Inspection V1](implementation/VISION_THERMAL_INSPECTION_V1.md).
 - WebGUI: [specyfikacja historyczna V1](ux/VISION_WEBGUI_V1_SPECIFICATION.md), [biblioteka i edytor ECU](ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md), [kod i instrukcja](../webgui/README.md). Aktualny kierunek Fluent 2 jest w main (#79–80); poniższe rozszerzenia znajdują się w DEV #81.
 - DEV ECU: [cykl życia i przegląd](implementation/VISION_ECU_LIBRARY_LIFECYCLE_V1.md), [uproszczona deklaracja V2](implementation/VISION_ECU_DECLARATION_V2.md).
-- DEV urządzenia: [diagnostyka gotowości](implementation/VISION_DEVICE_READINESS_V1.md), [Luxonis V1 i podgląd](implementation/VISION_DEVICES_LUXONIS_V1.md), [autostart](implementation/VISION_LUXONIS_AUTOSTART_V1.md), [sterowanie IR](implementation/VISION_LUXONIS_IR_V1.md).
+- DEV urządzenia: [diagnostyka gotowości](implementation/VISION_DEVICE_READINESS_V1.md), [Luxonis V1 i podgląd](implementation/VISION_DEVICES_LUXONIS_V1.md), [autostart](implementation/VISION_LUXONIS_AUTOSTART_V1.md), [sterowanie IR](implementation/VISION_LUXONIS_IR_V1.md), [NERO V1 — odczyt telemetrii](implementation/VISION_DEVICES_NERO_V1.md).
 - API: [Foundation](implementation/VISION_API_FOUNDATION_V1.md), [Core reports](implementation/VISION_API_CORE_REPORTS_V1.md), [ECU Library read](implementation/VISION_API_ECU_LIBRARY_READ_V1.md), [Station WebGUI](implementation/VISION_STATION_WEBGUI_V1.md), [deployment](operations/VISION_WEBGUI_DEPLOYMENT.md), [kontrakt API](../contracts/vision-api/v1/README.md).
 
 ## Odbiory i kalibracja

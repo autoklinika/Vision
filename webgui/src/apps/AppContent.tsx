@@ -9,6 +9,7 @@ import { StationStatusContent } from '../station/StationStatusContent';
 import { connectionLabel } from '../api/presentation';
 import type { AppId } from '../shell/model';
 import { SettingsContent } from './SettingsContent';
+import { NeroContent } from '../station/NeroContent';
 import { DevicesContent } from '../station/DevicesContent';
 const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 'events' | 'ecu' | 'settings'>, { heading: string; columns: string[]; message: string; action: string }> = {
   luxonis: { heading: 'RGB-D observation', columns: ['RGB', 'Depth', 'Point cloud', 'Timestamp'], message: 'No sensor media available. Frames, geometry and measurements must come from the Vision interface.', action: 'Acquire frame' },
@@ -18,6 +19,7 @@ const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 
 };
 export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station, onNavigate, active=false }:  { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation; onNavigate?: (id: AppId) => void; active?:boolean }) {
   const {t}=useTranslation();
+  if (id === 'nero' && station) return <NeroContent station={station} active={active}/>;
   if (id === 'luxonis' && station) return <DevicesContent station={station} active={active}/>;
   if (id === 'settings') return <SettingsContent station={station}/>;
   if (id === 'status' && station && sessionControls) return <StationStatusContent station={station} session={sessionControls} openInspection={onNavigate?()=>onNavigate("inspection"):undefined}/>;

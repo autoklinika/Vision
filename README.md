@@ -19,7 +19,8 @@ Vision to modułowy system dokumentowania i inspekcji sterowników ECU oraz pły
 | [WebGUI](webgui/README.md) | Fluent 2 Kiosk i zdalny klient, rzeczywiste logowanie, zmiana hasła, prywatny IPC do niezależnego Core. Produkcyjny GUI pozostaje na wydaniu #80. |
 | [System Status / diagnostyka](docs/implementation/VISION_DEVICE_READINESS_V1.md) | DEV #81: usługi, USB i diagnostyka ROS 2; nie jest autoryzacją inspekcji |
 | [Biblioteka ECU — deklaracja V2](docs/implementation/VISION_ECU_DECLARATION_V2.md) | DEV #81: uproszczony formularz, wersje, wyszukiwanie i cykl życia; nie jest zatwierdzonym profilem wykonawczym |
-| [Luxonis V1](docs/implementation/VISION_DEVICES_LUXONIS_V1.md) | DEV #81: osobna zakładka, parametry, RGB/Depth, IR i stabilizacja podglądu; zakres zaakceptowany na obecnym etapie. Samodzielna usługa kamery ma autostart; pełny odbiór zimnego rozruchu pozostaje otwarty. NERO, Sony i Images wymagają osobnych pakietów |
+| [Luxonis V1](docs/implementation/VISION_DEVICES_LUXONIS_V1.md) | DEV #81: osobna zakładka, parametry, RGB/Depth, IR i stabilizacja podglądu; zakres zaakceptowany na obecnym etapie. Samodzielna usługa kamery ma autostart; pełny odbiór zimnego rozruchu pozostaje otwarty. Sony i Images wymagają osobnych pakietów. |
+| [NERO V1](docs/implementation/VISION_DEVICES_NERO_V1.md) | DEV: rzeczywista telemetria J1–J7, diagnostyka napędów i CAN; sterowanie ręczne pozostaje do wdrożenia |
 | [ETC3 — lokalizacja RGB-D](https://github.com/autoklinika/Vision/pull/51) | Odrębny draft LAB, nie wdrożenie ani dowód S03/S04 PASS |
 
 ## Rozpocznij tutaj

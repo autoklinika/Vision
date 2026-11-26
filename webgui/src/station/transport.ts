@@ -1,3 +1,5 @@
+import {isNeroReport} from './neroContract';
+import type {NeroReport} from './neroContract';
 import {isLuxonisReport,isIRResult} from './luxonisContract';
 import type {LuxonisReport,IRResult,IRChannel} from './luxonisContract';
 import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
@@ -76,6 +78,10 @@ export function signIn(username: string, password: string): Promise<StationResul
 export function changePassword(currentPassword: string, newPassword: string): Promise<PasswordChangeResult> {
   return request('/api/v1/auth/password', isPasswordChangeReport, JSON.stringify({currentPassword, newPassword}),
     {400: 'PASSWORD_REJECTED', 403: 'CURRENT_PASSWORD_INVALID'} as const);
+}
+
+export function readNero():Promise<StationResult<NeroReport>>{
+  return request<NeroReport,never>('/api/v1/devices/nero',isNeroReport,undefined,undefined,16384);
 }
 
 export async function readLuxonis(preview:boolean):Promise<StationResult<LuxonisReport>>{

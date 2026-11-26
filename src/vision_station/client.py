@@ -10,6 +10,7 @@ from vision_api.reports import _timestamp, validate_session_report, validate_eve
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
 from .luxonis import validate_luxonis_report
+from .nero import validate_nero_report
 from .luxonis_ir import IRRejected, validate_request, validate_result
 from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
 from .protocol import (ERRORS, exchange_timeout, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
@@ -134,6 +135,9 @@ class RemoteStationOwner:
         if any(report[k]!=intent[k] for k in intent):
             raise ReportUnavailable()
         return report
+
+    def nero_report(self):
+        return self._read("nero",{},validate_nero_report)
 
     def luxonis_report(self, *, preview=False):
         report=self._read("luxonis_preview" if preview else "luxonis",{},validate_luxonis_report)

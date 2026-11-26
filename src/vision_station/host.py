@@ -8,6 +8,7 @@ from vision_runtime import VisionRuntimeCoordinator
 from .inspection import InspectionOwner, InspectionRejected
 from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 from .luxonis import LuxonisMonitor
+from .nero import NeroMonitor
 from .luxonis_ir import IRRejected, controllable, validate_request
 
 
@@ -21,7 +22,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -39,6 +40,7 @@ class CoreHost:
         self._view_id = None
         self._draft_editor = DraftEditor(self)
         self._luxonis = LuxonisMonitor(luxonis_directory)
+        self._nero = NeroMonitor(nero_directory)
         self._luxonis_ir = luxonis_ir
         self._luxonis_ir_interlock = luxonis_ir_interlock
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
@@ -75,6 +77,9 @@ class CoreHost:
         # Connection is independent of whether a specimen inspection exists.
         report["coreConnection"] = "CONNECTED"
         return report
+
+    def nero_report(self):
+        return self._nero.report(self.station_report()["instanceId"])
 
     def luxonis_report(self, *, preview=False):
         station=self.station_report()

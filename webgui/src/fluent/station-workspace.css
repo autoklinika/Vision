@@ -270,3 +270,17 @@ body { margin: 0; }
 .luxonis-ir-controls { display:flex; flex-wrap:wrap; gap:12px 28px; margin:8px 0; }
 .luxonis-ir-controls>div { display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:min(260px,100%); padding:4px 10px; background:var(--colorNeutralBackground2); border-radius:4px; }
 .luxonis-ir-controls>div>span { font-variant-numeric:tabular-nums; font-size:12px; color:var(--colorNeutralForeground3); }
+
+/* NERO: independent diagnostic fields, bounded horizontal table on mobile. */
+.nero-table-scroll { overflow-x:auto; max-width:100%; margin:12px 0; border:1px solid var(--colorNeutralStroke2); border-radius:6px; }
+.nero-table-scroll .fui-Table { min-width:1000px; font-variant-numeric:tabular-nums; }
+.nero-table-scroll .fui-TableHeaderCell { font-size:12px; white-space:normal; }
+.nero-table-scroll .fui-TableCell { padding:8px 10px; }
+.nero-fault { color:var(--colorStatusDangerForeground1); font-size:12px; overflow-wrap:anywhere; }
+.nero-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.nero-details { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px 12px; margin:8px 0; font-size:13px; }
+.nero-details dt { color:var(--colorNeutralForeground3); min-width:0; overflow-wrap:anywhere; }
+.nero-details dd { margin:0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.nero-planned { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+@media(max-width:1000px){.nero-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:680px){.nero-detail-grid{grid-template-columns:minmax(0,1fr);}}

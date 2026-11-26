@@ -319,6 +319,9 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
+        if target == "/api/v1/devices/nero":
+            self._authorize(environ,touch=False)
+            return self._json(start_response,200,self.owner.nero_report())
         if target in ("/api/v1/devices/luxonis","/api/v1/devices/luxonis/preview"):
             identity=self._authorize(environ,touch=False)
             preview=target.endswith("/preview")

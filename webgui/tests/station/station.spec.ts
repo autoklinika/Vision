@@ -7,6 +7,7 @@ import { identityFixture, stationFixture } from '../fixtures/station';
 import { libraryFixture, libraryDetailFixture, libraryHistoryFixture, draftEntry } from '../fixtures/library';
 import { sessionFixture, eventsFixture } from '../fixtures/session';
 import {luxonisFixture} from '../fixtures/luxonis';
+import {neroFixture} from '../fixtures/nero';
 
 const contentType = 'application/json; charset=utf-8';
 async function login(page: Page, username: string, password: string) {
@@ -800,4 +801,36 @@ test('Luxonis IR switches use independent verified readback and fixed command sc
     {instanceId:'f'.repeat(32),channel:'flood',enabled:true},
     {instanceId:'f'.repeat(32),channel:'dot',enabled:false}
   ]);
+});
+
+test('NERO live read-only telemetry clears expired feedback and never writes controls',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ let active=true,stale=false,reads=0;
+ await page.route('**/api/v1/devices/nero',route=>{
+   expect(route.request().method()).toBe('GET');reads++;
+   const r=neroFixture(active);
+   return route.fulfill({contentType,body:JSON.stringify(stale?{...r,joints:null,motors:null}:r)});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await expect(panel).toContainText('Live feedback');
+ await expect(panel).toContainText('All drives disabled');
+ await expect(panel).toContainText('Joint brakes not released');
+ await expect(panel.getByRole('table',{name:'Joint telemetry',exact:true}).getByRole('row')).toHaveCount(8);
+ await expect(panel.getByRole('row').filter({hasText:'J7'})).toContainText('60.00');
+ await expect(panel).toContainText('ERROR-ACTIVE');
+ await expect(panel.getByRole('button',{name:'Drive enable / disable',exact:true})).toBeDisabled();
+ await expect(panel.getByRole('button',{name:'Keyboard control',exact:true})).toBeDisabled();
+ stale=true;await expect(panel).toContainText('Drive status unknown');
+ await expect(panel.getByRole('row').filter({hasText:'J7'})).not.toContainText('60.00');
+ stale=false;active=false;await expect(panel).toContainText('Robot feedback is incomplete or stale.');
+ active=true;await expect(panel).toContainText('Live feedback');
+ await page.setViewportSize({width:390,height:844});
+ expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ await page.getByRole('tab',{name:'System Status',exact:true}).click();
+ await expect(panel).toBeHidden();
+ await page.waitForTimeout(1000);const stopped=reads;await page.waitForTimeout(1000);
+ expect(reads).toBe(stopped);expect(state.writes).toEqual(['/api/v1/auth/login']);
 });

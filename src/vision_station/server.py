@@ -30,6 +30,8 @@ def dispatch(host, request):
         raise ValueError("legacy request too large")
     if operation == "station" and not query:
         return host.station_report()
+    if operation == "nero" and not query:
+        return host.nero_report()
     if operation == "luxonis" and not query:
         return host.luxonis_report()
     if operation == "luxonis_ir" and validate_request(query):

@@ -4,7 +4,7 @@
 
 Fluent 2 zastąpił stanowiskowy pulpit Windows 98 w #79, a #80 poprawił odnawianie sesji. Kiosk na VENTUNO Q i prywatny HTTPS pozostają dostępne. API odczytuje niezależny Core przez prywatny Unix socket; GUI nie tworzy Workflow ani drugiej biblioteki. Wydanie produkcyjne GUI pozostaje na #80, a Core ma niezależnie przypięte wydanie.
 
-W **DEV #81** rozszerzono System Status i bibliotekę ECU (wyszukiwanie, cykl życia i czterosekcyjna deklaracja V2) oraz wdrożono osobną zakładkę Luxonis. Odczyt parametrów i podgląd RGB/Depth są diagnostyczne; jedyną nową komendą urządzenia jest ograniczone sterowanie IR przy spełnionych bramkach Core. Operator zaakceptował zakres Luxonis V1 na tym etapie. NERO i Sony nie mają jeszcze nowych modułów sterowania. DEV nie jest zatwierdzonym wydaniem produkcyjnym.
+W **DEV #81** rozszerzono System Status i bibliotekę ECU (wyszukiwanie, cykl życia i czterosekcyjna deklaracja V2) oraz wdrożono osobną zakładkę Luxonis. Odczyt parametrów i podgląd RGB/Depth są diagnostyczne; jedyną nową komendą urządzenia jest ograniczone sterowanie IR przy spełnionych bramkach Core. Operator zaakceptował zakres Luxonis V1 na tym etapie. NERO V1 udostępnia rzeczywisty odczyt telemetrii i diagnostyki; przełącznik napędów i sterowanie klawiaturą pozostają planowane. Sony nie ma jeszcze modułu sterowania. DEV nie jest zatwierdzonym wydaniem produkcyjnym.
 
 Dokumentacja: [bieżący rejestr](../docs/operations/REPOSITORY_REGISTER_2026-11-26.md), [ECU V2](../docs/implementation/VISION_ECU_DECLARATION_V2.md), [Luxonis V1](../docs/implementation/VISION_DEVICES_LUXONIS_V1.md), [IR](../docs/implementation/VISION_LUXONIS_IR_V1.md).
 
