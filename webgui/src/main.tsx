@@ -1,12 +1,15 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import '98.css';
-import './style.css';
 const root = createRoot(document.getElementById('root')!);
 if (import.meta.env.VITE_VISION_DEPLOYMENT === 'station') {
+  const { LanguageProvider } = await import('./i18n/LanguageProvider');
   const { StationStartup } = await import('./station/StationStartup');
-  root.render(<React.StrictMode><StationStartup/></React.StrictMode>);
+  const { FluentProvider, webLightTheme } = await import('@fluentui/react-components');
+  await import('./fluent/station-workspace.css');
+  root.render(<React.StrictMode><FluentProvider theme={webLightTheme} className="vision-station-root"><LanguageProvider><StationStartup/></LanguageProvider></FluentProvider></React.StrictMode>);
 } else {
+  await import('98.css');
+  await import('./style.css');
   // The isolated LAB shell keeps its explicit demo/default behavior.
   const { createClient } = await import('./api/client');
   const { Startup } = await import('./startup/Startup');

@@ -12,26 +12,31 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await page.getByLabel('User name',{exact:true}).fill(credentials.username);
   await page.getByLabel('Password',{exact:true}).fill(credentials.password);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
-  await expect(page.getByRole('dialog',{name:'System Status',exact:true})).toBeVisible();
+  await expect(page.locator('.vision-workspace')).toBeVisible();
   const identity=await (await page.request.get('/api/v1/auth/session')).json();
   expect(identity.role).toBe('operator');
-  await page.locator('.desktop-icons').getByRole('button',{name:'ECU Library',exact:true}).click();
-  const library=page.getByRole('dialog',{name:'ECU Library',exact:true});
-  const maximize=library.getByRole('button',{name:'Maximize ECU Library',exact:true});
-  if(await maximize.isVisible())await maximize.click();
-  await library.getByRole('button',{name:'New profile',exact:true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name:'ECU Library',exact:true}).click();
+  const library=page.locator('[data-module="ecu"]');
+  const newProfile = library.getByRole('button',{name:'New profile',exact:true});
+  await expect(newProfile).toHaveClass(/fui-Button/);
+  await newProfile.click();
   const editor=library.getByRole('region',{name:'ECU reference editor'});
   const button=(name:string)=>editor.getByRole('button',{name,exact:true});
   const label=(name:string)=>editor.getByLabel(name,{exact:true});
   const section=async(name:string)=>{await label('Section').selectOption(name);};
+  await expect(editor.locator('.fui-Input')).toHaveCount(5);
+  await expect(button('Create draft')).toBeDisabled();
   await label('ECU family').fill('synthetic-family');
   await label('Variant ID').fill('synthetic-variant');
   await label('New profile ID').fill('browser-neutral');
   await label('Revision').fill('r1');
   await label('Display name').fill('Browser neutral draft');
+  await expect(button('Create draft')).toHaveClass(/fui-Button/);
   await button('Create draft').click();
   await expect(editor).toContainText('Draft saved in Core.');
   await expect(editor).toContainText('DRAFT / NOT_READY');
+  await expect(button('Check structure')).toHaveClass(/fui-Button/);
   await button('Check structure').click();
   await expect(editor).toContainText('Valid structure · NOT_READY');
   await expect(editor).toContainText('Structural validation only');
@@ -75,7 +80,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
 
   // Cancellation of the window-close prompt must preserve unsaved fields.
   page.once('dialog',dialog=>dialog.dismiss());
-  await library.getByRole('button',{name:'Close ECU Library',exact:true}).click();
+  await page.getByRole('button',{name:'Close ECU Library',exact:true}).click();
   await expect(editor).toBeVisible();
   await expect(label('Manufacturer (optional)')).toHaveValue('Synthetic browser manufacturer');
   await button('Save draft generation').click();
@@ -144,7 +149,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   for(const name of librarySections){
     await section(name);
     await expect(editor.locator('.editor-section-form')).toBeVisible();
-    await expect(editor.locator('.editor-section-form input, .editor-section-form select').first()).toBeVisible();
+    await expect(editor.locator('.editor-section-form :is(.fui-Input,.fui-Select,.fui-Checkbox)').first()).toBeVisible();
   }
   await section('photography_recipes');
   const view=editor.getByRole('group',{name:'camera view 1',exact:true});
@@ -153,6 +158,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await expect(editor.getByLabel('Thermal mode',{exact:true})).toHaveValue('relative_intensity');
   await section('validation_policies');
   await expect(editor.getByRole('group',{name:'policy 1',exact:true}).getByLabel('Metric 1',{exact:true})).toHaveValue('minimum');
+  await expect(button('Check structure')).toHaveClass(/fui-Button/);
   await button('Check structure').click();
   await expect(editor).toContainText('Valid structure · NOT_READY');
   await button('Save draft generation').click();
@@ -164,9 +170,37 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await button('Close editor').click();
   await library.getByRole('button',{name:'Browse Browser neutral draft r1',exact:true}).click();
   await library.getByRole('tab',{name:'Revision history (4)'}).click();
+  await expect(library.getByRole('table',{name:'Reference revision history'})).toHaveClass(/fui-Table/);
   await expect(library.getByRole('table',{name:'Reference revision history'}).locator('tbody tr')).toHaveCount(4);
   const after=await (await page.request.get('/api/v1/station')).json();
   expect(after).toMatchObject({instanceId:station.instanceId,state:'NO_ACTIVE_SESSION',coreConnection:'CONNECTED'});
   expect(errors).toEqual([]);
   expect(await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Synthetic browser manufacturer');
+
+  // Responsive regression using the same authorized fixture.
+  await page.setViewportSize({width:390,height:844});
+  await library.getByRole('button',{name:'New profile',exact:true}).click();
+  for(const name of ['ECU family','Variant ID','New profile ID','Display name']) {
+    await expect(editor.getByLabel(name,{exact:true})).toHaveValue('');
+  }
+  await expect(editor.getByLabel('Revision',{exact:true})).toHaveValue('r1');
+  await editor.getByLabel('ECU family',{exact:true}).fill('mobile-synthetic');
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).click();
+  await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('mobile-synthetic');
+  await expect(editor.getByRole('button',{name:'Create draft',exact:true})).toBeDisabled();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  expect(await editor.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  // Live localization changes neither the draft owner nor the unsaved input.
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Settings',exact:true}).click();
+  await page.locator('[data-module="settings"]').getByLabel('Interface language',{exact:true}).selectOption('pl');
+  await page.getByRole('tab',{name:'Biblioteka ECU',exact:true}).click();
+  await expect(library.locator('.draft-editor').getByLabel('Rodzina ECU',{exact:true})).toHaveValue('mobile-synthetic');
+  await expect(library.locator('.draft-editor').getByRole('button',{name:'Utwórz projekt',exact:true})).toBeDisabled();
+  await page.getByRole('tab',{name:'Ustawienia',exact:true}).click();
+  await page.locator('[data-module="settings"]').getByLabel('Język interfejsu',{exact:true}).selectOption('en');
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).click();
+  await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('mobile-synthetic');
+
 });

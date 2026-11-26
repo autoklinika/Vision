@@ -9,10 +9,10 @@ async function newEditor(page:Page,key:string,create=true){
   await page.getByLabel('User name',{exact:true}).fill(credentials.username);
   await page.getByLabel('Password',{exact:true}).fill(credentials.password);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
-  await expect(page.getByRole('dialog',{name:'System Status',exact:true})).toBeVisible();
-  await page.locator('.desktop-icons').getByRole('button',{name:'ECU Library',exact:true}).click();
-  const library=page.getByRole('dialog',{name:'ECU Library',exact:true});
-  await library.getByRole('button',{name:'Maximize ECU Library',exact:true}).click();
+  await expect(page.locator('.vision-workspace')).toBeVisible();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name:'ECU Library',exact:true}).click();
+  const library=page.locator('[data-module="ecu"]');
   await library.getByRole('button',{name:'New profile',exact:true}).click();
   const editor=library.getByRole('region',{name:'ECU reference editor'});
   await editor.getByLabel('ECU family',{exact:true}).fill('resilience-family');
@@ -41,9 +41,9 @@ test('unsaved editor survives transient station/auth failures, Core outage and s
   page.on('requestfailed',request=>observations.delete(request));
   // Exercise pre-create discard protection in the same authenticated flow.
   // The suite stays within the real five-login limit; no throttling override.
-  const {library,editor}=await newEditor(page,'resilience-profile',false);
+  const {editor}=await newEditor(page,'resilience-profile',false);
   page.once('dialog',dialog=>dialog.dismiss());
-  await library.getByRole('button',{name:'Close ECU Library',exact:true}).click();
+  await page.getByRole('button',{name:'Close ECU Library',exact:true}).click();
   await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('resilience-family');
   page.once('dialog',dialog=>dialog.dismiss());
   await editor.getByRole('button',{name:'Close editor',exact:true}).click();
@@ -126,7 +126,7 @@ for(const change of ['role','user'] as const){
       ...identity,...(change==='role'?{role:'reader'}:{username:'synthetic-other-owner'}),
     })}));
     await page.clock.fastForward(15100);
-    await expect(page.getByRole('dialog',{name:'System Status',exact:true})).toBeVisible();
+    await expect(page.locator('.vision-workspace')).toBeVisible();
     await expect(page.locator('.desktop .mode-banner')).toContainText(change==='role'?'Read only':'synthetic-other-owner');
     await expect(editor).toHaveCount(0);
     await expect(page.locator('[data-editor-dirty]')).toHaveCount(0);
@@ -134,7 +134,7 @@ for(const change of ['role','user'] as const){
 }
 
 test('Core reconnect discards previous READY evidence until a fresh inspection report arrives',async({page})=>{
-  const {library,editor}=await newEditor(page,'readiness-reconnect');
+  const {editor}=await newEditor(page,'readiness-reconnect');
   const station=await (await page.request.get('/api/v1/station')).json();
   const inspection=await (await page.request.get('/api/v1/inspection')).json();
   const ready={...inspection,
@@ -153,8 +153,8 @@ test('Core reconnect discards previous READY evidence until a fresh inspection r
     if(holdInspection)await new Promise<void>(resolve=>{releaseInspection=resolve;});
     await route.fulfill({status:200,contentType:'application/json; charset=utf-8',body:JSON.stringify(ready)});
   });
-  await library.getByRole('button',{name:'Minimize ECU Library',exact:true}).click();
-  const status=page.getByRole('dialog',{name:'System Status',exact:true});
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  const status=page.locator('[data-module="status"]');
   const readyCells=status.getByRole('cell',{name:'READY',exact:true});
   const start=status.getByRole('button',{name:'Start inspection session',exact:true});
   await page.clock.fastForward(5100);
@@ -175,7 +175,7 @@ test('Core reconnect discards previous READY evidence until a fresh inspection r
   await expect(readyCells).toHaveCount(4);
   await expect(start).toBeDisabled();
   await expect(status.getByLabel('Declared ECU and recipe',{exact:true})).toHaveValue('');
-  await page.locator('.task-buttons').getByRole('button',{name:'ECU Library',exact:true}).click();
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).click();
   await expect(editor.getByLabel('Manufacturer (optional)',{exact:true})).toHaveValue('Unsaved synthetic manufacturer');
   expect(operations).toEqual([]);
 });

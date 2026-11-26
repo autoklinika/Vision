@@ -1,3 +1,5 @@
+import { useTranslation } from '../i18n/LanguageProvider';
+import { LanguageSelector } from '../i18n/LanguageSelector';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Desktop } from '../shell/Desktop';
 import type { Snapshot } from '../api/types';
@@ -12,6 +14,7 @@ type AuthPhase = 'CHECKING' | 'SIGNED_OUT' | 'SIGNING_IN' | 'SIGNED_IN' | 'CHANG
 type AuthState = {phase: AuthPhase; identity: IdentityReport | null; message: string; epoch?: number};
 
 function StationDesktop({identity, epoch, denied, logout, accountBusy, authUnavailable, changePassword}: {identity: IdentityReport; epoch: number; denied: (epoch: number) => void; logout: () => void; accountBusy: boolean; authUnavailable: boolean; changePassword: (currentPassword: string, newPassword: string) => Promise<PasswordChangeResult>}) {
+  const {t}=useTranslation();
   const expired = useCallback(() => denied(epoch), [denied, epoch]);
   // A transient transport failure must not destroy an in-memory editor. The
   // observation is never shown as current until this auth epoch is refreshed.
@@ -47,12 +50,12 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, authUnava
   const refresh = () => refreshRef.current?.();
   function signOutDisconnected() {
     if (document.querySelector('[data-editor-busy="true"]')) {
-      window.alert('A Core editor request is pending. Wait for its outcome before signing out.');
+      window.alert(t('A Core editor request is pending. Wait for its outcome before signing out.'));
       return;
     }
-    if (!document.querySelector('[data-editor-dirty="true"]') || window.confirm('Discard unsaved ECU draft changes?')) logout();
+    if (!document.querySelector('[data-editor-dirty="true"]') || window.confirm(t('Discard unsaved ECU draft changes?'))) logout();
   }
-  const connectionPanel = <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · {identity.role === 'operator' ? 'inspection operator' : 'read-only access'}</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? 'Connecting to VENTUNO' : 'Connection lost'}</h1></div><div className="window-body"><p role="status">{connecting ? 'Waiting for the station report…' : 'Station data is unavailable. Retrying automatically.'}</p><p>Signed in as {identity.username}.</p><div className="startup-actions"><button onClick={refresh} disabled={accountBusy || authUnavailable}>Retry connection</button><button onClick={() => window.location.reload()} disabled={accountBusy}>Reload interface</button><button onClick={signOutDisconnected} disabled={accountBusy}>Sign out</button></div></div></section></main>;
+  const connectionPanel = <main className="startup station-startup"><header className="mode-banner"><strong>VISION</strong><span>VENTUNO · {t(identity.role === 'operator' ? 'inspection operator' : 'read-only access')}</span></header><section className="window station-login" role="dialog" aria-labelledby="station-connection-title"><div className="title-bar"><h1 className="title-bar-text" id="station-connection-title">{connecting ? t("Connecting to VENTUNO") : t("Connection lost")}</h1></div><div className="window-body"><p role="status">{connecting ? t("Waiting for the station report…") : t("Station data is unavailable. Retrying automatically.")}</p><p>{t("Signed in as")+" "}{identity.username}.</p><div className="startup-actions"><button onClick={refresh} disabled={accountBusy || authUnavailable}>{t("Retry connection")}</button><button onClick={() => window.location.reload()} disabled={accountBusy}>{t("Reload interface")}</button><button onClick={signOutDisconnected} disabled={accountBusy}>{t("Sign out")}</button></div></div></section></main>;
   if (!report || !client) return connectionPanel;
   const snapshot: Snapshot = {
     schema: 'client-view-v1', source: 'real', connection: available ? 'API_AVAILABLE' : 'UNAVAILABLE', readiness: 'UNKNOWN', observedAt: null,
@@ -63,13 +66,20 @@ function StationDesktop({identity, epoch, denied, logout, accountBusy, authUnava
   // and the API's synthetic outage instance only invalidate live projections.
   const owner = `${identity.username}:${identity.role}:${observation.coreOwner ?? 'unconnected'}`;
   return <>{!available && connectionPanel}<div hidden={!available}>
-    <Desktop key={owner} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout, accountBusy: accountBusy || authUnavailable, changePassword}}/>
+    <Desktop key={owner} stationAvailable={available} client={client} snapshot={snapshot} refresh={refresh} station={{identity, report, refresh, logout, accountBusy: accountBusy || authUnavailable, changePassword}}/>
   </div></>;
 }
 
 /** A station build has real authentication and cannot switch to demo by URL. */
 export function StationStartup() {
+  const {t}=useTranslation();
   const [auth, setAuth] = useState<AuthState>({phase: 'CHECKING', identity: null, message: 'Checking your session…'});
+  const authHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    // A modal navigation drawer may disappear on logout or token revocation.
+    // Transfer focus to the newly mounted authentication screen.
+    if (!auth.identity) authHeading.current?.focus({preventScroll:true});
+  }, [auth.phase, auth.identity]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const control = useRef({version: 0, busy: false, pendingLogout: false, changingPassword: false, forceSignIn: false, identity: null as IdentityReport | null, unavailable: false});
@@ -181,21 +191,21 @@ export function StationStartup() {
   const busy = ['CHECKING','SIGNING_IN','SIGNING_OUT'].includes(auth.phase);
   const pendingLogout = auth.phase === 'LOGOUT_PENDING' || auth.phase === 'SIGNING_OUT';
   return <main className="startup station-startup">
-    <header className="mode-banner"><strong>VISION</strong><span>VENTUNO workstation</span></header>
+    <header className="mode-banner"><strong>VISION</strong><span>{t("VENTUNO workstation")}</span><LanguageSelector/></header>
     <section className="window station-login" role="dialog" aria-labelledby="station-login-title">
-      <div className="title-bar"><h1 className="title-bar-text" id="station-login-title">{pendingLogout ? 'Vision sign out' : 'Welcome to Vision'}</h1></div>
+      <div className="title-bar"><h1 className="title-bar-text" id="station-login-title" tabIndex={-1} ref={authHeading}>{pendingLogout ? t("Vision sign out") : t("Welcome to Vision")}</h1></div>
       <div className="window-body">
-        <div className="station-login-heading"><span aria-hidden="true">V</span><div><h2>Vision Workstation</h2><p>Read-only access to VENTUNO</p></div></div>
-        <p role="status" className="station-login-message">{globalThis.isSecureContext ? auth.message : 'A secure connection is required. Open the station HTTPS address.'}</p>
+        <div className="station-login-heading"><span aria-hidden="true">V</span><div><h2>{t("Vision Workstation")}</h2><p>{t("Read-only access to VENTUNO")}</p></div></div>
+        <p role="status" className="station-login-message">{globalThis.isSecureContext ? t(auth.message) : t("A secure connection is required. Open the station HTTPS address.")}</p>
         {!pendingLogout && <form onSubmit={event => { event.preventDefault(); if (!busy) void login(); }}>
           <div className="login-fields">
-            <label htmlFor="station-username">User name</label><input id="station-username" name="username" autoComplete="username" maxLength={64} value={username} onChange={event => setUsername(event.target.value)} disabled={busy || !globalThis.isSecureContext} required/>
-            <label htmlFor="station-password">Password</label><input id="station-password" name="password" type="password" autoComplete="current-password" maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} disabled={busy || !globalThis.isSecureContext} required/>
+            <label htmlFor="station-username">{t("User name")}</label><input id="station-username" name="username" autoComplete="username" maxLength={64} value={username} onChange={event => setUsername(event.target.value)} disabled={busy || !globalThis.isSecureContext} required/>
+            <label htmlFor="station-password">{t("Password")}</label><input id="station-password" name="password" type="password" autoComplete="current-password" maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} disabled={busy || !globalThis.isSecureContext} required/>
           </div>
-          <div className="startup-actions">{auth.phase === 'UNAVAILABLE' && <button type="button" onClick={() => { void checkSession(); }}>Retry connection</button>}<button type="submit" disabled={busy || !username || !password || !globalThis.isSecureContext}>Sign in</button></div>
+          <div className="startup-actions">{auth.phase === 'UNAVAILABLE' && <button type="button" onClick={() => { void checkSession(); }}>{t("Retry connection")}</button>}<button type="submit" disabled={busy || !username || !password || !globalThis.isSecureContext}>{t("Sign in")}</button></div>
         </form>}
-        {pendingLogout && <div className="startup-actions"><button onClick={() => { void logout(); }} disabled={busy}>Retry sign out</button></div>}
-        <p className="fine-print">Vision keeps control of the system. Signing in opens its desktop client.</p>
+        {pendingLogout && <div className="startup-actions"><button onClick={() => { void logout(); }} disabled={busy}>{t("Retry sign out")}</button></div>}
+        <p className="fine-print">{t("Vision keeps control of the system. Signing in opens its desktop client.")}</p>
       </div>
     </section>
   </main>;

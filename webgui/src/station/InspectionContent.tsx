@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import { useEffect, useRef, useState } from 'react';
 import type { StationPresentation } from './client';
 import type { InspectionBlocker, InspectionReport } from './contract';
@@ -13,6 +14,7 @@ const blockerText: Record<InspectionBlocker, string> = {
 const deviceLabel = {luxonis: 'Luxonis RGB-D', nero: 'AgileX NERO', moveit: 'MoveIt 2', sony: 'Sony capture'};
 
 export function InspectionContent({station}: {station: StationPresentation}) {
+  const {t}=useTranslation();
   const [inspection, setInspection] = useState<InspectionReport | null>(null);
   const [selection, setSelection] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,7 +54,7 @@ export function InspectionContent({station}: {station: StationPresentation}) {
     if (operation.current || !isOperator || !current || accountBusy) return;
     if (kind === 'start' && (!current.startAllowed || !chosen)) return;
     if (kind === 'close' && (!current.closeAllowed || !current.sessionId)) return;
-    if (kind === 'close' && !window.confirm('Close this inspection session? No device movement will be requested.')) return;
+    if (kind === 'close' && !window.confirm(t('Close this inspection session? No device movement will be requested.'))) return;
     operation.current = true;
     setBusy(true);
     setMessage('');
@@ -73,25 +75,25 @@ export function InspectionContent({station}: {station: StationPresentation}) {
     } finally { operation.current = false; setBusy(false); }
   }
 
-  return <section aria-label="Inspection orchestration">
-    <h3>Inspection readiness</h3>
+  return <section aria-label={t("Inspection orchestration")}>
+    <h3>{t("Inspection readiness")}</h3>
     {current ? <>
       <div className="sunken-panel report"><table>
-        <thead><tr><th scope="col">Device</th><th scope="col">Availability</th><th scope="col">Readiness</th></tr></thead>
-        <tbody>{current.devices.map(d => <tr key={d.device}><th scope="row">{deviceLabel[d.device]}</th><td>{d.availability}</td><td>{d.readiness}</td></tr>)}</tbody>
+        <thead><tr><th scope="col">{t("Device")}</th><th scope="col">{t("Availability")}</th><th scope="col">{t("Readiness")}</th></tr></thead>
+        <tbody>{current.devices.map(d => <tr key={d.device}><th scope="row">{t(deviceLabel[d.device])}</th><td>{d.availability}</td><td>{d.readiness}</td></tr>)}</tbody>
       </table></div>
-      <p className="fine-print">Live service availability is not physical readiness. Last report: {current.capturedAt} UTC.</p>
-      {current.blockers.length > 0 && <ul>{current.blockers.map(b => <li key={b}>{blockerText[b]}</li>)}</ul>}
+      <p className="fine-print">{t("Live service availability is not physical readiness. Last report:")+" "}{current.capturedAt} UTC.</p>
+      {current.blockers.length > 0 && <ul>{current.blockers.map(b => <li key={b}>{t(blockerText[b])}</li>)}</ul>}
       {isOperator ? <>
-        <label htmlFor="inspection-selection">Declared ECU and recipe</label>{' '}
+        <label htmlFor="inspection-selection">{t("Declared ECU and recipe")}</label>{' '}
         <select id="inspection-selection" value={chosen?.selectionId ?? ''} onChange={e => setSelection(e.target.value)} disabled={busy || current.sessionId !== null || current.selections.length === 0}>
-          <option value="">Select an approved recipe</option>
+          <option value="">{t("Select an approved recipe")}</option>
           {current.selections.map(item => <option value={item.selectionId} key={item.selectionId}>{item.family} / {item.variant} / {item.revision} / {item.physicalState} / {item.recipe}</option>)}
         </select>
-        <div className="startup-actions"><button disabled={!current.startAllowed || !chosen || busy} onClick={() => { void command('start'); }}>Start inspection session</button>
-        <button disabled={!current.closeAllowed || busy} onClick={() => { void command('close'); }}>Close session</button></div>
-      </> : <p>Read-only account. Starting or closing a session requires operator permission.</p>}
-    </> : <p>Inspection readiness report unavailable. No session command is enabled.</p>}
-    {message && <p role="status">{message}</p>}
+        <div className="startup-actions"><button disabled={!current.startAllowed || !chosen || busy} onClick={() => { void command('start'); }}>{t("Start inspection session")}</button>
+        <button disabled={!current.closeAllowed || busy} onClick={() => { void command('close'); }}>{t("Close session")}</button></div>
+      </> : <p>{t("Read-only account. Starting or closing a session requires operator permission.")}</p>}
+    </> : <p>{t("Inspection readiness report unavailable. No session command is enabled.")}</p>}
+    {message && <p role="status">{t(message)}</p>}
   </section>;
 }

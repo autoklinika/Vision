@@ -13,10 +13,10 @@ async function login(page: Page, username: string, password: string) {
   await page.getByLabel('User name', {exact: true}).fill(username);
   await page.getByLabel('Password', {exact: true}).fill(password);
   await page.getByRole('button', {name: 'Sign in', exact: true}).click();
-  await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toBeVisible();
+  await expect(page.locator('.vision-workspace')).toBeVisible();
 }
 async function fillPasswordChange(page: Page, current: string, next: string, confirmation = next) {
-  const settings = page.getByRole('dialog', {name: 'Settings', exact: true});
+  const settings = page.locator('[data-module="settings"]');
   await settings.getByLabel('Current password', {exact: true}).fill(current);
   await settings.getByLabel('New password', {exact: true}).fill(next);
   await settings.getByLabel('Confirm new password', {exact: true}).fill(confirmation);
@@ -71,7 +71,7 @@ test('station build ignores demo URL, requires real login and reports missing Co
   await expect(page.getByLabel('User name', {exact: true})).toBeEnabled();
   expect(state.reads.every(path => path === '/api/v1/auth/session')).toBe(true);
   await login(page, 'operator', 'mock-password');
-  const status = page.getByRole('dialog', {name: 'System Status', exact: true});
+  const status = page.locator('[data-module="status"]');
   await expect(status).toContainText('Vision Core is not connected');
   await expect(status.locator('dd').filter({hasText: /^Unavailable$/})).toBeVisible();
   await expect(status).toContainText('Session report unavailable');
@@ -79,8 +79,8 @@ test('station build ignores demo URL, requires real login and reports missing Co
   await status.getByRole('button', {name: 'Refresh session'}).click();
   expect(state.reads.some(path => path === '/api/v1/session' || path.startsWith('/api/v1/events'))).toBe(false);
   await expect(page.locator('.mode-banner')).not.toContainText('DEMO');
-  await page.getByRole('button', {name: 'Start', exact: true}).click();
-  await page.getByRole('menuitem', {name: 'Sign out', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Sign out', exact: true}).click();
   await expect(page.getByLabel('User name', {exact: true})).toBeEnabled();
   await expect(page.locator('.desktop')).toHaveCount(0);
   expect(state.writes).toEqual(['/api/v1/auth/login','/api/v1/auth/logout']);
@@ -90,13 +90,14 @@ test('connected idle Core creates no session and its outage clears library data 
   await page.clock.install();
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  const status = page.getByRole('dialog', {name: 'System Status', exact: true});
+  const status = page.locator('[data-module="status"]');
   await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
   await expect(status).toContainText('Unknown');
   await expect(status.getByRole('button', {name: 'Refresh session'})).toBeDisabled();
   expect(state.reads.some(path => path === '/api/v1/session' || path.startsWith('/api/v1/events'))).toBe(false);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.locator('[data-module="ecu"]');
   await expect(library.getByRole('table', {name: 'ECU library entries'}).locator('tbody tr')).toHaveCount(2);
   await library.getByRole('button', {name: 'Browse API-03 synthetic reference r1', exact: true}).click();
   await expect(library.getByRole('region', {name: 'Library entry details'})).toBeVisible();
@@ -123,7 +124,8 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   await page.clock.install();
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'ECU Library', exact: true}).click();
   await expect(page.getByRole('table', {name: 'ECU library entries'}).locator('tbody tr')).toHaveCount(2);
   state.offline = true;
   await page.clock.fastForward(5100);
@@ -132,16 +134,17 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   await expect(page.getByRole('table')).toHaveCount(0);
   state.offline = false;
   await page.clock.fastForward(5100);
-  await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toBeVisible();
+  await expect(page.locator('.vision-workspace')).toBeVisible();
   await expect(page.getByRole('table', {name: 'ECU library entries'}).locator('tbody tr')).toHaveCount(2);
   state.active = true;
   await page.clock.fastForward(5100);
-  await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toContainText('station-session');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Inspection Manager', exact: true}).click();
+  await expect(page.locator('[data-module="status"]')).toContainText('station-session');
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Inspection Manager', exact: true}).click();
   await expect(page.getByRole('table', {name: 'Reported inspection stages'}).locator('tbody tr')).toHaveCount(11);
   state.coreConnected = false;
   await page.clock.fastForward(5100);
-  const inspection = page.getByRole('dialog', {name: 'Inspection Manager', exact: true});
+  const inspection = page.locator('[data-module="inspection"]');
   await expect(inspection).toContainText('Session report unavailable');
   await expect(inspection).not.toContainText('No active inspection session');
   await expect(page.getByRole('table', {name: 'Reported inspection stages'})).toHaveCount(0);
@@ -150,9 +153,9 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   await expect(page.getByRole('table', {name: 'Reported inspection stages'}).locator('tbody tr')).toHaveCount(11);
   state.active = false;
   await page.clock.fastForward(5100);
-  await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(page.locator('[data-module="status"]')).toContainText('Vision Core is connected. No inspection session is active.');
   await expect(page.getByRole('table', {name: 'Reported inspection stages'})).toHaveCount(0);
-  await expect(page.getByRole('dialog', {name: 'Inspection Manager', exact: true})).toContainText('No active inspection session');
+  await expect(page.locator('[data-module="inspection"]')).toContainText('No active inspection session');
   state.revoked = true;
   await page.clock.fastForward(5100);
   await expect(page.getByLabel('User name', {exact: true})).toBeEnabled();
@@ -165,7 +168,8 @@ test('reconnecting to the same session keeps old stages hidden until a fresh rep
   const state = await mockStation(page);
   state.active = true;
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Inspection Manager', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Inspection Manager', exact: true}).click();
   const stages = page.getByRole('table', {name: 'Reported inspection stages'});
   await expect(stages.locator('tbody tr')).toHaveCount(11);
   state.coreConnected = false;
@@ -187,8 +191,9 @@ test('automatic library refresh preserves valid selected detail and history page
   await page.clock.install();
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.locator('[data-module="ecu"]');
   await library.getByRole('button', {name: 'Browse API-03 synthetic reference r1', exact: true}).click();
   await library.getByRole('tab', {name: 'Revision history (53)'}).click();
   await library.getByRole('button', {name: 'Next history page'}).click();
@@ -209,21 +214,23 @@ test('automatic library refresh preserves valid selected detail and history page
 test('late denial from a previous login cannot sign out a new login', async ({page}) => {
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'ECU Library', exact: true}).click();
   let release: (() => void) | undefined;
   state.holdDetail = () => new Promise<void>(resolve => { release = resolve; });
   await page.getByRole('button', {name: 'Browse API-03 synthetic reference r1', exact: true}).click();
   await expect.poll(() => release !== undefined).toBe(true);
-  await page.getByRole('button', {name: 'Start', exact: true}).click();
-  await page.getByRole('menuitem', {name: 'Sign out', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Sign out', exact: true}).click();
   await login(page, 'operator', 'mock-password');
   state.holdDetail = null;
   const previousDenial = page.waitForResponse(response => new URL(response.url()).pathname.endsWith(draftEntry.entryId) && response.status() === 401);
   release!();
   await previousDenial;
-  await expect(page.getByRole('dialog', {name: 'System Status', exact: true})).toBeVisible();
-  await page.locator('.desktop-icons').getByRole('button', {name: 'System Status', exact: true}).click();
-  await page.getByRole('dialog', {name: 'System Status', exact: true}).getByRole('button', {name: 'Refresh station'}).click();
+  await expect(page.locator('.vision-workspace')).toBeVisible();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'System Status', exact: true}).click();
+  await page.locator('[data-module="status"]').getByRole('button', {name: 'Refresh station'}).click();
   await expect(page.locator('.mode-banner')).toContainText('CONNECTED · VENTUNO');
 });
 
@@ -231,8 +238,8 @@ test('unconfirmed logout hides protected data and retries without restoring the 
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
   state.logoutOffline = true;
-  await page.getByRole('button', {name: 'Start', exact: true}).click();
-  await page.getByRole('menuitem', {name: 'Sign out', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Sign out', exact: true}).click();
   await expect(page.getByRole('dialog', {name: 'Vision sign out'})).toContainText('Sign-out is not confirmed yet');
   await expect(page.locator('.desktop')).toHaveCount(0);
   await expect(page.getByRole('button', {name: 'Sign in', exact: true})).toHaveCount(0);
@@ -246,11 +253,12 @@ test('Settings validates locally, preserves login for a wrong current password a
   const state = await mockStation(page);
   state.passwordResult = 'wrong';
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
-  const settings = page.getByRole('dialog', {name: 'Settings', exact: true});
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
+  const settings = page.locator('[data-module="settings"]');
   await expect(settings).toContainText('Signed in as operator');
-  await page.getByRole('button', {name: 'Start', exact: true}).click();
-  await page.getByRole('menuitem', {name: 'Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
   await expect(settings).toHaveCount(1);
   await fillPasswordChange(page, 'test-current-password', 'short');
   await settings.getByRole('button', {name: 'Change password', exact: true}).click();
@@ -277,8 +285,9 @@ test('Settings validates locally, preserves login for a wrong current password a
   await fillPasswordChange(page, 'test-current-password', 'test-next-password');
   const stored = await page.evaluate(() => JSON.stringify({...localStorage, ...sessionStorage}));
   expect(stored).not.toContain('test-current-password'); expect(stored).not.toContain('test-next-password');
-  await settings.getByRole('button', {name: 'Close Settings', exact: true}).click();
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Close Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
   for (const field of ['Current password', 'New password', 'Confirm new password']) await expect(settings.getByLabel(field, {exact: true})).toHaveValue('');
 });
 
@@ -289,19 +298,22 @@ test('a pending password change survives closing Settings and late protected den
   state.holdPassword = () => new Promise<void>(resolve => { releasePassword = resolve; });
   state.holdDetail = () => new Promise<void>(resolve => { releaseDetail = resolve; });
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
-  const settings = page.getByRole('dialog', {name: 'Settings', exact: true});
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
+  const settings = page.locator('[data-module="settings"]');
   await fillPasswordChange(page, 'test-current-password', 'test-next-password');
   await settings.getByRole('button', {name: 'Change password', exact: true}).click();
   await expect.poll(() => releasePassword !== undefined).toBe(true);
-  await page.getByRole('button', {name: 'Start', exact: true}).click();
-  await expect(page.getByRole('menuitem', {name: 'Sign out', exact: true})).toBeDisabled();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await expect(page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Sign out', exact: true})).toBeDisabled();
   await page.keyboard.press('Escape');
-  await settings.getByRole('button', {name: 'Close Settings', exact: true}).click();
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Close Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
   await expect(settings.getByLabel('Current password', {exact: true})).toHaveValue('');
   await expect(settings.getByRole('button', {name: 'Changing password…', exact: true})).toBeDisabled();
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'ECU Library', exact: true}).click();
   await page.getByRole('button', {name: 'Browse API-03 synthetic reference r1', exact: true}).click();
   await expect.poll(() => releaseDetail !== undefined).toBe(true);
   releasePassword!();
@@ -320,7 +332,8 @@ test('an unconfirmed password change requests explicit sign-in and never retries
   const state = await mockStation(page);
   state.passwordResult = 'unconfirmed';
   await page.goto('/'); await login(page, 'operator', 'mock-password');
-  await page.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
   await fillPasswordChange(page, 'test-current-password', 'test-next-password');
   await page.getByRole('button', {name: 'Change password', exact: true}).click();
   const signIn = page.getByRole('dialog', {name: 'Welcome to Vision'});
@@ -356,13 +369,14 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
   await expect(section).toContainText('Required device readiness is not verified.');
   await expect(section.getByRole('table').locator('tbody tr')).toHaveCount(4);
   await expect(section.getByRole('button', {name: 'Start inspection session'})).toHaveCount(0);
-  const status = page.getByRole('dialog', {name: 'System Status', exact: true});
+  const status = page.locator('[data-module="status"]');
   await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
   const core = await (await page.request.get('/api/v1/station')).json();
   expect(core).toMatchObject({coreConnection: 'CONNECTED', state: 'NO_ACTIVE_SESSION', sessionId: null, sessionViewId: null, coreReadiness: 'UNKNOWN'});
   expect((await context.cookies()).some(cookie => cookie.name === 'vision_session' && cookie.httpOnly && cookie.sameSite === 'Strict')).toBe(true);
-  await page.locator('.desktop-icons').getByRole('button', {name: 'ECU Library', exact: true}).click();
-  const library = page.getByRole('dialog', {name: 'ECU Library', exact: true});
+  await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'ECU Library', exact: true}).click();
+  const library = page.locator('[data-module="ecu"]');
   await expect(library.getByRole('table', {name: 'ECU library entries'}).locator('tbody tr')).toHaveCount(1);
   await expect(library).not.toContainText('SYNTHETIC');
   await library.getByRole('button', {name: 'Browse ETC3 v1', exact: true}).click();
@@ -372,7 +386,7 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
   expect(stored.includes(credentials.password)).toBe(false);
   expect(stored.includes('vision-ecu-library')).toBe(false);
   await page.reload();
-  await expect(status).toBeVisible();
+  await expect(page.locator('.vision-workspace')).toBeVisible();
   await expect(page.getByLabel('Password', {exact: true})).toHaveCount(0);
   const secondContext = await browser.newContext({baseURL: 'http://127.0.0.1:18491'});
   const nextPassword = randomBytes(32).toString('base64url');
@@ -381,8 +395,8 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
   try {
     second = await secondContext.newPage();
     await second.goto('/'); await login(second, credentials.username, credentials.password);
-    await page.getByRole('button', {name: 'Start', exact: true}).click();
-    await page.getByRole('menuitem', {name: 'Sign out', exact: true}).click();
+    await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+    await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Sign out', exact: true}).click();
     await expect(page.getByLabel('User name', {exact: true})).toBeEnabled();
     expect((await page.request.get('/api/v1/auth/session')).status()).toBe(401);
     const secondReport = await second.request.get('/api/v1/station');
@@ -390,8 +404,9 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
     expect(await secondReport.json()).toMatchObject({instanceId: core.instanceId, coreConnection: 'CONNECTED', state: 'NO_ACTIVE_SESSION'});
     // Reopen the first client so the change must revoke two independent cookies.
     await login(page, credentials.username, credentials.password);
-    await second.locator('.desktop-icons').getByRole('button', {name: 'Settings', exact: true}).click();
-    const settings = second.getByRole('dialog', {name: 'Settings', exact: true});
+    await second.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  await second.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'Settings', exact: true}).click();
+    const settings = second.locator('[data-module="settings"]');
     await second.screenshot({path: 'test-results/station-settings.png'});
     await fillPasswordChange(second, 'wrong-test-password', nextPassword);
     await settings.getByRole('button', {name: 'Change password', exact: true}).click();
@@ -432,4 +447,72 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
     } finally { await secondContext.close(); }
   }
   expect(errors).toEqual([]);
+});
+
+test('Fluent navigation is a left modal drawer 320px wide and closes on selection, Escape, backdrop and station loss', async ({page}) => {
+  const state = await mockStation(page);
+  await page.goto('/');
+  await login(page, 'operator', 'mock-password');
+  const trigger = page.getByRole('button', {name: 'Open navigation', exact: true});
+  const drawer = page.getByRole('dialog', {name: 'Navigation', exact: true});
+  await expect(drawer).toHaveCount(0);
+  await trigger.click();
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toHaveAttribute('aria-modal', 'true');
+  await expect.poll(async () => Math.round((await drawer.boundingBox())?.width ?? 0)).toBe(320);
+  await expect.poll(async () => Math.round((await drawer.boundingBox())?.x ?? -1)).toBe(0);
+  await expect(drawer.getByRole('button', {name: 'System Status', exact: true})).toHaveAttribute('aria-current', 'page');
+  await drawer.getByRole('button', {name: 'ECU Library', exact: true}).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.locator('[data-module="ecu"]')).toBeVisible();
+  await trigger.click();
+  await expect(drawer.getByRole('button', {name: 'ECU Library', exact: true})).toHaveAttribute('aria-current', 'page');
+  await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
+  await trigger.click();
+  await drawer.getByRole('button', {name: 'Close navigation', exact: true}).click();
+  await expect(drawer).toHaveCount(0);
+  await trigger.click();
+  await page.mouse.click(600, 100);
+  await expect(drawer).toHaveCount(0);
+  await trigger.click();
+  state.offline = true;
+  await expect(page.getByRole('dialog', {name: 'Connection lost'})).toBeVisible({timeout: 15000});
+  await expect(drawer).toHaveCount(0);
+});
+
+test('private shell logo is the verified local original', async ({page}) => {
+  test.skip(process.env.GUI_PRIVATE_SHELL_LOGO !== '1', 'Optional local original; no public asset.');
+  await mockStation(page);
+  await page.goto('/');
+  await login(page, 'operator', 'mock-password');
+  const logo = page.getByRole('img', {name: 'Original Vision logo', exact: true});
+  await expect(logo).toBeVisible();
+  await expect.poll(() => logo.evaluate((img: HTMLImageElement) => [img.naturalWidth,img.naturalHeight])).toEqual([800,100]);
+  await expect(logo).toHaveAttribute('src', /^blob:/);
+});
+
+test('interface language changes live and persists without restarting authentication', async ({page}) => {
+  const state=await mockStation(page);
+  await page.addInitScript(()=>{ if(!localStorage.getItem('vision.ui.language.v1')) localStorage.setItem('vision.ui.language.v1','en'); });
+  await page.goto('/');
+  await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Settings',exact:true}).click();
+  const settings=page.locator('[data-module="settings"]');
+  await settings.getByLabel('Interface language',{exact:true}).selectOption('pl');
+  await expect(page.locator('html')).toHaveAttribute('lang','pl');
+  await expect(settings.getByLabel('Język interfejsu',{exact:true})).toHaveValue('pl');
+  await expect(page.getByRole('tab',{name:'Ustawienia',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Otwórz nawigację',exact:true}).click();
+  const drawer=page.getByRole('dialog',{name:'Nawigacja',exact:true});
+  await drawer.getByRole('button',{name:'Biblioteka ECU',exact:true}).click();
+  await expect(page.locator('[data-module="ecu"]').getByRole('button',{name:'Nowy profil',exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang','pl');
+  await page.getByRole('tab',{name:'Ustawienia',exact:true}).click();
+  await settings.getByLabel('Język interfejsu',{exact:true}).selectOption('en');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(settings.getByLabel('Interface language',{exact:true})).toHaveValue('en');
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
