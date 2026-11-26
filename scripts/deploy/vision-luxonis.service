@@ -1,0 +1,27 @@
+[Unit]
+Description=Vision Luxonis camera-only ROS 2 service
+# Mutual exclusion with previous owners; explicit legacy starts switch the
+# camera owner. Never pull in a robot or MoveIt service.
+Conflicts=vision-luxonis-preview-camera.service vision-oak-camera.service vision-nero-oak-scene-lab.service vision-nero-oak800-scene-lab.service
+After=vision-luxonis-preview-camera.service vision-oak-camera.service vision-nero-oak-scene-lab.service vision-nero-oak800-scene-lab.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/vision-data/tools/vision-luxonis
+ExecStartPre=/usr/bin/mountpoint -q /srv/vision-data
+ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash; exec /usr/bin/python3 -B /srv/vision-data/tools/vision-luxonis/vision_luxonis_supervisor.py'
+Environment=ROS_DOMAIN_ID=186
+Environment=ROS_LOCALHOST_ONLY=1
+Environment=ROS_HOME=/srv/vision-data/tools/vision-luxonis/ros
+Environment=ROS_LOG_DIR=/srv/vision-data/tools/vision-luxonis/ros/log
+Environment=TMPDIR=/srv/vision-data/tmp
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=15
+KillMode=mixed
+TimeoutStopSec=25
+UMask=0077
+
+[Install]
+WantedBy=default.target

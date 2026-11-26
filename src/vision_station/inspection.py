@@ -28,8 +28,9 @@ DEVICES = ("luxonis", "nero", "moveit", "sony")
 # The two alternative plan-only scenes include Luxonis and MoveIt. An active
 # scene service is NOT evidence that either individual ROS node or device works.
 # Do not infer Sony acquisition availability from USB presence or a legacy app.
+STANDALONE_CAMERA_UNIT = "vision-luxonis.service"
 UNITS = MappingProxyType({
-    "luxonis": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service"),
+    "luxonis": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service", STANDALONE_CAMERA_UNIT),
     "nero": ("vision-nero-guarded-lab.service",),
     "moveit": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service"),
 })
@@ -139,13 +140,16 @@ def systemd_diagnostics(readiness_report=None):
     hardware = usb_hardware_connections()
     now = time.time()
     observations = read_snapshot(readiness_report, now)
-    active_scenes = tuple(source for source, unit in zip(("oak","oak800"), UNITS["luxonis"])
+    active_scenes = tuple(source for source, unit in zip(("oak","oak800"), UNITS["moveit"])
                           if values.get(unit) == "active")
+    # The standalone camera runs in domain 186, not the scene observer's
+    # domain 181. Never borrow evidence from an unrelated legacy scene.
+    camera_sources = active_scenes + (("standalone186",) if values.get(STANDALONE_CAMERA_UNIT) == "active" else ())
     devices = []
     for device in DEVICES:
         available = availability(device)
         connection = hardware.get(device, "UNKNOWN")
-        observation = device_observation(device, available, connection, observations, active_scenes, now)
+        observation = device_observation(device, available, connection, observations, camera_sources if device == "luxonis" else active_scenes, now)
         devices.append(DeviceStatus(device, available, observation.state, observation.observed_at,
                                     connection, observation.reason))
     return tuple(devices)

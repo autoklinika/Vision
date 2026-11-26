@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from vision_station.inspection import DEVICES, UNITS, systemd_diagnostics
 
-SCENE, SCENE_800 = UNITS["luxonis"]
+SCENE, SCENE_800, CAMERA = UNITS["luxonis"]
 GUARD, = UNITS["nero"]
 
 
@@ -24,7 +24,7 @@ class ServiceDiagnosticsTests(unittest.TestCase):
             report = systemd_diagnostics()
             command = run.call_args.args[0]
             self.assertEqual(command[:4], ["systemctl", "--user", "show", "--property=Id,LoadState,ActiveState"])
-            self.assertCountEqual(command[4:], [SCENE, SCENE_800, GUARD])
+            self.assertCountEqual(command[4:], [SCENE, SCENE_800, CAMERA, GUARD])
             self.assertFalse(run.call_args.kwargs.get("shell", False))
             self.assertEqual(run.call_args.kwargs["timeout"], 0.65)
         self.assertEqual(tuple(item.device for item in report), DEVICES)
@@ -33,12 +33,16 @@ class ServiceDiagnosticsTests(unittest.TestCase):
         return {item.device: item.availability for item in report}
 
     def test_current_guard_active_and_scene_services_stopped(self):
-        self.assertEqual(self.snapshot("\n".join([block(GUARD,state="active"),block(SCENE),block(SCENE_800,state="failed")])),
+        self.assertEqual(self.snapshot("\n".join([block(GUARD,state="active"),block(SCENE),block(SCENE_800,state="failed"),block(CAMERA)])),
             {"luxonis":"INACTIVE","nero":"ACTIVE","moveit":"INACTIVE","sony":"UNKNOWN"})
 
     def test_active_alternative_never_establishes_readiness(self):
         self.assertEqual(self.snapshot("\n".join([block(SCENE_800,state="active"),block(GUARD,state="inactive")])),
             {"luxonis":"ACTIVE","nero":"INACTIVE","moveit":"ACTIVE","sony":"UNKNOWN"})
+
+    def test_standalone_camera_does_not_imply_moveit_or_inspection_readiness(self):
+        self.assertEqual(self.snapshot("\n".join([block(GUARD,state="active"),block(SCENE),block(SCENE_800),block(CAMERA,state="active")])),
+            {"luxonis":"ACTIVE","nero":"ACTIVE","moveit":"INACTIVE","sony":"UNKNOWN"})
 
     def test_not_found_and_transitional_states_are_unknown(self):
         self.assertEqual(self.snapshot("\n".join([block(GUARD,load="not-found"),block(SCENE),block(SCENE_800,state="activating")]),returncode=1),
