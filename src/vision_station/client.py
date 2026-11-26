@@ -11,6 +11,7 @@ from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
 from .luxonis import validate_luxonis_report
 from .nero import validate_nero_report
+from .nero_tcp import validate_report as validate_nero_tcp
 from .nero_diagnostics import validate_report as validate_nero_diagnostics
 from .nero_history import validate_history as validate_nero_history, valid_query as valid_nero_history_query, validate_attempts
 from .nero_clear_coordinator import valid_intent, valid_actor, validate_envelope
@@ -141,6 +142,9 @@ class RemoteStationOwner:
 
     def nero_report(self):
         return self._read("nero",{},validate_nero_report)
+
+    def nero_tcp_report(self):
+        return self._read("nero_tcp",{},validate_nero_tcp)
 
     def nero_diagnostics_report(self):
         return self._read("nero_diagnostics",{},validate_nero_diagnostics)

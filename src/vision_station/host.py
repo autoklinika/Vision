@@ -9,6 +9,7 @@ from .inspection import InspectionOwner, InspectionRejected
 from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 from .luxonis import LuxonisMonitor
 from .nero import NeroMonitor
+from .nero_tcp import project as project_nero_tcp
 from .nero_diagnostics import projection
 from .nero_history import FaultHistory, HistorySampler
 from .nero_clear import result as clear_result, validate_result as validate_clear_result
@@ -63,6 +64,9 @@ class CoreHost:
         if self._nero_history is not None:
             sampler, self._nero_history = self._nero_history, None
             sampler.close()
+
+    def nero_tcp_report(self):
+        return project_nero_tcp(self.nero_report())
 
     def nero_diagnostics_report(self):
         r=self.nero_report()

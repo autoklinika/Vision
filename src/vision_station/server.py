@@ -34,6 +34,8 @@ def dispatch(host, request):
         return host.station_report()
     if operation == "nero" and not query:
         return host.nero_report()
+    if operation == "nero_tcp" and not query:
+        return host.nero_tcp_report()
     if operation == "nero_diagnostics" and not query:
         return host.nero_diagnostics_report()
     if operation == "nero_history" and set(query) == {"source","status","before"} and valid_nero_history_query(**query):

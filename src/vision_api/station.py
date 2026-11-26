@@ -330,6 +330,9 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
+        if target == "/api/v1/devices/nero/control":
+            self._authorize(environ,touch=False)
+            return self._json(start_response,200,self.owner.nero_tcp_report())
         if target == "/api/v1/devices/nero/diagnostics":
             self._authorize(environ,touch=False)
             return self._json(start_response,200,self.owner.nero_diagnostics_report())

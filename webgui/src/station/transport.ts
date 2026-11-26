@@ -1,3 +1,5 @@
+import {isTcpReport} from './neroTcpContract';
+import type {TcpReport} from './neroTcpContract';
 import {isDiagnosticsReport,isHistoryReport,isAttemptReport,isClearEnvelope} from './neroDiagnosticsContract';
 import type {DiagnosticsReport,HistoryReport,AttemptReport,ClearEnvelope,SourceFilter,HistoryFilter,ClearScope} from './neroDiagnosticsContract';
 import {isNeroReport} from './neroContract';
@@ -86,6 +88,9 @@ export function readNero():Promise<StationResult<NeroReport>>{
   return request<NeroReport,never>('/api/v1/devices/nero',isNeroReport,undefined,undefined,16384);
 }
 
+export function readNeroTcp():Promise<StationResult<TcpReport>>{
+  return request<TcpReport,never>('/api/v1/devices/nero/control',isTcpReport,undefined,undefined,16384);
+}
 export function readNeroDiagnostics():Promise<StationResult<DiagnosticsReport>>{
   return request<DiagnosticsReport,never>('/api/v1/devices/nero/diagnostics',isDiagnosticsReport,undefined,undefined,131072);
 }

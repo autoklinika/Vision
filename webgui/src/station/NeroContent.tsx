@@ -1,9 +1,10 @@
-import {Badge,Tab,TabList,MessageBar,MessageBarBody,Button,Table,TableHeader,TableHeaderCell,TableBody,TableRow,TableCell} from '@fluentui/react-components';
-import {AppsRegular,KeyboardRegular,PowerRegular} from '@fluentui/react-icons';
+import {Badge,Tab,TabList,MessageBar,MessageBarBody,Table,TableHeader,TableHeaderCell,TableBody,TableRow,TableCell} from '@fluentui/react-components';
+import {AppsRegular} from '@fluentui/react-icons';
 import {useEffect,useState} from 'react';
 import type {StationPresentation} from './client';
 import {readNero} from './transport';
 import {NeroDiagnostics,NeroFaultHistory} from './NeroDiagnostics';
+import {NeroControl} from './NeroControl';
 import {NERO_AGE,NERO_JOINTS,NERO_FAULTS} from './neroContract';
 import type {NeroReport} from './neroContract';
 import {useTranslation} from '../i18n/LanguageProvider';
@@ -17,7 +18,7 @@ const code=(v:number|undefined)=>v===undefined?'—':'0x'+v.toString(16).toUpper
 
 export function NeroContent({station,active}:{station:StationPresentation;active:boolean}){
  const {t}=useTranslation();
- const [view,setView]=useState<"telemetry"|"diagnostics"|"history">("telemetry");
+ const [view,setView]=useState<"telemetry"|"diagnostics"|"history"|"control">("telemetry");
  const [visible,setVisible]=useState(!document.hidden);
  const [sample,setSample]=useState<{report:NeroReport;received:number;owner:string}|null>(null);
  const [tick,setTick]=useState(()=>performance.now());
@@ -85,9 +86,11 @@ export function NeroContent({station,active}:{station:StationPresentation;active
      <Tab value="telemetry">{t('Telemetry')}</Tab>
      <Tab value="diagnostics">{t('Diagnostics')}</Tab>
      <Tab value="history">{t('Fault history')}</Tab>
+     <Tab value="control">{t('Control')}</Tab>
    </TabList>
    {view==="diagnostics"&&<NeroDiagnostics key={owner} station={station} active={enabled}/>}
    {view==="history"&&<NeroFaultHistory key={owner} station={station} active={enabled}/>}
+   {view==="control"&&<NeroControl key={owner+String(enabled)} station={station} active={enabled}/>}
    {view==="telemetry"&&<>
    <section aria-label={t('Joint telemetry')}>
     <div className="luxonis-section-heading"><div><h2>{t('Joint telemetry')}</h2><p>{t('Actual ROS 2 feedback · J1–J7 · read only')}</p></div></div>
@@ -122,7 +125,7 @@ export function NeroContent({station,active}:{station:StationPresentation;active
       <p className="fine-print">{t('Configured driver parameters, not confirmation of HOLD or permission to move.')}</p>
     </section>
    </div>
-   <section className="luxonis-settings-card" aria-label={t('Manual control — planned')}><h3>{t('Manual control — planned')}</h3><div className="nero-planned"><Button disabled icon={<PowerRegular/>}>{t('Drive enable / disable')}</Button><Button disabled icon={<KeyboardRegular/>}>{t('Keyboard control')}</Button></div><p className="fine-print">{t('Planned motion controls are not connected.')}</p></section>
+
    </>}
  </div>;
 }

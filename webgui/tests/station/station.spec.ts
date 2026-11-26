@@ -823,8 +823,7 @@ test('NERO live read-only telemetry clears expired feedback and never writes con
  await expect(panel.getByRole('table',{name:'Joint telemetry',exact:true}).getByRole('row')).toHaveCount(8);
  await expect(panel.getByRole('row').filter({hasText:'J7'})).toContainText('60.00');
  await expect(panel).toContainText('ERROR-ACTIVE');
- await expect(panel.getByRole('button',{name:'Drive enable / disable',exact:true})).toBeDisabled();
- await expect(panel.getByRole('button',{name:'Keyboard control',exact:true})).toBeDisabled();
+ await expect(panel.getByRole('tab',{name:'Control',exact:true})).toBeVisible();
  stale=true;await expect(panel).toContainText('Drive status unknown');
  await expect(panel.getByRole('row').filter({hasText:'J7'})).not.toContainText('60.00');
  stale=false;active=false;await expect(panel).toContainText('Robot feedback is incomplete or stale.');
@@ -901,4 +900,55 @@ test('NERO diagnostics shows source codes, filtered history and explicit clear c
  await page.setViewportSize({width:390,height:844});
  expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  expect(commands).toHaveLength(1);
+});
+
+
+test('NERO TCP control uses live drive readback and local-only speed and keyboard declaration',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ await page.route('**/api/v1/devices/nero',r=>r.fulfill({contentType,body:JSON.stringify(neroFixture())}));
+ let requests=0;
+ await page.route('**/api/v1/devices/nero/control',r=>{
+   expect(r.request().method()).toBe('GET');requests++;
+   return r.fulfill({contentType,body:JSON.stringify({
+     schema:'vision.api.nero-tcp.v1',source:'STATION',instanceId:'f'.repeat(32),capturedAt:Date.now()/1000,
+     driveEnabled:[false,false,false,false,false,false,false],mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
+     capabilities:{enable:false,jog:false,hold:false},speedLimits:{linearMin:1,linearMax:100,angularMin:1,angularMax:30},
+     defaults:{linearMmS:10,angularDegS:5},frames:['BASE','TOOL'],actualTcp:null
+   })});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Control',exact:true}).click();
+ const control=panel.getByRole('region',{name:'TCP control'});
+ await expect(control).toContainText('0/7 Enabled');
+ await expect(control.getByRole('button',{name:'Enable drives',exact:true})).toBeDisabled();
+ await expect(control.getByRole('button',{name:'STOP / HOLD',exact:true})).toBeDisabled();
+ await expect(control.getByRole('spinbutton',{name:'Linear speed value'})).toHaveValue('10');
+ await expect(control.getByRole('spinbutton',{name:'Angular speed value'})).toHaveValue('5');
+ await control.getByRole('button',{name:'Normal speed',exact:true}).click();
+ await expect(control.getByRole('spinbutton',{name:'Linear speed value'})).toHaveValue('25');
+ await expect(control.getByRole('spinbutton',{name:'Angular speed value'})).toHaveValue('10');
+ await control.getByLabel('Reference frame').selectOption('TOOL');
+ await control.getByRole('button',{name:'Test keyboard',exact:true}).click();
+ const area=control.getByRole('group',{name:'Keyboard test area'});
+ await area.focus();
+ await page.keyboard.down('ArrowUp');
+ await expect(area.getByRole('status')).toContainText('X +');
+ await expect(area.getByRole('status')).toContainText('TOOL · 25 mm/s');
+ await page.keyboard.up('ArrowUp');
+ await expect(area.getByRole('status')).toContainText('No input');
+ await page.keyboard.down('e');
+ await expect(area.getByRole('status')).toContainText('ROLL +');
+ await expect(area.getByRole('status')).toContainText('10 °/s');
+ await page.keyboard.press('Escape');
+ await expect(area.getByRole('status')).toContainText('No input');
+ await page.keyboard.up('e');
+ await control.getByRole('button',{name:'End keyboard test',exact:true}).click();
+ await expect(area.getByRole('button',{name:'X +',exact:true})).toBeDisabled();
+ await page.setViewportSize({width:390,height:844});
+ await expect.poll(()=>panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ expect(requests).toBeGreaterThan(0);
+ expect(state.writes).toEqual(['/api/v1/auth/login']);
 });

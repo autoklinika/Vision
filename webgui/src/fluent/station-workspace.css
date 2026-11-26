@@ -284,3 +284,29 @@ body { margin: 0; }
 .nero-planned { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
 @media(max-width:1000px){.nero-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:680px){.nero-detail-grid{grid-template-columns:minmax(0,1fr);}}
+
+/* Cartesian control workspace: declaration and isolated keyboard preview. */
+.nero-tcp-control { display: grid; gap: 12px; min-width: 0; }
+.nero-tcp-control .luxonis-settings-card { display: grid; gap: 12px; min-width: 0; }
+.nero-tcp-drive-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.nero-tcp-axis-status { display: flex; flex-wrap: wrap; gap: 8px; }
+.nero-tcp-speed-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,230px),1fr)); gap: 14px; }
+.nero-tcp-speed { display: grid; grid-template-columns: minmax(0,1fr) 76px; align-items: center; gap: 10px; }
+.nero-tcp-speed .fui-Slider { width: 100%; min-width: 0; }
+.nero-tcp-keyboard { display: grid; gap: 12px; outline-offset: 4px; border-radius: 6px; }
+.nero-tcp-keys { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: 8px 16px; }
+.nero-tcp-key-row { display: grid; grid-template-columns: 1fr 58px 1fr; align-items: center; gap: 8px; text-align: center; }
+.nero-tcp-key-row .fui-Button { min-width: 0; }
+.nero-tcp-intent,.nero-tcp-stop { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.nero-tcp-control,.nero-tcp-control .luxonis-settings-card,.nero-tcp-keyboard { grid-template-columns:minmax(0,1fr); }
+.nero-tcp-control .fui-Field,.nero-tcp-control .fui-Select,.nero-tcp-control .fui-Input { min-width:0; max-width:100%; }
+.nero-tcp-speed .fui-Input { width:100%; box-sizing:border-box; }
+.nero-tcp-speed .fui-Input input { min-width:0; width:100%; box-sizing:border-box; }
+.nero-tcp-control .fui-Select select { min-width:0; max-width:100%; }
+.nero-tcp-control .fui-MessageBar { min-width:0; }
+.nero-tcp-key-row { grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr); }
+.nero-device > .fui-TabList { flex-wrap:wrap; }
+@media(max-width:480px){
+ .nero-tcp-speed-grid,.nero-tcp-keys { grid-template-columns:minmax(0,1fr); }
+ .nero-tcp-control .luxonis-settings-card { padding:10px; }
+}
