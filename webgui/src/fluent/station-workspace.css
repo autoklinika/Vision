@@ -163,7 +163,7 @@ body { margin: 0; }
 .vision-system-status .station-section-heading { margin-bottom: 10px; align-items: flex-end; }
 .vision-system-status .station-device-report-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
 .vision-system-status .station-device-table { min-width: 0; overflow-x: auto; border: 1px solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusMedium); }
-.vision-system-status .station-device-table .fui-Table { min-width: 570px; }
+.vision-system-status .station-device-table .fui-Table { min-width: 740px; }
 .vision-system-status .station-device-table .fui-TableCell { vertical-align: middle; padding-top: 7px; padding-bottom: 7px; }
 .vision-system-status .station-device-table .fui-TableHeaderCell { font-weight: 600; }
 .vision-system-status .station-device-table time { font-size: 12px; color: var(--colorNeutralForeground2); white-space: nowrap; }

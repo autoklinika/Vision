@@ -15,7 +15,8 @@ def block(name, load="loaded", state="inactive"):
 
 class ServiceDiagnosticsTests(unittest.TestCase):
     def snapshot(self, stdout="", *, error=None, returncode=0):
-        with patch("vision_station.inspection.subprocess.run") as run:
+        with patch("vision_station.inspection.usb_hardware_connections", return_value=dict.fromkeys(DEVICES,"UNKNOWN")), \
+                patch("vision_station.inspection.subprocess.run") as run:
             if error is not None:
                 run.side_effect = error
             else:

@@ -685,5 +685,11 @@
   "Inactive": "Nieaktywna",
   "Ready": "Gotowe",
   "Not ready": "Niegotowe",
-  "Monitored service availability does not establish physical connectivity or device readiness.": "Stan monitorowanych usług nie potwierdza fizycznego połączenia ani gotowości urządzeń."
+  "Monitored service availability does not establish physical connectivity or device readiness.": "Stan monitorowanych usług nie potwierdza fizycznego połączenia ani gotowości urządzeń.",
+  "Hardware connection": "Połączenie sprzętowe",
+  "USB detected": "Wykryto USB",
+  "USB not detected": "Nie wykryto USB",
+  "Hardware unknown": "Nieznane",
+  "Not applicable": "Nie dotyczy",
+  "Hardware detection, monitored service availability and operational readiness are independent.": "Wykrycie sprzętu, dostępność monitorowanej usługi i gotowość operacyjna są niezależne."
 }

@@ -2,7 +2,7 @@ import { useTranslation } from '../i18n/LanguageProvider';
 import { Badge, Button, Label, MessageBar, MessageBarBody, MessageBarTitle, Select, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow } from '@fluentui/react-components';
 import { useEffect, useRef, useState } from 'react';
 import type { StationPresentation } from './client';
-import type { DeviceReport, InspectionBlocker, InspectionReport } from './contract';
+import type { DeviceReport, HardwareConnection, InspectionBlocker, InspectionReport } from './contract';
 import { readInspection, startInspection, closeInspection } from './transport';
 
 const blockerText: Record<InspectionBlocker, string> = {
@@ -79,16 +79,22 @@ export function InspectionContent({station}: {station: StationPresentation}) {
   const labels = {ACTIVE:'Active',INACTIVE:'Inactive',READY:'Ready',NOT_READY:'Not ready',UNKNOWN:'Unknown'} as const;
   const statusBadge = (value: DeviceReport['availability'] | DeviceReport['readiness']) =>
     <Badge appearance="tint" color={value==='ACTIVE'||value==='READY'?'success':value==='NOT_READY'||value==='INACTIVE'?'warning':'informative'} title={value} data-reported-state={value}>{t(labels[value])}</Badge>;
+  const hardwareLabels: Record<HardwareConnection,string> = {
+    USB_DETECTED:'USB detected', USB_NOT_DETECTED:'USB not detected', UNKNOWN:'Hardware unknown', NOT_APPLICABLE:'Not applicable',
+  };
+  const hardwareBadge = (value: HardwareConnection) =>
+    <Badge appearance="tint" color={value==='USB_DETECTED'?'success':value==='USB_NOT_DETECTED'?'warning':'informative'} title={value} data-hardware-connection={value}>{t(hardwareLabels[value])}</Badge>;
   return <section className="station-device-section" aria-label={t("Inspection orchestration")}>
-    <div className="station-section-heading"><div><h2>{t("Devices and services")}</h2><span>{t("Monitored service availability does not establish physical connectivity or device readiness.")}</span></div>
+    <div className="station-section-heading"><div><h2>{t("Devices and services")}</h2><span>{t("Hardware detection, monitored service availability and operational readiness are independent.")}</span></div>
       {current&&<div className="station-device-report-meta"><Badge appearance="tint" color={current.startAllowed?'success':'warning'}>{t(current.startAllowed?"Core permits session start":"Session start blocked")}</Badge><span className="station-report-time">{t("Last report:")} <time dateTime={current.capturedAt}>{current.capturedAt}</time></span></div>}
     </div>
     {current ? <>
       <div className="station-device-table">
         <Table aria-label={t("Devices and services")}>
-          <TableHeader><TableRow><TableHeaderCell>{t("Device")}</TableHeaderCell><TableHeaderCell>{t("Availability")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell><TableHeaderCell>{t("Last observation (UTC)")}</TableHeaderCell></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHeaderCell>{t("Device")}</TableHeaderCell><TableHeaderCell>{t("Hardware connection")}</TableHeaderCell><TableHeaderCell>{t("Availability")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell><TableHeaderCell>{t("Last observation (UTC)")}</TableHeaderCell></TableRow></TableHeader>
           <TableBody>{current.devices.map(d=><TableRow key={d.device} data-device={d.device}>
             <TableCell className="station-device-name">{t(deviceLabel[d.device])}</TableCell>
+            <TableCell>{hardwareBadge(d.hardwareConnection??'UNKNOWN')}</TableCell>
             <TableCell>{statusBadge(d.availability)}</TableCell>
             <TableCell>{statusBadge(d.readiness)}</TableCell>
             <TableCell><time dateTime={d.observedAt}>{d.observedAt}</time></TableCell>

@@ -517,16 +517,16 @@ test('interface language changes live and persists without restarting authentica
   expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
 
-test('Fluent system status presents only reported device availability/readiness, updates in place and navigates without operations',async({page})=>{
+test('Fluent system status presents only reported hardware/availability/readiness, updates in place and navigates without operations',async({page})=>{
   const state=await mockStation(page);
   await page.clock.install();
   const fixture=stationFixture(false,true);
   const observedAt='2026-11-25T12:00:00Z';
   let devices=[
-    {device:'luxonis',availability:'ACTIVE',readiness:'UNKNOWN',observedAt},
-    {device:'nero',availability:'ACTIVE',readiness:'NOT_READY',observedAt},
-    {device:'moveit',availability:'INACTIVE',readiness:'UNKNOWN',observedAt},
-    {device:'sony',availability:'ACTIVE',readiness:'READY',observedAt},
+    {device:'luxonis',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'UNKNOWN',observedAt},
+    {device:'nero',hardwareConnection:'UNKNOWN',availability:'ACTIVE',readiness:'NOT_READY',observedAt},
+    {device:'moveit',hardwareConnection:'NOT_APPLICABLE',availability:'INACTIVE',readiness:'UNKNOWN',observedAt},
+    {device:'sony',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'READY',observedAt},
   ];
   let pending=false;
   await page.route('**/api/v1/inspection',route=>pending?route.fulfill({status:503,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'REPORT_UNAVAILABLE'})}):route.fulfill({contentType,body:JSON.stringify({
@@ -539,6 +539,10 @@ test('Fluent system status presents only reported device availability/readiness,
   await expect(status.getByRole('toolbar',{name:'Station actions'})).toBeVisible();
   await expect(table).toHaveClass(/fui-Table/);
   await expect(table.locator('tbody tr')).toHaveCount(4);
+  await expect(table.getByRole('columnheader',{name:'Hardware connection'})).toBeVisible();
+  await expect(table.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('USB detected');
+  await expect(table.locator('[data-device="nero"] [data-hardware-connection="UNKNOWN"]')).toHaveText('Hardware unknown');
+  await expect(table.locator('[data-device="moveit"] [data-hardware-connection="NOT_APPLICABLE"]')).toHaveText('Not applicable');
   await expect(table.locator('[data-device="luxonis"]')).toContainText('Active');
   await expect(table.locator('[data-device="luxonis"]')).toContainText('Unknown');
   await expect(table.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Not ready');
@@ -547,9 +551,10 @@ test('Fluent system status presents only reported device availability/readiness,
   await expect(status).toContainText('No approved ECU inspection recipe is available.');
   await expect(status.getByRole('button',{name:'Start inspection session'})).toHaveCount(0);
   const original=await table.elementHandle();
-  devices=devices.map(d=>d.device==='sony'?{...d,readiness:'NOT_READY'}:d);
+  devices=devices.map(d=>d.device==='sony'?{...d,readiness:'NOT_READY',hardwareConnection:'USB_NOT_DETECTED'}:d);
   await page.clock.fastForward(5100);
   await expect(table.locator('[data-device="sony"] [data-reported-state="NOT_READY"]')).toBeVisible();
+  await expect(table.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('USB not detected');
   expect(await table.evaluate((element,previous)=>element===previous,original)).toBe(true);
   await original?.dispose();
   pending=true;
@@ -572,6 +577,9 @@ test('Fluent system status presents only reported device availability/readiness,
   await page.getByLabel('Interface language',{exact:true}).selectOption('pl');
   await page.getByRole('tab',{name:'Stan systemu',exact:true}).click();
   const translated=status.getByRole('table',{name:'Urządzenia i usługi'});
+  await expect(translated.getByRole('columnheader',{name:'Połączenie sprzętowe'})).toBeVisible();
+  await expect(translated.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('Wykryto USB');
+  await expect(translated.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('Nie wykryto USB');
   await expect(translated.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Niegotowe');
   await expect(status).toContainText('Rozpoczęcie sesji zablokowane');
   await expect(status.getByRole('button',{name:'Przejdź do menedżera inspekcji'})).toBeVisible();

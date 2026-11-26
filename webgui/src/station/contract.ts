@@ -45,7 +45,8 @@ export function isStationReport(value: unknown): value is StationReport {
 }
 
 export type DeviceId = 'luxonis' | 'nero' | 'moveit' | 'sony';
-export type DeviceReport = Readonly<{device: DeviceId; availability: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN'; readiness: 'READY' | 'NOT_READY' | 'UNKNOWN'; observedAt: string}>;
+export type HardwareConnection = 'USB_DETECTED' | 'USB_NOT_DETECTED' | 'UNKNOWN' | 'NOT_APPLICABLE';
+export type DeviceReport = Readonly<{device: DeviceId; availability: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN'; readiness: 'READY' | 'NOT_READY' | 'UNKNOWN'; observedAt: string; hardwareConnection?: HardwareConnection}>;
 export type InspectionSelection = Readonly<{selectionId: string; family: string; variant: string; revision: string; physicalState: string; recipe: string}>;
 const deviceIds = ['luxonis', 'nero', 'moveit', 'sony'] as const;
 const blockerIds = ['COMPOSITION_UNCONFIGURED', 'NO_APPROVED_SELECTION', 'DEVICES_NOT_VERIFIED', 'SESSION_ACTIVE', 'RECOVERY_REQUIRED'] as const;
@@ -59,7 +60,11 @@ function identifier(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value);
 }
 function isDevice(value: unknown, device: DeviceId): value is DeviceReport {
-  return record(value, ['device','availability','readiness','observedAt']) && value.device === device &&
+  const legacyKeys = ['device','availability','readiness','observedAt'];
+  return (record(value, legacyKeys) || record(value, [...legacyKeys,'hardwareConnection'])) && value.device === device &&
+    (!Object.hasOwn(value,'hardwareConnection') || value.hardwareConnection === 'UNKNOWN' ||
+      ((device === 'luxonis' || device === 'sony') && (value.hardwareConnection === 'USB_DETECTED' || value.hardwareConnection === 'USB_NOT_DETECTED')) ||
+      (device === 'moveit' && value.hardwareConnection === 'NOT_APPLICABLE')) &&
     ['ACTIVE','INACTIVE','UNKNOWN'].includes(String(value.availability)) && typeof value.availability === 'string' &&
     ['READY','NOT_READY','UNKNOWN'].includes(String(value.readiness)) && typeof value.readiness === 'string' &&
     (value.readiness !== 'READY' || value.availability === 'ACTIVE') && utc(value.observedAt);

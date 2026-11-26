@@ -19,6 +19,7 @@ from vision_core.ports import Request
 from vision_modules.ecu_profiles import Declaration
 from vision_modules.ecu_reference import compile_profile
 from vision_runtime import VisionRuntimeCoordinator
+from .hardware_presence import usb_hardware_connections, valid_hardware_connection
 
 DEVICES = ("luxonis", "nero", "moveit", "sony")
 # Explicit, installed ROS 2 service bindings for the current station.
@@ -81,10 +82,12 @@ class DeviceStatus:
     availability: str
     readiness: str
     observed_at: float
+    hardware_connection: str = "UNKNOWN"
 
     def __post_init__(self):
         if (self.device not in DEVICES or self.availability not in ("ACTIVE", "INACTIVE", "UNKNOWN")
                 or self.readiness not in ("READY", "NOT_READY", "UNKNOWN")
+                or not valid_hardware_connection(self.device, self.hardware_connection)
                 or type(self.observed_at) not in (float, int) or not math.isfinite(self.observed_at)
                 or self.observed_at < 0 or (self.readiness == "READY" and self.availability != "ACTIVE")):
             raise ValueError("invalid device status")
@@ -96,7 +99,8 @@ def systemd_diagnostics():
     Missing/unloaded units and unrecognized/transitional states are UNKNOWN,
     not INACTIVE. A loaded active alternative establishes service liveness;
     INACTIVE requires every bound alternative to be known stopped or failed.
-    Physical readiness is never established by this provider.
+    Physical readiness is never established by this provider. USB enumeration
+    is independent of systemd service liveness.
     """
     names = tuple(dict.fromkeys(unit for units in UNITS.values() for unit in units))
     values = {}
@@ -128,9 +132,10 @@ def systemd_diagnostics():
             return "INACTIVE"
         return "UNKNOWN"
 
+    hardware = usb_hardware_connections()
     now = time.time()
-    return tuple(DeviceStatus(device, availability(device), "UNKNOWN", now)
-                 for device in DEVICES)
+    return tuple(DeviceStatus(device, availability(device), "UNKNOWN", now,
+                              hardware.get(device, "UNKNOWN")) for device in DEVICES)
 
 
 @dataclass(frozen=True)
@@ -319,7 +324,8 @@ class InspectionOwner:
                 "capturedAt":_timestamp(time.time()), "sessionId":station["sessionId"],
                 "intentToken":self.intent_token,
                 "devices":[{"device":d.device, "availability":d.availability, "readiness":d.readiness,
-                            "observedAt":_timestamp(d.observed_at)} for d in devices],
+                            "observedAt":_timestamp(d.observed_at),
+                            "hardwareConnection":d.hardware_connection} for d in devices],
                 "selections":[s.report() for s in choices], "blockers":blockers,
                 "startAllowed":not blockers, "closeAllowed":closable}
 
@@ -425,7 +431,11 @@ def validate_inspection_report(value):
     if value["closeAllowed"] and value["sessionId"] is None:
         return False
     for device,row in zip(DEVICES,value["devices"]):
-        if (type(row) is not dict or set(row) != {"device","availability","readiness","observedAt"}
+        # Accept only the exact legacy shape or the documented optional
+        # hardware observation extension; old Core releases remain readable.
+        base_keys = {"device","availability","readiness","observedAt"}
+        if (type(row) is not dict or set(row) not in (base_keys, base_keys | {"hardwareConnection"})
+                or not valid_hardware_connection(device, row.get("hardwareConnection", "UNKNOWN"))
                 or row["device"] != device or row["availability"] not in ("ACTIVE","INACTIVE","UNKNOWN")
                 or row["readiness"] not in ("READY","NOT_READY","UNKNOWN") or not _utc(row["observedAt"])
                 or (row["readiness"] == "READY" and row["availability"] != "ACTIVE")):
