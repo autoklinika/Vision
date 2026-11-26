@@ -14,9 +14,30 @@ not an operational inspection or a second camera implementation.
   in the local user systemd directory, not as a symlink into a development
   worktree. Keep the private camera configuration in
   `/srv/vision-data/config/luxonis/rgbd.yaml`.
-- Preserve the accepted live camera-only RGB-D profile, 15 FPS configured,
-  observed 640x400 RGB and depth, IR disabled, no NN and no automatic
-  calibration. Do not copy station-private configuration into the repository.
+- Owner decision, 2026-11-26: the default boot profile is restored from the
+  frozen Vision Guided Positioning V1 baseline of 2026-11-23,
+  `fixed/camera/luxonis_rgb1080_stereo800_ros2.yaml`. Its source manifest
+  checksum was verified and the installed profile is a byte-identical copy.
+  Do not silently return to the earlier 640x400 diagnostic profile.
+  RGB is configured to 1920x1080, stereo output parameters to 1280x800,
+  both at 15 FPS, FAST_ACCURACY, IR disabled, no NN and no automatic
+  calibration. The live source topics were both verified at 1920x1080
+  (depth aligned to RGB, 16UC1). The driver reports left/right settings
+  of 640x400; this profile is not proof of native 800p stereo acquisition.
+  Subpixel and left-right check are enabled; extended disparity is disabled.
+  GUI previews remain reduced independently of source images.
+  Do not copy station-private configuration into the repository.
+- Historical regression audit of 2026-11-17 established that the earlier
+  400p diagnostic pipeline was unsuitable for the 34 mm reference:
+  23.842 mm versus 33.401 mm in the isolated native 800p stereo-only test
+  using the same top-surface estimator. The simultaneous unaligned RGB
+  1080p/native 800p candidate of that date did not pass measurement QA.
+  The later VGP baseline is a different aligned RGB-D profile accepted for
+  guided positioning, not a certification of metrological accuracy.
+  Native 800p measurement qualification must not be inferred from the
+  aligned 1920x1080 output or configured stereo dimensions. Preserve
+  the frozen baseline, and do not change calibration, TF, robot or MoveIt
+  based on this resolution-only camera service deployment.
 - Keep ROS domain 186 and localhost-only discovery. The future operational
   Runtime domain and camera-to-station transform are separate acceptance tasks.
 - Start only after checking that NVMe is mounted and exactly one recognized
