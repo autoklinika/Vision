@@ -34,12 +34,13 @@ it('validates only exact reports and explicit reader or operator identity',()=>{
 });
 
 it('accepts the explicit hardware metadata extension, never interprets USB as readiness',()=>{
-  const hardware = ['USB_DETECTED','UNKNOWN','NOT_APPLICABLE','USB_NOT_DETECTED'];
+  const hardware = ['USB_DETECTED','USB_CAN_DETECTED','NOT_APPLICABLE','USB_NOT_DETECTED'];
   const extended = {...report,devices:report.devices.map((d,i)=>({...d,hardwareConnection:hardware[i]}))};
   expect(isInspectionReport(extended)).toBe(true);
   expect(isInspectionReport(report)).toBe(true);
+  expect(isInspectionReport({...extended,devices:extended.devices.map((d,i)=>i===1?{...d,hardwareConnection:'USB_CAN_NOT_DETECTED'}:d)})).toBe(true);
   expect(isInspectionReport({...extended,startAllowed:true,blockers:[]})).toBe(false);
-  for(const [index,value] of [[0,'READY'],[1,'USB_DETECTED'],[2,'USB_DETECTED'],[3,'NOT_APPLICABLE'],[0,null]] as const){
+  for(const [index,value] of [[0,'READY'],[0,'USB_CAN_DETECTED'],[1,'USB_DETECTED'],[2,'USB_DETECTED'],[3,'NOT_APPLICABLE'],[0,null]] as const){
     expect(isInspectionReport({...extended,devices:extended.devices.map((d,i)=>i===index?{...d,hardwareConnection:value}:d)})).toBe(false);
   }
   expect(isInspectionReport({...extended,devices:extended.devices.map(d=>({...d,extra:true}))})).toBe(false);

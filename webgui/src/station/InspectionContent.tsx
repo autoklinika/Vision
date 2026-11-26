@@ -80,10 +80,11 @@ export function InspectionContent({station}: {station: StationPresentation}) {
   const statusBadge = (value: DeviceReport['availability'] | DeviceReport['readiness']) =>
     <Badge appearance="tint" color={value==='ACTIVE'||value==='READY'?'success':value==='NOT_READY'||value==='INACTIVE'?'warning':'informative'} title={value} data-reported-state={value}>{t(labels[value])}</Badge>;
   const hardwareLabels: Record<HardwareConnection,string> = {
-    USB_DETECTED:'USB detected', USB_NOT_DETECTED:'USB not detected', UNKNOWN:'Hardware unknown', NOT_APPLICABLE:'Not applicable',
+    USB_DETECTED:'USB detected', USB_NOT_DETECTED:'USB not detected',
+    USB_CAN_DETECTED:'USB-CAN detected', USB_CAN_NOT_DETECTED:'USB-CAN not detected', UNKNOWN:'Hardware unknown', NOT_APPLICABLE:'Not applicable',
   };
   const hardwareBadge = (value: HardwareConnection) =>
-    <Badge appearance="tint" color={value==='USB_DETECTED'?'success':value==='USB_NOT_DETECTED'?'warning':'informative'} title={value} data-hardware-connection={value}>{t(hardwareLabels[value])}</Badge>;
+    <Badge appearance="tint" color={value==='USB_DETECTED'||value==='USB_CAN_DETECTED'?'success':value==='USB_NOT_DETECTED'||value==='USB_CAN_NOT_DETECTED'?'warning':'informative'} title={value==='USB_CAN_DETECTED'||value==='USB_CAN_NOT_DETECTED'?t('USB-CAN adapter only; communication with the arm is not verified.'):value} data-hardware-connection={value}>{t(hardwareLabels[value])}</Badge>;
   return <section className="station-device-section" aria-label={t("Inspection orchestration")}>
     <div className="station-section-heading"><div><h2>{t("Devices and services")}</h2><span>{t("Hardware detection, monitored service availability and operational readiness are independent.")}</span></div>
       {current&&<div className="station-device-report-meta"><Badge appearance="tint" color={current.startAllowed?'success':'warning'}>{t(current.startAllowed?"Core permits session start":"Session start blocked")}</Badge><span className="station-report-time">{t("Last report:")} <time dateTime={current.capturedAt}>{current.capturedAt}</time></span></div>}

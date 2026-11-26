@@ -691,5 +691,8 @@
   "USB not detected": "Nie wykryto USB",
   "Hardware unknown": "Nieznane",
   "Not applicable": "Nie dotyczy",
-  "Hardware detection, monitored service availability and operational readiness are independent.": "Wykrycie sprzętu, dostępność monitorowanej usługi i gotowość operacyjna są niezależne."
+  "Hardware detection, monitored service availability and operational readiness are independent.": "Wykrycie sprzętu, dostępność monitorowanej usługi i gotowość operacyjna są niezależne.",
+  "USB-CAN detected": "Wykryto USB–CAN",
+  "USB-CAN not detected": "Nie wykryto USB–CAN",
+  "USB-CAN adapter only; communication with the arm is not verified.": "Stan adaptera USB–CAN; komunikacja z ramieniem nie została zweryfikowana."
 }

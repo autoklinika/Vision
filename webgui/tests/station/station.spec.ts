@@ -524,7 +524,7 @@ test('Fluent system status presents only reported hardware/availability/readines
   const observedAt='2026-11-25T12:00:00Z';
   let devices=[
     {device:'luxonis',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'UNKNOWN',observedAt},
-    {device:'nero',hardwareConnection:'UNKNOWN',availability:'ACTIVE',readiness:'NOT_READY',observedAt},
+    {device:'nero',hardwareConnection:'USB_CAN_DETECTED',availability:'ACTIVE',readiness:'NOT_READY',observedAt},
     {device:'moveit',hardwareConnection:'NOT_APPLICABLE',availability:'INACTIVE',readiness:'UNKNOWN',observedAt},
     {device:'sony',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'READY',observedAt},
   ];
@@ -541,7 +541,7 @@ test('Fluent system status presents only reported hardware/availability/readines
   await expect(table.locator('tbody tr')).toHaveCount(4);
   await expect(table.getByRole('columnheader',{name:'Hardware connection'})).toBeVisible();
   await expect(table.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('USB detected');
-  await expect(table.locator('[data-device="nero"] [data-hardware-connection="UNKNOWN"]')).toHaveText('Hardware unknown');
+  await expect(table.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_DETECTED"]')).toHaveText('USB-CAN detected');
   await expect(table.locator('[data-device="moveit"] [data-hardware-connection="NOT_APPLICABLE"]')).toHaveText('Not applicable');
   await expect(table.locator('[data-device="luxonis"]')).toContainText('Active');
   await expect(table.locator('[data-device="luxonis"]')).toContainText('Unknown');
@@ -551,10 +551,11 @@ test('Fluent system status presents only reported hardware/availability/readines
   await expect(status).toContainText('No approved ECU inspection recipe is available.');
   await expect(status.getByRole('button',{name:'Start inspection session'})).toHaveCount(0);
   const original=await table.elementHandle();
-  devices=devices.map(d=>d.device==='sony'?{...d,readiness:'NOT_READY',hardwareConnection:'USB_NOT_DETECTED'}:d);
+  devices=devices.map(d=>d.device==='sony'?{...d,readiness:'NOT_READY',hardwareConnection:'USB_NOT_DETECTED'}:d.device==='nero'?{...d,hardwareConnection:'USB_CAN_NOT_DETECTED'}:d);
   await page.clock.fastForward(5100);
   await expect(table.locator('[data-device="sony"] [data-reported-state="NOT_READY"]')).toBeVisible();
   await expect(table.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('USB not detected');
+  await expect(table.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_NOT_DETECTED"]')).toHaveText('USB-CAN not detected');
   expect(await table.evaluate((element,previous)=>element===previous,original)).toBe(true);
   await original?.dispose();
   pending=true;
@@ -581,6 +582,7 @@ test('Fluent system status presents only reported hardware/availability/readines
   await expect(translated.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('Wykryto USB');
   await expect(translated.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('Nie wykryto USB');
   await expect(translated.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Niegotowe');
+  await expect(translated.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_NOT_DETECTED"]')).toHaveText('Nie wykryto USB–CAN');
   await expect(status).toContainText('Rozpoczęcie sesji zablokowane');
   await expect(status.getByRole('button',{name:'Przejdź do menedżera inspekcji'})).toBeVisible();
   await page.setViewportSize({width:390,height:844});

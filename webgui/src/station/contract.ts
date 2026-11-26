@@ -45,7 +45,7 @@ export function isStationReport(value: unknown): value is StationReport {
 }
 
 export type DeviceId = 'luxonis' | 'nero' | 'moveit' | 'sony';
-export type HardwareConnection = 'USB_DETECTED' | 'USB_NOT_DETECTED' | 'UNKNOWN' | 'NOT_APPLICABLE';
+export type HardwareConnection = 'USB_DETECTED' | 'USB_NOT_DETECTED' | 'USB_CAN_DETECTED' | 'USB_CAN_NOT_DETECTED' | 'UNKNOWN' | 'NOT_APPLICABLE';
 export type DeviceReport = Readonly<{device: DeviceId; availability: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN'; readiness: 'READY' | 'NOT_READY' | 'UNKNOWN'; observedAt: string; hardwareConnection?: HardwareConnection}>;
 export type InspectionSelection = Readonly<{selectionId: string; family: string; variant: string; revision: string; physicalState: string; recipe: string}>;
 const deviceIds = ['luxonis', 'nero', 'moveit', 'sony'] as const;
@@ -64,6 +64,7 @@ function isDevice(value: unknown, device: DeviceId): value is DeviceReport {
   return (record(value, legacyKeys) || record(value, [...legacyKeys,'hardwareConnection'])) && value.device === device &&
     (!Object.hasOwn(value,'hardwareConnection') || value.hardwareConnection === 'UNKNOWN' ||
       ((device === 'luxonis' || device === 'sony') && (value.hardwareConnection === 'USB_DETECTED' || value.hardwareConnection === 'USB_NOT_DETECTED')) ||
+      (device === 'nero' && (value.hardwareConnection === 'USB_CAN_DETECTED' || value.hardwareConnection === 'USB_CAN_NOT_DETECTED')) ||
       (device === 'moveit' && value.hardwareConnection === 'NOT_APPLICABLE')) &&
     ['ACTIVE','INACTIVE','UNKNOWN'].includes(String(value.availability)) && typeof value.availability === 'string' &&
     ['READY','NOT_READY','UNKNOWN'].includes(String(value.readiness)) && typeof value.readiness === 'string' &&

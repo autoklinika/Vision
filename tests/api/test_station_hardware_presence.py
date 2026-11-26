@@ -1,5 +1,6 @@
 """Synthetic sysfs inventory fixtures; no USB opens or CAN/ROS operations."""
 from pathlib import Path
+import shutil
 import tempfile
 import time
 import unittest
@@ -31,7 +32,7 @@ class HardwarePresenceTests(unittest.TestCase):
                     self.device("1-3", "03e7", oak_pid)
                     self.device("1-4", "054c", sony_pid)
                     self.assertEqual(usb_hardware_connections(self.root), {
-                        "luxonis": "USB_DETECTED", "nero": "UNKNOWN",
+                        "luxonis": "USB_DETECTED", "nero": "USB_CAN_DETECTED",
                         "moveit": "NOT_APPLICABLE", "sony": "USB_DETECTED",
                     })
 
@@ -39,9 +40,21 @@ class HardwarePresenceTests(unittest.TestCase):
         self.device("1-3", "054c", "9999")
         self.device("1-4", "03e7", "9999")
         self.assertEqual(usb_hardware_connections(self.root), {
-            "luxonis": "USB_NOT_DETECTED", "nero": "UNKNOWN",
+            "luxonis": "USB_NOT_DETECTED", "nero": "USB_CAN_DETECTED",
             "moveit": "NOT_APPLICABLE", "sony": "USB_NOT_DETECTED",
         })
+
+    def test_usb_can_adapter_absence_and_reappearance(self):
+        self.assertEqual(usb_hardware_connections(self.root)["nero"], "USB_CAN_DETECTED")
+        shutil.rmtree(self.root / "1-2")
+        self.assertEqual(usb_hardware_connections(self.root)["nero"], "USB_CAN_NOT_DETECTED")
+        # An unrelated USB device is not the configured adapter.
+        self.device("1-2", "1d50", "9999")
+        self.assertEqual(usb_hardware_connections(self.root)["nero"], "USB_CAN_NOT_DETECTED")
+        (self.root / "1-2" / "idProduct").unlink()
+        self.assertEqual(usb_hardware_connections(self.root)["nero"], "UNKNOWN")
+        self.device("1-2", "1d50", "606f")
+        self.assertEqual(usb_hardware_connections(self.root)["nero"], "USB_CAN_DETECTED")
 
     def test_partial_inventory_cannot_prove_absence(self):
         self.device("1-3", "03e7", "2485")
@@ -61,7 +74,7 @@ class HardwarePresenceTests(unittest.TestCase):
                 })
 
     def test_hardware_metadata_never_authorizes_inspection(self):
-        states = {"luxonis":"USB_DETECTED", "nero":"UNKNOWN",
+        states = {"luxonis":"USB_DETECTED", "nero":"USB_CAN_DETECTED",
                   "moveit":"NOT_APPLICABLE", "sony":"USB_NOT_DETECTED"}
         host = CoreHost(self.root / "isolated-library", diagnostics=lambda: tuple(
             DeviceStatus(d, "ACTIVE", "UNKNOWN", time.time(), states[d]) for d in DEVICES))
@@ -74,6 +87,9 @@ class HardwarePresenceTests(unittest.TestCase):
         self.assertTrue(validate_inspection_report(report))
         report["devices"][1]["hardwareConnection"] = "USB_DETECTED"
         self.assertFalse(validate_inspection_report(report))
-        report["devices"][1]["hardwareConnection"] = "UNKNOWN"
+        report["devices"][1]["hardwareConnection"] = "USB_CAN_NOT_DETECTED"
+        self.assertTrue(validate_inspection_report(report))
+        report["devices"][0]["hardwareConnection"] = "USB_CAN_DETECTED"
+        self.assertFalse(validate_inspection_report(report))
         report["devices"][0]["hardwareConnection"] = "READY"
         self.assertFalse(validate_inspection_report(report))

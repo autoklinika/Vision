@@ -8,6 +8,8 @@ from types import MappingProxyType
 # Sony PC Remote/storage IDs confirmed in docs/hardware/SONY_A6100_VERIFICATION_2026-10-10.md
 # and docs/architecture/ADR_SONY_STAGED_ACQUISITION_2026-10-13.md.
 USB_IDS = MappingProxyType({
+    # Station USB-CAN adapter (candleLight), not the NERO arm itself.
+    "nero": frozenset({("1d50", "606f")}),
     "luxonis": frozenset({("03e7", "2485"), ("03e7", "f63b"), ("03e7", "f63c")}),
     "sony": frozenset({("054c", "0f0d"), ("054c", "0f0b")}),
 })
@@ -19,6 +21,8 @@ def valid_hardware_connection(device, value):
     """Only the explicitly supported observation classes; no readiness claim."""
     if value == "UNKNOWN":
         return True
+    if device == "nero":
+        return value in ("USB_CAN_DETECTED", "USB_CAN_NOT_DETECTED")
     if device in USB_IDS:
         return value in ("USB_DETECTED", "USB_NOT_DETECTED")
     return device == "moveit" and value == "NOT_APPLICABLE"
@@ -29,7 +33,8 @@ def usb_hardware_connections(root=Path("/sys/bus/usb/devices")):
 
     A complete readable USB inventory with a root hub is needed for a negative
     observation. A partial/racing/unavailable inventory cannot prove absence.
-    An enumerated CAN adapter does not identify the NERO arm behind it.
+    The NERO observation identifies only the installed USB-CAN adapter,
+    never the arm, CAN bus state, or motion readiness.
     """
     result = {"luxonis": "UNKNOWN", "nero": "UNKNOWN",
               "moveit": "NOT_APPLICABLE", "sony": "UNKNOWN"}
@@ -53,9 +58,9 @@ def usb_hardware_connections(root=Path("/sys/bus/usb/devices")):
                 complete = False
         for device, ids in USB_IDS.items():
             if pairs & ids:
-                result[device] = "USB_DETECTED"
+                result[device] = "USB_CAN_DETECTED" if device == "nero" else "USB_DETECTED"
             elif complete and root_hub_seen:
-                result[device] = "USB_NOT_DETECTED"
+                result[device] = "USB_CAN_NOT_DETECTED" if device == "nero" else "USB_NOT_DETECTED"
     except OSError:
         pass
     return result
