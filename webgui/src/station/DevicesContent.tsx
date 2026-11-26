@@ -3,7 +3,7 @@ import {VideoRegular,PlayRegular,StopRegular,ImageRegular} from '@fluentui/react
 import {useEffect,useRef,useState} from 'react';
 import type {StationPresentation} from './client';
 import {readLuxonis,setLuxonisIR} from './transport';
-import {parameterGroups,level} from './luxonisContract';
+import {parameterGroups,level,PREVIEW_LIVE_AGE,PREVIEW_MAX_AGE} from './luxonisContract';
 import type {LuxonisReport,PreviewFrame,IRResult,IRChannel} from './luxonisContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 
@@ -54,9 +54,15 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
           }else if(result.report.capturedAt<lastCaptured){
             setSample(null);setFailure(true);
           } // A replayed identical observation never resets display age.
-        }else{setSample(null);setFailure(true);}
-      }catch{if(!cancelled){setSample(null);setFailure(true);}}
-      if(!cancelled)timer=setTimeout(()=>{void poll();},viewing?750:2000);
+        }else{
+          // Only a transport outage may retain the last diagnostic image,
+          // explicitly marked delayed and bounded by its original timestamp.
+          // Authorization loss or owner mismatch clears everything immediately.
+          if(result.status!=='UNAVAILABLE')setSample(null);
+          setFailure(true);
+        }
+      }catch{if(!cancelled)setFailure(true);}
+      if(!cancelled)timer=setTimeout(()=>{void poll();},viewing?500:2000);
     }
     void poll();
     return()=>{cancelled=true;clearTimeout(timer);clearInterval(clock);};
@@ -64,23 +70,25 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
   const current=enabled&&sample?.owner===owner&&Math.max(0,tick-sample.received)<=4500?sample:null;
   const report=current?.report;
   const elapsed=current?Math.max(0,tick-current.received)/1000:Infinity;
+  const frameAge=(f:PreviewFrame)=>report?elapsed+report.capturedAt-f.stamp:Infinity;
   const liveFrame=(key:'rgb'|'depth'):PreviewFrame|null=>{
     const f=report?.frames[key];
-    return viewing&&f&&report&&badFrames[key]!==f.stamp&&elapsed+report.capturedAt-f.stamp<=2.5?f:null;
+    return viewing&&f&&report&&badFrames[key]!==f.stamp&&frameAge(f)<=PREVIEW_MAX_AGE?f:null;
   };
   const frameRgb=liveFrame('rgb'),frameDepth=liveFrame('depth');
-  const available=report?.hardwareConnection==='USB_DETECTED';
-  const graph=report?.graph??'UNKNOWN';
+  const statusReport=failure?undefined:report;
+  const available=statusReport?.hardwareConnection==='USB_DETECTED';
+  const graph=statusReport?.graph??'UNKNOWN';
   const source=selected==='live'||(selected&&report?.profiles[selected])?selected:
     graph==='ACTIVE'?'live':report?.profiles.rgbd_lab?'rgbd_lab':report?.profiles.stereo800_lab?'stereo800_lab':'live';
-  const data=source==='live'?(report?.settingsAt!==null&&report?.settingsAt!==undefined&&elapsed+report.capturedAt-report.settingsAt<=8?report.settings:{}):report?.profiles[source]??{};
-  const liveSettings=report?.settingsAt!==null&&report?.settingsAt!==undefined&&elapsed+report.capturedAt-report.settingsAt<=8?report.settings:{};
-  const newerReply=report?.irControlAvailable&&irReply?.owner===owner&&
+  const data=source==='live'?(!failure&&report?.settingsAt!==null&&report?.settingsAt!==undefined&&elapsed+report.capturedAt-report.settingsAt<=8?report.settings:{}):report?.profiles[source]??{};
+  const liveSettings=!failure&&report?.settingsAt!==null&&report?.settingsAt!==undefined&&elapsed+report.capturedAt-report.settingsAt<=8?report.settings:{};
+  const newerReply=!failure&&report?.irControlAvailable&&irReply?.owner===owner&&
     tick-irReply.received<=8000&&irReply.report.capturedAt>(report.settingsAt??0)?irReply.report:null;
   const dot=newerReply?.dot??liveSettings['driver.r_laser_dot_intensity'];
   const flood=newerReply?.flood??liveSettings['driver.r_floodlight_intensity'];
   const known=liveSettings['driver.i_enable_ir']===true&&level(dot)&&level(flood);
-  const canIR=permitted&&report?.irControlAvailable===true&&known&&!irBusy;
+  const canIR=permitted&&report?.irControlAvailable===true&&known&&!irBusy&&!failure;
   async function toggleIR(channel:IRChannel,value:boolean){
     if(!canIR||irRunning.current)return;
     irRunning.current=true;setIrBusy(true);setIrMessage('');
@@ -97,12 +105,13 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
     finally{irRunning.current=false;setIrBusy(false);}
   }
   const irLevel=(value:unknown)=>known&&level(value)?Math.round(value*100)+'%':'—';
-  const describe=(stream:'rgb'|'depth')=>t(report?.endpoints[stream]==='AVAILABLE'?'Topic available':report?.endpoints[stream]==='UNAVAILABLE'?'Topic unavailable':report?.endpoints[stream]==='AMBIGUOUS'?'Ambiguous source':'Unknown');
+  const describe=(stream:'rgb'|'depth')=>t(statusReport?.endpoints[stream]==='AVAILABLE'?'Topic available':statusReport?.endpoints[stream]==='UNAVAILABLE'?'Topic unavailable':statusReport?.endpoints[stream]==='AMBIGUOUS'?'Ambiguous source':'Unknown');
   const badgeColor=(v:boolean)=>v?'success':'informative';
   const renderPreview=(key:'rgb'|'depth',frame:PreviewFrame|null)=>{
     const label=key==='rgb'?'RGB preview':'Depth preview';
+    const delayed=frame!==null&&(failure||frameAge(frame)>PREVIEW_LIVE_AGE);
     return <section className="luxonis-preview-card" aria-label={t(label)}>
-      <div className="luxonis-preview-heading"><h3>{t(label)}</h3><Badge appearance="tint" color={frame?'success':'informative'}>{t(frame?'Live frame':!viewing?'Preview paused':'No fresh frame')}</Badge></div>
+      <div className="luxonis-preview-heading"><h3>{t(label)}</h3><Badge appearance="tint" color={delayed?'warning':frame?'success':'informative'}>{t(frame?(delayed?'Delayed frame':'Live frame'):!viewing?'Preview paused':'No fresh frame')}</Badge></div>
       <div className="luxonis-image-viewport">
         {frame?<img src={'data:image/jpeg;base64,'+frame.jpeg} alt={t(label)} onError={()=>setBadFrames(old=>({...old,[key]:frame.stamp}))}/>:<div className="luxonis-empty-frame"><ImageRegular fontSize={36}/><span>{t(!viewing?'Enable preview to view images':graph==='NO_NODE'?'ROS 2 camera node not detected':graph==='AMBIGUOUS'?'Ambiguous camera sources':'Waiting for current image')}</span></div>}
       </div>
@@ -114,12 +123,12 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
     <div className="luxonis-device-header"><div className="luxonis-device-title"><span aria-hidden="true" className="luxonis-device-icon"><VideoRegular fontSize={26}/></span><div><h2>Luxonis OAK-D Pro AF</h2><p>DepthAI ROS v3 · RGB-D</p></div></div>
     </div>
     <div className="luxonis-facts" aria-label={t('Device availability')}>
-      <div><span>{t('Hardware connection')}</span><Badge appearance="tint" color={badgeColor(available)}>{t(available?'USB detected':report?.hardwareConnection==='USB_NOT_DETECTED'?'USB not detected':'Hardware unknown')}</Badge></div>
-      <div><span>{t('ROS 2 camera node')}</span><Badge appearance="tint" color={graph==='ACTIVE'?'success':graph==='NO_NODE'||graph==='AMBIGUOUS'?'warning':'informative'}>{t(graph==='ACTIVE'?'Detected':graph==='NO_NODE'?'Not detected':graph==='AMBIGUOUS'?'Ambiguous source':'Unknown')}</Badge>{report?.node&&<small>{report.node.name} · ROS {report.node.domain}</small>}</div>
-      <div><span>RGB</span><Badge appearance="tint" color={badgeColor(report?.endpoints.rgb==='AVAILABLE')}>{describe('rgb')}</Badge></div>
-      <div><span>Depth</span><Badge appearance="tint" color={badgeColor(report?.endpoints.depth==='AVAILABLE')}>{describe('depth')}</Badge></div>
+      <div><span>{t('Hardware connection')}</span><Badge appearance="tint" color={badgeColor(available)}>{t(available?'USB detected':statusReport?.hardwareConnection==='USB_NOT_DETECTED'?'USB not detected':'Hardware unknown')}</Badge></div>
+      <div><span>{t('ROS 2 camera node')}</span><Badge appearance="tint" color={graph==='ACTIVE'?'success':graph==='NO_NODE'||graph==='AMBIGUOUS'?'warning':'informative'}>{t(graph==='ACTIVE'?'Detected':graph==='NO_NODE'?'Not detected':graph==='AMBIGUOUS'?'Ambiguous source':'Unknown')}</Badge>{statusReport?.node&&<small>{statusReport.node.name} · ROS {statusReport.node.domain}</small>}</div>
+      <div><span>RGB</span><Badge appearance="tint" color={badgeColor(statusReport?.endpoints.rgb==='AVAILABLE')}>{describe('rgb')}</Badge></div>
+      <div><span>Depth</span><Badge appearance="tint" color={badgeColor(statusReport?.endpoints.depth==='AVAILABLE')}>{describe('depth')}</Badge></div>
     </div>
-    {(!report||report.observer==='UNAVAILABLE')&&<MessageBar intent="warning"><MessageBarBody>{t(failure?'Device report unavailable.':'No current Luxonis observer report.')}</MessageBarBody></MessageBar>}
+    {(failure||!report||report.observer==='UNAVAILABLE')&&<MessageBar intent="warning"><MessageBarBody>{t(failure?'Device report unavailable.':'No current Luxonis observer report.')}</MessageBarBody></MessageBar>}
     {graph==='NO_NODE'&&<MessageBar intent="info"><MessageBarBody>{t('The camera node is not running in the monitored ROS domains. Saved settings are not active parameters.')}</MessageBarBody></MessageBar>}
     {graph==='AMBIGUOUS'&&<MessageBar intent="warning"><MessageBarBody>{t('Multiple camera sources detected. Live settings and preview are withheld.')}</MessageBarBody></MessageBar>}
     <section className="luxonis-ir-card" aria-label={t('IR illumination')}>
@@ -132,7 +141,7 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
     </section>
     <section className="luxonis-preview-section" aria-label={t('Live preview')}>
       <div className="luxonis-section-heading"><div><h2>{t('Live preview')}</h2><p>{t('Read-only preview of existing ROS 2 streams.')}</p></div>
-        <Button appearance={viewing?'secondary':'primary'} icon={viewing?<StopRegular/>:<PlayRegular/>} disabled={!permitted||report?.observer!=='ACTIVE'||report.previewAllowed===false} onClick={()=>{setPreview(!viewing);setSample(old=>old?{...old,report:{...old.report,frames:{rgb:null,depth:null}}}:null);}}>{t(viewing?'Stop preview':'Enable preview')}</Button>
+        <Button appearance={viewing?'secondary':'primary'} icon={viewing?<StopRegular/>:<PlayRegular/>} disabled={!permitted||(!viewing&&(failure||report?.observer!=='ACTIVE'||report.previewAllowed===false))} onClick={()=>{setPreview(!viewing);setSample(old=>old?{...old,report:{...old.report,frames:{rgb:null,depth:null}}}:null);}}>{t(viewing?'Stop preview':'Enable preview')}</Button>
       </div>
       {!permitted&&enabled&&<p className="fine-print">{t('Preview requires an operator and an idle station.')}</p>}
       <div className="luxonis-preview-grid">{renderPreview('rgb',frameRgb)}{renderPreview('depth',frameDepth)}</div>

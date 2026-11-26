@@ -30,8 +30,13 @@ placeholders. The LAB shell is unchanged. This is not an inspection workflow.
   The first target is a low-rate diagnostic preview, not full-rate video.
 - The observer has no image subscriptions without a short viewer lease.
   A preview request renews a four-second lease in a private volatile directory.
-  Image subscriptions are released after samples and after lease expiry. The
-  browser only polls while Luxonis is selected, visible, authenticated and
+  Image subscriptions remain matched during the viewer lease, with depth-one
+  history and reliability matched to the publisher (RELIABLE for the installed
+  high-resolution ROS driver). JPEG encoding is limited to one successful
+  sample per 0.4 seconds per stream; malformed samples do not replace a valid
+  frame or extend its timestamp. Readers are released on lease expiry, source
+  change, ambiguity or shutdown. This avoids discovery churn during live view.
+  The browser only polls while Luxonis is selected, visible, authenticated and
   explicitly enabled by an operator on an idle Core. This does not authorize
   inspection or change physical device state. Preview is withheld during an
   active session in that Core. The independent DEV Core does not govern PROD
@@ -40,8 +45,12 @@ placeholders. The LAB shell is unchanged. This is not an inspection workflow.
   directory, owner-only 0600 files. It is never an image archive, repository
   artifact, inspection evidence or durable capture. Core validates the closed
   schema, parameter names, source, size and freshness; unavailable/stale data
-  are not presented as live. Images expire after 2.5 seconds, parameter reads
-  after 8 seconds and observer observations after 4 seconds.
+  are not presented as live. The browser polls at 0.5 s intervals when
+  viewing. Diagnostic images older than 2.5 seconds are explicitly marked
+  delayed; after 4 seconds they are removed entirely. A transient transport
+  failure may retain only that bounded last image with a warning and no
+  live IR controls. Authorization or source changes clear images. Parameter
+  reads expire after 8 seconds and observer observations after 4 seconds.
 
 ## API and deployment
 

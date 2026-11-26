@@ -741,8 +741,9 @@ test('Devices Luxonis distinguishes saved settings and current frames, and stops
   await expect(panel.getByRole('table',{name:'RGB camera'})).toContainText('15');
   await expect(panel).toContainText('/oak · ROS 186');
   fail=true;
-  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
   await expect(panel).toContainText('Device report unavailable.');
+  await expect(panel.getByText('Delayed frame',{exact:true}).first()).toBeVisible();
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0,{timeout:6000});
   fail=false;
   await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(2);
   await page.getByRole('tab',{name:'System Status',exact:true}).click();

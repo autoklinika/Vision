@@ -12,6 +12,8 @@ it('validates live observations and rejects stale, mixed and private settings',(
  expect(isLuxonisReport({...r,settings:{serial:'private'}})).toBe(false);
  expect(isLuxonisReport({...r,settingsAt:90})).toBe(false);
  expect(isLuxonisReport({...r,previewAllowed:false})).toBe(false);
+ expect(isLuxonisReport({...r,frames:{...r.frames,rgb:{...r.frames.rgb,stamp:96.1}}})).toBe(true);
+ expect(isLuxonisReport({...r,frames:{...r.frames,rgb:{...r.frames.rgb,stamp:95.9}}})).toBe(false);
  expect(isLuxonisReport({...r,frames:{...r.frames,rgb:{...r.frames.rgb,stamp:90}}})).toBe(false);
  expect(isLuxonisReport({...r,frames:{...r.frames,rgb:{...r.frames.rgb,jpeg:'bad'}}})).toBe(false);
 });

@@ -35,6 +35,8 @@ export type LuxonisReport=Readonly<{
   endpoints:{rgb:Endpoint;depth:Endpoint};settings:Settings;settingsAt:number|null;
   profiles:Partial<Record<'rgbd_lab'|'stereo800_lab',Settings>>;frames:{rgb:PreviewFrame|null;depth:PreviewFrame|null};previewAllowed:boolean;irControlAvailable?:boolean;
 }>;
+export const PREVIEW_LIVE_AGE=2.5;
+export const PREVIEW_MAX_AGE=4;
 type Endpoint='UNKNOWN'|'AVAILABLE'|'UNAVAILABLE'|'AMBIGUOUS';
 const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const number=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value);
@@ -46,7 +48,7 @@ function settings(v:unknown):v is Settings{
 function frame(v:unknown,stream:string,now:number):v is PreviewFrame|null{
   if(v===null)return true;
   if(!record(v,['stamp','sourceWidth','sourceHeight','encoding','width','height','jpeg'])||
-    !fresh(v.stamp,now,2.5)||!((stream==='rgb'?['rgb8','bgr8']:['16UC1','32FC1']).includes(String(v.encoding))))return false;
+    !fresh(v.stamp,now,PREVIEW_MAX_AGE)||!((stream==='rgb'?['rgb8','bgr8']:['16UC1','32FC1']).includes(String(v.encoding))))return false;
   const dims=[v.width,v.height,v.sourceWidth,v.sourceHeight];
   if(!dims.every(x=>typeof x==='number'&&Number.isSafeInteger(x)&&x>=1&&x<=4096))return false;
   if(Number(v.width)>Math.min(640,Number(v.sourceWidth))||Number(v.height)>Math.min(480,Number(v.sourceHeight)))return false;

@@ -29,7 +29,7 @@ class SyntheticObserverTest(unittest.TestCase):
         from rclpy.executors import SingleThreadedExecutor
         from rclpy.signals import SignalHandlerOptions
         from sensor_msgs.msg import Image
-        from rclpy.qos import qos_profile_sensor_data
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
         domain=219
         context=Context()
         rclpy.init(args=[],context=context,domain_id=domain,signal_handler_options=SignalHandlerOptions.NO)
@@ -46,16 +46,13 @@ class SyntheticObserverTest(unittest.TestCase):
             driver.declare_parameter("rgb.i_fps",15.0)
             driver.declare_parameter("rgb.r_set_man_focus",False)
             driver.declare_parameter("driver.i_enable_ir",False)
-            pub={s:driver.create_publisher(Image,"/oak/"+("rgb" if s=="rgb" else "stereo")+"/image_raw",qos_profile_sensor_data)
+            pub={s:driver.create_publisher(Image,"/oak/"+("rgb" if s=="rgb" else "stereo")+"/image_raw",(QoSProfile(depth=1,reliability=ReliabilityPolicy.RELIABLE) if s=="rgb" else qos_profile_sensor_data))
                  for s in ("rgb","depth")}
             with tempfile.TemporaryDirectory() as directory:
                 root=Path(directory)
                 o=Observer(root,{},domains=[domain])
                 try:
-                    end=time.monotonic()+12
-                    result=None
-                    while time.monotonic()<end:
-                        executor.spin_once(timeout_sec=.02)
+                    def publish(*, invalid_depth=False):
                         atomic_json(root/"viewer.json",{"requestedAt":time.time()},256)
                         for stream,p in pub.items():
                             msg=Image()
@@ -65,7 +62,14 @@ class SyntheticObserverTest(unittest.TestCase):
                             msg.encoding="bgr8" if stream=="rgb" else "16UC1"
                             msg.step=32*(3 if stream=="rgb" else 2)
                             msg.data=bytes([30,90,180])*768 if stream=="rgb" else bytes([0x20,0x03])*768
+                            if stream=="depth" and invalid_depth:
+                                msg.data=b""
                             p.publish(msg)
+                    end=time.monotonic()+12
+                    result=None
+                    while time.monotonic()<end:
+                        executor.spin_once(timeout_sec=.02)
+                        publish()
                         result=o.step(bindings=((domain,"/oak"),))
                         if all(result["frames"].values()) and result["settings"].get("rgb.i_fps")==15.0:break
                         time.sleep(.04)
@@ -73,6 +77,32 @@ class SyntheticObserverTest(unittest.TestCase):
                     self.assertEqual(result["settings"].get("rgb.i_fps"),15.0)
                     self.assertTrue(all(result["frames"].values()),result["endpoints"])
                     self.assertEqual(result["frames"]["depth"]["encoding"],"16UC1")
+                    readers=dict(o.subs)
+                    self.assertEqual(set(readers),{"rgb","depth"})
+                    self.assertEqual(readers["rgb"].qos_profile.reliability,ReliabilityPolicy.RELIABLE)
+                    self.assertEqual(readers["depth"].qos_profile.reliability,ReliabilityPolicy.BEST_EFFORT)
+                    stamps={k:v["stamp"] for k,v in result["frames"].items()}
+                    end=time.monotonic()+2.0
+                    while time.monotonic()<end:
+                        executor.spin_once(timeout_sec=.01)
+                        publish()
+                        result=o.step(bindings=((domain,"/oak"),))
+                        self.assertTrue(all(result["frames"].values()))
+                        self.assertEqual(o.subs,readers)
+                        time.sleep(.03)
+                    for k in stamps:
+                        self.assertGreater(result["frames"][k]["stamp"],stamps[k])
+                    old_depth=result["frames"]["depth"]["stamp"]
+                    # Invalid messages must not erase a still-fresh frame.
+                    # A pending good sample may arrive first; track it once.
+                    end=time.monotonic()+.9
+                    while time.monotonic()<end:
+                        publish(invalid_depth=True)
+                        result=o.step(bindings=((domain,"/oak"),))
+                        self.assertIsNotNone(result["frames"]["depth"])
+                        self.assertGreaterEqual(result["frames"]["depth"]["stamp"],old_depth)
+                        self.assertEqual(o.subs,readers)
+                        time.sleep(.03)
                     (root/"viewer.json").unlink()
                     stopped=o.step(bindings=((domain,"/oak"),))
                     self.assertEqual(stopped["frames"],{"rgb":None,"depth":None})

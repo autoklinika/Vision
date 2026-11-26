@@ -903,5 +903,6 @@
   "IR change rejected by Core.": "Core odrzucił zmianę IR.",
   "IR change not confirmed. Check current values before retrying.": "Nie potwierdzono zmiany IR. Sprawdź aktualne wartości przed ponowieniem.",
   "IR control requires the standalone camera, fresh parameters and an idle operator session.": "Sterowanie IR wymaga samodzielnej kamery, aktualnych parametrów i bezczynnego stanowiska z kontem operatora.",
-  "Read-only parameter overview. Use IR controls above to change illumination.": "Podgląd parametrów tylko do odczytu. Oświetlenie zmieniaj przełącznikami IR powyżej."
+  "Read-only parameter overview. Use IR controls above to change illumination.": "Podgląd parametrów tylko do odczytu. Oświetlenie zmieniaj przełącznikami IR powyżej.",
+  "Delayed frame": "Opóźniona klatka"
 }

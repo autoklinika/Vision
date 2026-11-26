@@ -18,6 +18,8 @@ from .readiness import header_stamp
 from vision_runtime.ros2_messages import image_layout
 
 DEPTH_LIMIT_MM=2000
+PREVIEW_INTERVAL=0.4
+PREVIEW_RETRY_INTERVAL=0.1
 
 
 def preview_image(message, stream, now):
@@ -115,6 +117,28 @@ def endpoint(node,topic,expected):
     return "AVAILABLE",tuple(item.endpoint_gid)
 
 
+def preview_qos(node, topic, expected, gid):
+    """Match the actual publisher; never require reliable from a BE source.
+
+    Large raw frames from the installed Fast DDS reliable publisher suffered
+    fragmentation losses with a best-effort reader. Keep history bounded at
+    one frame and use the offered reliability when available.
+    """
+    from rclpy.qos import QoSProfile, ReliabilityPolicy
+    rows=node.get_publishers_info_by_topic(topic)
+    if len(rows)!=1:
+        return None
+    row=rows[0]
+    name=row.node_namespace.rstrip("/")+"/"+row.node_name
+    if (name!=expected or row.topic_type!="sensor_msgs/msg/Image"
+            or tuple(row.endpoint_gid)!=gid):
+        return None
+    reliability=(ReliabilityPolicy.RELIABLE
+                 if row.qos_profile.reliability==ReliabilityPolicy.RELIABLE
+                 else ReliabilityPolicy.BEST_EFFORT)
+    return QoSProfile(depth=1,reliability=reliability)
+
+
 class Observer:
     """One local node/executor per allowed domain; no cross-domain data mixing."""
     def __init__(self, directory, profiles, domains=None):
@@ -169,7 +193,6 @@ class Observer:
 
     def step(self, bindings=BINDINGS):
         from rcl_interfaces.srv import GetParameters,ListParameters
-        from rclpy.qos import QoSProfile, ReliabilityPolicy
         from sensor_msgs.msg import Image
         for _context,_node,executor in self.domains.values():
             executor.spin_once(timeout_sec=0.02)
@@ -239,31 +262,41 @@ class Observer:
                 self.frames[key]=None
                 self.next_sample[key]=0.
             self.endpoints[key]=gid
-            if interested and gid is not None and key not in self.subs and time.monotonic()>=self.next_sample[key]:
-                def bind(stream,expected_gid,expected_topic,expected_node):
-                    def receive(message,info):
-                        # Read one actual source frame per bounded sample,
-                        # rejecting wrong endpoints and stale header stamps.
-                        # The installed Jazzy rclpy MessageInfo omits publisher_gid.
-                        # Re-check the exact unique graph endpoint in that case;
-                        # this is diagnostic provenance, not DDS authentication.
-                        received_gid=info.get("publisher_gid")
-                        if received_gid is not None and tuple(received_gid)!=expected_gid:
-                            return
-                        if endpoint(node,expected_topic,expected_node)!=("AVAILABLE",expected_gid):
-                            return
-                        if self.frames[stream] is not None and self.frames[stream]["stamp"]>= (header_stamp(message) or 0):
-                            return
-                        if lease_active(self.directory,time.time()):
-                            self.frames[stream]=preview_image(message,stream,time.time())
-                            self.next_sample[stream]=time.monotonic()+0.7
-                    return receive
-                self.subs[key]=node.create_subscription(Image,topic,bind(key,gid,topic,name),
-                    QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT))
-            # Release the image subscriber after a sample so we do not sustain
-            # an unnecessary extra full-rate RGB-D consumer.
-            if key in self.subs and self.next_sample[key]>time.monotonic():
-                node.destroy_subscription(self.subs.pop(key))
+            if interested and gid is not None and key not in self.subs:
+                qos=preview_qos(node,topic,name,gid)
+                if qos is not None:
+                    def bind(stream,expected_gid,expected_topic,expected_node):
+                        def receive(message,info):
+                            # Keep one DDS reader for the viewer lease. Throttle
+                            # JPEG work, not the DDS discovery/handshake.
+                            monotonic=time.monotonic()
+                            if monotonic<self.next_sample[stream]:
+                                return
+                            received_gid=info.get("publisher_gid")
+                            if received_gid is not None and tuple(received_gid)!=expected_gid:
+                                return
+                            if endpoint(node,expected_topic,expected_node)!=("AVAILABLE",expected_gid):
+                                return
+                            stamp=header_stamp(message)
+                            if self.frames[stream] is not None and self.frames[stream]["stamp"]>=(stamp or 0):
+                                return
+                            observed=time.time()
+                            if not lease_active(self.directory,observed):
+                                return
+                            frame=preview_image(message,stream,observed)
+                            if frame is None:
+                                # A bad sample is not a disconnect. Keep the
+                                # previous valid frame only until its original
+                                # timestamp expires; never renew its freshness.
+                                self.next_sample[stream]=monotonic+PREVIEW_RETRY_INTERVAL
+                                return
+                            self.frames[stream]=frame
+                            self.next_sample[stream]=monotonic+PREVIEW_INTERVAL
+                        return receive
+                    self.subs[key]=node.create_subscription(Image,topic,bind(key,gid,topic,name),qos)
+            # Release only on loss of interest, endpoint change or shutdown.
+            # Recreating the reader for every sample causes discovery churn
+            # and missed fragments, especially at 1080p.
             frame=self.frames[key]
             if interested and state=="AVAILABLE" and frame and fresh(frame["stamp"],now,FRAME_AGE):
                 result["frames"][key]=frame

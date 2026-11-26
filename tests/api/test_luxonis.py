@@ -86,6 +86,8 @@ class PreviewTests(unittest.TestCase):
             clock[0]+=3
             r=m.report("a"*32)
             self.assertEqual(r["graph"],"ACTIVE")
+            self.assertIsNotNone(m.report("a"*32,preview=True)["frames"]["rgb"])
+            clock[0]+=.6
             self.assertIsNone(m.report("a"*32,preview=True)["frames"]["rgb"])
             clock[0]+=5
             r=m.report("a"*32)
