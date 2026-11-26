@@ -28,7 +28,8 @@ class ServiceDiagnosticsTests(unittest.TestCase):
             self.assertFalse(run.call_args.kwargs.get("shell", False))
             self.assertEqual(run.call_args.kwargs["timeout"], 0.65)
         self.assertEqual(tuple(item.device for item in report), DEVICES)
-        self.assertTrue(all(item.readiness == "UNKNOWN" for item in report))
+        self.assertTrue(all(item.readiness == ("NOT_READY" if item.availability == "INACTIVE" else "UNKNOWN") for item in report))
+        self.assertTrue(all(item.readiness_reason is not None for item in report))
         return {item.device: item.availability for item in report}
 
     def test_current_guard_active_and_scene_services_stopped(self):

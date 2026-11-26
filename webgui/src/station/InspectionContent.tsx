@@ -2,7 +2,7 @@ import { useTranslation } from '../i18n/LanguageProvider';
 import { Badge, Button, Label, MessageBar, MessageBarBody, MessageBarTitle, Select, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow } from '@fluentui/react-components';
 import { useEffect, useRef, useState } from 'react';
 import type { StationPresentation } from './client';
-import type { DeviceReport, HardwareConnection, InspectionBlocker, InspectionReport } from './contract';
+import type { DeviceReport, HardwareConnection, ReadinessReason, InspectionBlocker, InspectionReport } from './contract';
 import { readInspection, startInspection, closeInspection } from './transport';
 
 const blockerText: Record<InspectionBlocker, string> = {
@@ -79,6 +79,17 @@ export function InspectionContent({station}: {station: StationPresentation}) {
   const labels = {ACTIVE:'Active',INACTIVE:'Inactive',READY:'Ready',NOT_READY:'Not ready',UNKNOWN:'Unknown'} as const;
   const statusBadge = (value: DeviceReport['availability'] | DeviceReport['readiness']) =>
     <Badge appearance="tint" color={value==='ACTIVE'||value==='READY'?'success':value==='NOT_READY'||value==='INACTIVE'?'warning':'informative'} title={value} data-reported-state={value}>{t(labels[value])}</Badge>;
+  const readinessLabels: Record<ReadinessReason,string> = {
+    SERVICE_INACTIVE:'Service stopped', SERVICE_UNKNOWN:'Service state unverified',
+    USB_MISSING:'Expected USB device not detected', OBSERVER_UNAVAILABLE:'No fresh diagnostic report',
+    AMBIGUOUS_SCENE:'Conflicting scene services', JOINT_FEEDBACK_UNVERIFIED:'No verified fresh J1–J7 feedback',
+    ARM_STATUS_UNVERIFIED:'Arm status unverified', ARM_BRAKE_NOT_RELEASED:'Joint brakes not released',
+    ARM_FAULT:'Arm reports a fault', MOTOR_STATUS_UNVERIFIED:'Motor status unverified',
+    MOTORS_NOT_ENABLED:'Motors not enabled', NERO_TELEMETRY_OK:'Joint, arm and motor reports OK',
+    RGBD_UNVERIFIED:'Fresh RGB/depth not verified', RGBD_STREAMS_OK:'Fresh RGB and depth received',
+    SCENE_UNVERIFIED:'Current planning scene unverified', ROBOT_TF_UNVERIFIED:'Current robot TF unverified',
+    PLANNING_DATA_OK:'Current scene and robot TF received', SONY_UNVERIFIED:'Acquisition diagnostics not connected',
+  };
   const hardwareLabels: Record<HardwareConnection,string> = {
     USB_DETECTED:'USB detected', USB_NOT_DETECTED:'USB not detected',
     USB_CAN_DETECTED:'USB-CAN detected', USB_CAN_NOT_DETECTED:'USB-CAN not detected', UNKNOWN:'Hardware unknown', NOT_APPLICABLE:'Not applicable',
@@ -97,11 +108,12 @@ export function InspectionContent({station}: {station: StationPresentation}) {
             <TableCell className="station-device-name">{t(deviceLabel[d.device])}</TableCell>
             <TableCell>{hardwareBadge(d.hardwareConnection??'UNKNOWN')}</TableCell>
             <TableCell>{statusBadge(d.availability)}</TableCell>
-            <TableCell>{statusBadge(d.readiness)}</TableCell>
+            <TableCell>{statusBadge(d.readiness)}{d.readinessReason&&<small className="station-readiness-reason" data-readiness-reason={d.readinessReason}>{t(readinessLabels[d.readinessReason])}</small>}</TableCell>
             <TableCell><time dateTime={d.observedAt}>{d.observedAt}</time></TableCell>
           </TableRow>)}</TableBody>
         </Table>
       </div>
+      <p className="fine-print">{t("Diagnostic readiness is not permission for motion or inspection.")}</p>
       <div className="station-readiness-heading"><h3>{t("Inspection readiness")}</h3></div>
       {current.blockers.length>0&&<MessageBar intent="warning" className="station-blocker-message"><MessageBarBody><MessageBarTitle>{t("Conditions reported by Core")}</MessageBarTitle><ul className="station-blocker-list">{current.blockers.map(b=><li key={b}>{t(blockerText[b])}</li>)}</ul></MessageBarBody></MessageBar>}
       {isOperator ? <div className="station-inspection-actions">

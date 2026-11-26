@@ -46,6 +46,14 @@ it('accepts the explicit hardware metadata extension, never interprets USB as re
   expect(isInspectionReport({...extended,devices:extended.devices.map(d=>({...d,extra:true}))})).toBe(false);
 });
 
+it('validates diagnostic readiness reasons without treating them as trusted receipts',()=>{
+  const devices=report.devices.map((d,i)=>i===1?{...d,availability:'ACTIVE',readiness:'NOT_READY',readinessReason:'ARM_BRAKE_NOT_RELEASED'}:d);
+  expect(isInspectionReport({...report,devices})).toBe(true);
+  expect(isInspectionReport({...report,devices:devices.map((d,i)=>i===1?{...d,readiness:'READY'}:d)})).toBe(false);
+  expect(isInspectionReport({...report,devices:devices.map((d,i)=>i===0?{...d,readiness:'NOT_READY',readinessReason:'ARM_FAULT'}:d)})).toBe(false);
+  expect(isInspectionReport({...report,devices:devices.map((d,i)=>i===1?{...d,readinessReason:'unknown arbitrary string'}:d)})).toBe(false);
+});
+
 it('reads readiness and sends only the explicit selection and stale intent token', async()=>{
   secure();
   const network=vi.fn().mockResolvedValueOnce(response(report,'/api/v1/inspection'))

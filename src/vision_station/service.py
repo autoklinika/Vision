@@ -4,6 +4,7 @@ import signal
 
 from .host import CoreHost
 from .server import CoreServer
+from .inspection import systemd_diagnostics
 
 
 def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None):
@@ -12,7 +13,12 @@ def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None):
     parser.add_argument("--library-root", required=True)
     parser.add_argument("--session-root", help="Existing private 0700 directory; no runtime composition is enabled by this option alone.")
     parser.add_argument("--diagnostics-disabled", action="store_true", help="Explicitly disable service probes in isolated fixtures.")
+    parser.add_argument("--readiness-report", help="Explicit private local ROS observer metadata file (diagnostic only).")
     args = parser.parse_args(argv)
+    if args.readiness_report and (args.diagnostics_disabled or diagnostics is not None):
+        parser.error("readiness report requires the default diagnostic provider")
+    if args.readiness_report:
+        diagnostics = lambda: systemd_diagnostics(args.readiness_report)
     def stop(_signal, _frame):
         raise KeyboardInterrupt()
     signal.signal(signal.SIGTERM, stop)

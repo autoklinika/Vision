@@ -20,6 +20,7 @@ from vision_modules.ecu_profiles import Declaration
 from vision_modules.ecu_reference import compile_profile
 from vision_runtime import VisionRuntimeCoordinator
 from .hardware_presence import usb_hardware_connections, valid_hardware_connection
+from .readiness import device_observation, read_snapshot, valid_reason
 
 DEVICES = ("luxonis", "nero", "moveit", "sony")
 # Explicit, installed ROS 2 service bindings for the current station.
@@ -83,24 +84,27 @@ class DeviceStatus:
     readiness: str
     observed_at: float
     hardware_connection: str = "UNKNOWN"
+    readiness_reason: str | None = None
 
     def __post_init__(self):
         if (self.device not in DEVICES or self.availability not in ("ACTIVE", "INACTIVE", "UNKNOWN")
                 or self.readiness not in ("READY", "NOT_READY", "UNKNOWN")
                 or not valid_hardware_connection(self.device, self.hardware_connection)
+                or (self.readiness_reason is not None and not valid_reason(self.device,self.readiness_reason,self.readiness))
                 or type(self.observed_at) not in (float, int) or not math.isfinite(self.observed_at)
                 or self.observed_at < 0 or (self.readiness == "READY" and self.availability != "ACTIVE")):
             raise ValueError("invalid device status")
 
 
-def systemd_diagnostics():
+def systemd_diagnostics(readiness_report=None):
     """Read only the liveness of explicitly bound ROS 2 services.
 
     Missing/unloaded units and unrecognized/transitional states are UNKNOWN,
     not INACTIVE. A loaded active alternative establishes service liveness;
     INACTIVE requires every bound alternative to be known stopped or failed.
-    Physical readiness is never established by this provider. USB enumeration
-    is independent of systemd service liveness.
+    USB and service liveness never establish operational readiness alone.
+    The optional local ROS observer adds diagnostic evidence, never trusted
+    Runtime composition or inspection/motion authorization.
     """
     names = tuple(dict.fromkeys(unit for units in UNITS.values() for unit in units))
     values = {}
@@ -134,8 +138,17 @@ def systemd_diagnostics():
 
     hardware = usb_hardware_connections()
     now = time.time()
-    return tuple(DeviceStatus(device, availability(device), "UNKNOWN", now,
-                              hardware.get(device, "UNKNOWN")) for device in DEVICES)
+    observations = read_snapshot(readiness_report, now)
+    active_scenes = tuple(source for source, unit in zip(("oak","oak800"), UNITS["luxonis"])
+                          if values.get(unit) == "active")
+    devices = []
+    for device in DEVICES:
+        available = availability(device)
+        connection = hardware.get(device, "UNKNOWN")
+        observation = device_observation(device, available, connection, observations, active_scenes, now)
+        devices.append(DeviceStatus(device, available, observation.state, observation.observed_at,
+                                    connection, observation.reason))
+    return tuple(devices)
 
 
 @dataclass(frozen=True)
@@ -307,7 +320,7 @@ class InspectionOwner:
             blockers.append("COMPOSITION_UNCONFIGURED")
         if not choices:
             blockers.append("NO_APPROVED_SELECTION")
-        if any(d.readiness != "READY" for d in devices):
+        if any(d.readiness != "READY" or d.readiness_reason is not None for d in devices):
             blockers.append("DEVICES_NOT_VERIFIED")
         if station["state"] == "SESSION_ACTIVE":
             blockers.append("SESSION_ACTIVE")
@@ -325,7 +338,8 @@ class InspectionOwner:
                 "intentToken":self.intent_token,
                 "devices":[{"device":d.device, "availability":d.availability, "readiness":d.readiness,
                             "observedAt":_timestamp(d.observed_at),
-                            "hardwareConnection":d.hardware_connection} for d in devices],
+                            "hardwareConnection":d.hardware_connection,
+                            **({"readinessReason":d.readiness_reason} if d.readiness_reason is not None else {})} for d in devices],
                 "selections":[s.report() for s in choices], "blockers":blockers,
                 "startAllowed":not blockers, "closeAllowed":closable}
 
@@ -343,7 +357,7 @@ class InspectionOwner:
             resolved = self.composition.resolve(self.host.library, selection_id)
         except Exception:
             raise InspectionRejected() from None
-        if any(d.readiness != "READY" for d in self._devices()):
+        if any(d.readiness != "READY" or d.readiness_reason is not None for d in self._devices()):
             raise InspectionRejected()
         session_id = "inspection-" + uuid4().hex
         root = _private_dir(self.root)
@@ -434,8 +448,10 @@ def validate_inspection_report(value):
         # Accept only the exact legacy shape or the documented optional
         # hardware observation extension; old Core releases remain readable.
         base_keys = {"device","availability","readiness","observedAt"}
-        if (type(row) is not dict or set(row) not in (base_keys, base_keys | {"hardwareConnection"})
+        if (type(row) is not dict or not base_keys <= set(row) <= base_keys | {"hardwareConnection","readinessReason"}
                 or not valid_hardware_connection(device, row.get("hardwareConnection", "UNKNOWN"))
+                or ("readinessReason" in row and (not isinstance(row["readinessReason"],str)
+                    or not valid_reason(device,row["readinessReason"],row["readiness"])))
                 or row["device"] != device or row["availability"] not in ("ACTIVE","INACTIVE","UNKNOWN")
                 or row["readiness"] not in ("READY","NOT_READY","UNKNOWN") or not _utc(row["observedAt"])
                 or (row["readiness"] == "READY" and row["availability"] != "ACTIVE")):
@@ -447,4 +463,4 @@ def validate_inspection_report(value):
             return False
         ids.append(row["selectionId"])
     return len(ids) == len(set(ids)) and (not value["startAllowed"] or
-                (bool(ids) and value["sessionId"] is None and all(x["readiness"]=="READY" for x in value["devices"])))
+                (bool(ids) and value["sessionId"] is None and all(x["readiness"]=="READY" and "readinessReason" not in x for x in value["devices"])))

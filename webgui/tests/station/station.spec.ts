@@ -524,7 +524,7 @@ test('Fluent system status presents only reported hardware/availability/readines
   const observedAt='2026-11-25T12:00:00Z';
   let devices=[
     {device:'luxonis',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'UNKNOWN',observedAt},
-    {device:'nero',hardwareConnection:'USB_CAN_DETECTED',availability:'ACTIVE',readiness:'NOT_READY',observedAt},
+    {device:'nero',hardwareConnection:'USB_CAN_DETECTED',availability:'ACTIVE',readiness:'NOT_READY',observedAt,readinessReason:'ARM_BRAKE_NOT_RELEASED'},
     {device:'moveit',hardwareConnection:'NOT_APPLICABLE',availability:'INACTIVE',readiness:'UNKNOWN',observedAt},
     {device:'sony',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'READY',observedAt},
   ];
@@ -546,6 +546,7 @@ test('Fluent system status presents only reported hardware/availability/readines
   await expect(table.locator('[data-device="luxonis"]')).toContainText('Active');
   await expect(table.locator('[data-device="luxonis"]')).toContainText('Unknown');
   await expect(table.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Not ready');
+  await expect(table.locator('[data-device="nero"] [data-readiness-reason="ARM_BRAKE_NOT_RELEASED"]')).toHaveText('Joint brakes not released');
   await expect(table.locator('[data-device="sony"] [data-reported-state="READY"]')).toHaveText('Ready');
   await expect(status).toContainText('Session start blocked');
   await expect(status).toContainText('No approved ECU inspection recipe is available.');
@@ -582,6 +583,7 @@ test('Fluent system status presents only reported hardware/availability/readines
   await expect(translated.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('Wykryto USB');
   await expect(translated.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('Nie wykryto USB');
   await expect(translated.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Niegotowe');
+  await expect(translated.locator('[data-device="nero"] [data-readiness-reason="ARM_BRAKE_NOT_RELEASED"]')).toHaveText('Hamulce przegubów niezwolnione');
   await expect(translated.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_NOT_DETECTED"]')).toHaveText('Nie wykryto USB–CAN');
   await expect(status).toContainText('Rozpoczęcie sesji zablokowane');
   await expect(status.getByRole('button',{name:'Przejdź do menedżera inspekcji'})).toBeVisible();
