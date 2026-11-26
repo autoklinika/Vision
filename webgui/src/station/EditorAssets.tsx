@@ -17,7 +17,7 @@ const failures:Record<string,string>={
   OPERATOR_REQUIRED:'Operator permission is required.',ACCESS_DENIED:'Authentication expired.',
   RATE_LIMITED:'Request rate limited.',UNAVAILABLE:'Import/preview outcome not confirmed. Do not retry automatically.',
 };
-async function fileBase64(file:File){
+export async function fileBase64(file:File){
   const bytes=new Uint8Array(await file.arrayBuffer());
   if(bytes.length>maxEditorImageBytes||bytes.length===0)throw new Error('Image must be between 1 byte and 2 MiB.');
   let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));

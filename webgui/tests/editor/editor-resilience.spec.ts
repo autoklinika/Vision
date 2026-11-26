@@ -15,6 +15,7 @@ async function newEditor(page:Page,key:string,create=true,virtualClock=true){
   await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name:'ECU Library',exact:true}).click();
   const library=page.locator('[data-module="ecu"]');
   await library.getByRole('button',{name:'New profile',exact:true}).click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   const editor=library.getByRole('region',{name:'ECU reference editor'});
   await editor.getByLabel('ECU family',{exact:true}).fill('resilience-family');
   await editor.getByLabel('Variant ID',{exact:true}).fill('synthetic-'+key);

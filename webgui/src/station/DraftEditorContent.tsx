@@ -128,6 +128,7 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
       else if(action==='clone'&&report)result=await editDraft('clone',{instanceId,key:report.key,etag:report.etag,newKey,newRevision:revision});
       else return;
       if(result.status==='AVAILABLE'){
+        if(result.report.declaration){setMessage("This profile uses the simplified editor. Reopen it from the library.");return;}
         try{load(result.report);}
         catch{setMessage('Stored document has an unsupported form structure. Reopen it with a compatible editor.');setUncertain(true);setUncertainKey(result.report.key);return;}
         if(action==='open')setMessage('Draft loaded from Core.');

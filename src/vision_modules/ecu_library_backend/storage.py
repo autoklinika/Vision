@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from vision_modules.ecu_reference import canonical_json, load_json
 from vision_modules.ecu_reference.models import thaw
+from .basic_profile import validate_basic, eligible
 
 REPO = Path(__file__).resolve().parents[3]
 IDENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
@@ -63,6 +64,7 @@ class DraftReadSnapshot:
     history: tuple[SavedRevision, ...]
     lifecycle: str = "ACTIVE"
     release_digest: str | None = None
+    declaration: dict | None = None
 
 
 class _ReadBudget:
@@ -227,7 +229,7 @@ class DraftStore:
             raw = self._read('history', key + '--' + generation + '.json', budget=budget)
             snapshot = json.loads(raw)
             fields = {'key', 'generation', 'previous', 'sha256', 'profile', 'snapshot_sha256'}
-            if (not isinstance(snapshot, dict) or not fields <= set(snapshot) <= fields | {'lifecycle','release_sha256'}
+            if (not isinstance(snapshot, dict) or not fields <= set(snapshot) <= fields | {'lifecycle','release_sha256','declaration'}
                     or snapshot.get('lifecycle','ACTIVE') not in LIFECYCLES
                     or snapshot['key'] != key or snapshot['generation'] != generation
                     or (snapshot['previous'] is not None and
@@ -249,7 +251,12 @@ class DraftStore:
             if (len(data) > MAX_DOCUMENT_BYTES or hashlib.sha256(data).hexdigest() != snapshot['sha256']
                     or profile.data['metadata']['profile_id'] != key):
                 raise ValueError('snapshot integrity failure')
-            return profile, snapshot['previous'], snapshot.get('lifecycle','ACTIVE'), release_digest
+            declaration=snapshot.get("declaration")
+            if "declaration" in snapshot:
+                validate_basic(declaration,profile)
+                if snapshot.get("lifecycle","ACTIVE") not in ("ACTIVE","ARCHIVED"):
+                    raise ValueError("declaration is not an executable release")
+            return profile, snapshot['previous'], snapshot.get('lifecycle','ACTIVE'), release_digest, declaration
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError, KeyError) as exc:
             raise ValueError('invalid snapshot') from exc
 
@@ -261,34 +268,38 @@ class DraftStore:
             if generation in seen: raise ValueError('snapshot cycle')
             if len(result) >= MAX_HISTORY_REVISIONS: raise ValueError('history too long')
             seen.add(generation)
-            profile, previous, lifecycle, release_digest = self._snapshot(key, generation, budget=budget)
-            result.append((generation, profile, lifecycle, release_digest))
+            profile, previous, lifecycle, release_digest, declaration = self._snapshot(key, generation, budget=budget)
+            result.append((generation, profile, lifecycle, release_digest, declaration))
             generation = previous
         # Verify state transitions along the committed chain. Lifecycle-only
         # generations must preserve the full unsigned document.
         prior = None
-        for _, profile, lifecycle, _ in reversed(result):
+        for _, profile, lifecycle, _, declaration in reversed(result):
             if prior is None:
                 if lifecycle != "ACTIVE":
                     raise ValueError("invalid initial lifecycle")
             else:
-                before, before_state = prior
+                before, before_state, before_declaration = prior
                 if lifecycle != before_state:
-                    if lifecycle not in TRANSITIONS[before_state] or canonical_json(before) != canonical_json(profile):
+                    if lifecycle not in TRANSITIONS[before_state] or canonical_json(before) != canonical_json(profile) or before_declaration!=declaration:
                         raise ValueError("invalid lifecycle transition")
                 elif lifecycle != "ACTIVE":
                     raise ValueError("immutable administrative generation")
-            prior = profile, lifecycle
+                if before_declaration is not None and declaration is None:
+                    raise ValueError("declaration cannot disappear")
+                if before_declaration is None and declaration is not None and not eligible(before):
+                    raise ValueError("cannot replace populated V1 technical data")
+            prior = profile, lifecycle, declaration
         return result
 
     def get_state(self,key):
         identifier(key)
         with self.lock:
-            generation, profile, lifecycle, release_digest = self._chain(key)[0]
-            return profile, self.etag(generation.encode('ascii')), lifecycle, release_digest
+            generation, profile, lifecycle, release_digest, declaration = self._chain(key)[0]
+            return profile, self.etag(generation.encode('ascii')), lifecycle, release_digest, declaration
 
     def get(self, key):
-        profile, etag, _, _ = self.get_state(key)
+        profile, etag, _, _, _ = self.get_state(key)
         return profile, etag
 
     def lifecycle(self, key):
@@ -304,28 +315,32 @@ class DraftStore:
             chain = self._chain(key,budget=_ReadBudget())
             if self.etag(chain[0][0].encode("ascii")) != expected_etag:
                 raise FileExistsError("ETag conflict")
-            for generation, profile, lifecycle, release_digest in chain:
+            for generation, profile, lifecycle, release_digest, declaration in chain:
                 if generation == snapshot_id:
-                    return profile, self.etag(generation.encode("ascii")), lifecycle, release_digest
+                    return profile, self.etag(generation.encode("ascii")), lifecycle, release_digest, declaration
             raise FileNotFoundError("generation not committed")
 
     def transition(self, key, expected_etag, lifecycle, *, release_digest=None):
         # Only trusted backend code may request RELEASED. HTTP exposes a
         # closed subset of these transitions, never release approval.
         with self.transaction(timeout=READ_LOCK_TIMEOUT):
-            generation, profile, before, _ = self._chain(identifier(key))[0]
+            generation, profile, before, _, declaration = self._chain(identifier(key))[0]
             if self.etag(generation.encode("ascii")) != expected_etag or lifecycle not in TRANSITIONS[before]:
                 raise FileExistsError("lifecycle conflict")
+            if declaration is not None and lifecycle not in ("ACTIVE","ARCHIVED"):
+                raise ValueError("declaration requires future inspection compilation")
             if lifecycle == "REVIEW_READY" and not profile.data["inspection_workflows"]["recipes"]:
                 raise ValueError("at least one inspection workflow required for review")
-            return self.save(key,profile,expected_etag,_lifecycle=lifecycle,_release_digest=release_digest)
+            return self.save(key,profile,expected_etag,_lifecycle=lifecycle,_release_digest=release_digest,declaration=declaration)
 
-    def save(self, key, profile, match=None, create=False, *, _lifecycle=None, _release_digest=None):
+    def save(self, key, profile, match=None, create=False, *, _lifecycle=None, _release_digest=None, declaration=None):
         identifier(key)
         m = profile.data['metadata']; pr = profile.data['provenance_release']
         if m['profile_id'] != key: raise ValueError('profile key mismatch')
         if m['status'] != 'DRAFT' or m['template_only'] or m['content_sha256'] is not None or m['approval_scopes'] or pr['release_approval'] is not None or pr['released_snapshot_sha256'] is not None:
             raise ValueError('only unsigned drafts may be saved')
+        if declaration is not None:
+            validate_basic(declaration,profile)
         data = canonical_json(profile).encode('ascii')
         if len(data) > MAX_DOCUMENT_BYTES: raise ValueError('profile too large')
         with self.transaction():
@@ -338,7 +353,13 @@ class DraftStore:
             else:
                 chain = self._chain(key)
                 if len(chain) >= MAX_HISTORY_REVISIONS: raise ValueError('history too long')
-                previous, old, prior_state, _ = chain[0]
+                previous, old, prior_state, _, old_declaration = chain[0]
+                if old_declaration is not None and declaration is None:
+                    raise FileExistsError("use the simplified editor for declarations")
+                if old_declaration is None and declaration is not None and not eligible(old):
+                    raise FileExistsError("populated V1 data cannot be replaced")
+                if _lifecycle is not None and old_declaration!=declaration:
+                    raise FileExistsError("lifecycle cannot change declaration")
                 if _lifecycle is None:
                     if prior_state != "ACTIVE":
                         raise FileExistsError("draft is locked")
@@ -360,6 +381,9 @@ class DraftStore:
             generation = secrets.token_hex(16)
             snapshot = {'key': key, 'generation': generation, 'previous': previous,
                         'sha256': hashlib.sha256(data).hexdigest(), 'profile': thaw(profile.data)}
+            if declaration is not None:
+                if lifecycle not in ('ACTIVE','ARCHIVED'): raise ValueError('declaration cannot be released')
+                snapshot['declaration'] = declaration
             if lifecycle == 'RELEASED':
                 if not isinstance(_release_digest,str) or not SHA.fullmatch(_release_digest):
                     raise ValueError("release digest required")
@@ -379,8 +403,8 @@ class DraftStore:
         identifier(key)
         with self.lock:
             result = []
-            for generation, profile, lifecycle, release_digest in self._chain(key):
-                result.append({'snapshot_id': generation, 'etag': self.etag(generation.encode('ascii')), 'revision': profile.data['metadata']['profile_revision'], 'profile': thaw(profile.data), **({'lifecycle': lifecycle} if lifecycle!='ACTIVE' else {}), **({'releaseDigest':release_digest} if release_digest else {})})
+            for generation, profile, lifecycle, release_digest, declaration in self._chain(key):
+                result.append({'snapshot_id': generation, 'etag': self.etag(generation.encode('ascii')), 'revision': profile.data['metadata']['profile_revision'], 'profile': thaw(profile.data), **({'lifecycle': lifecycle} if lifecycle!='ACTIVE' else {}), **({'releaseDigest':release_digest} if release_digest else {}), **({'declaration':declaration} if declaration is not None else {})})
             return list(reversed(result))
 
     def keys(self):
@@ -449,14 +473,14 @@ class DraftStore:
             identities = set()
             for key in self._read_keys():
                 chain = self._chain(key, budget=budget)
-                current_generation, current, lifecycle, release_digest = chain[0]
+                current_generation, current, lifecycle, release_digest, declaration = chain[0]
                 metadata = current.data['metadata']
                 identity = tuple(metadata[k] for k in ('profile_id', 'family_id', 'variant_id', 'profile_revision'))
                 if identity[1:] in identities:
                     raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
                 identities.add(identity[1:])
                 history = []
-                for generation, profile, state, digest in reversed(chain):
+                for generation, profile, state, digest, _ in reversed(chain):
                     m = profile.data['metadata']; p = profile.data['provenance_release']
                     if (tuple(m[k] for k in ('profile_id', 'family_id', 'variant_id', 'profile_revision')) != identity
                             or m['schema_version'] != '1' or m['template_only'] is not False
@@ -466,7 +490,7 @@ class DraftStore:
                         raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
                     history.append(SavedRevision(generation, self.etag(generation.encode('ascii')), m['profile_revision'], state, digest))
                 result.append(DraftReadSnapshot(key, current,
-                    self.etag(current_generation.encode('ascii')), tuple(history), lifecycle, release_digest))
+                    self.etag(current_generation.encode('ascii')), tuple(history), lifecycle, release_digest, declaration))
             return tuple(result)
         except DraftReadUnavailable:
             raise

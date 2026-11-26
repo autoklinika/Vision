@@ -10,6 +10,7 @@ import {editDraft} from './transport';
 import {editorSections,hydrateDocument,row} from './editorFields';
 import {FieldControl} from './EditorForm';
 import {compareProfiles} from './profileComparison';
+import {basicStateLabels,photoRoleLabels} from './basicContract';
 
 export function SavedProfileInspector({station,detail,history,onHistoryPage}:{station:StationPresentation;detail:LibraryDetail;history:LibraryHistory|null;onHistoryPage:(direction:'next'|'previous')=>void}){
   const {t}=useTranslation();
@@ -53,7 +54,7 @@ export function SavedProfileInspector({station,detail,history,onHistoryPage}:{st
     finally{running.current=false;setBusy(false);}
   }
   const doc=before?hydrateDocument(before.document):null;
-  const comparison=before&&after?compareProfiles(before.document,after.document):null;
+  const comparison=before&&after?compareProfiles(before.document,after.document,before.declaration,after.declaration):null;
   return <section className="saved-profile-inspector" aria-label={t('Saved profile viewer')}>
     <h3>{t('Saved profile viewer')}</h3>
     <div className="library-review-controls">
@@ -78,7 +79,12 @@ export function SavedProfileInspector({station,detail,history,onHistoryPage}:{st
           {comparison.differences.map((diff,i)=><TableRow key={i}><TableCell>{t(editorSections[diff.section].title)}<small>{diff.path}</small></TableCell><TableCell>{diff.before}</TableCell><TableCell>{diff.after}</TableCell></TableRow>)}
         </TableBody></Table></div>}
         {comparison.truncated&&<p role="status">{t('Comparison limited to the first 256 differences.')}</p>}
-      </>:<>
+      </>:before.declaration?<div className="basic-profile-grid">
+        <section className="basic-card"><h3>01 · {t('ECU identification')}</h3><p>{before.declaration.familyLabel} / {before.declaration.variantLabel}</p><dl><dt>{t('Manufacturer')}</dt><dd>{String(row(before.document.identity).manufacturer??'—')}</dd><dt>{t('Display name')}</dt><dd>{String(row(before.document.metadata).display_name)}</dd><dt>{t('Manufacturer part numbers')}</dt><dd>{(row(before.document.identity).manufacturer_part_numbers as string[]).join(', ')||'—'}</dd><dt>{t('OEM part numbers')}</dt><dd>{(row(before.document.identity).oem_part_numbers as string[]).join(', ')||'—'}</dd><dt>{t('Aliases')}</dt><dd>{(row(before.document.identity).aliases as string[]).join(', ')||'—'}</dd></dl></section>
+        <section className="basic-card"><h3>02 · {t('ECU geometry')}</h3>{before.declaration.states.map(s=><p key={s.stateId}><strong>{t(basicStateLabels[s.stateId])}</strong><br/>{s.dimensionsMm.map(x=>x??'—').join(' × ')} mm</p>)}</section>
+        <section className="basic-card"><h3>03 · {t('Reference photographs')}</h3>{before.declaration.photos.map(p=><p key={p.sha256}>{t(photoRoleLabels[p.role])} · {t(basicStateLabels[p.stateId])} · {Math.ceil(p.bytes/1024)} KB</p>)}<p className="fine-print">{t('Saved photo associations. Open the current profile to preview stored images.')}</p></section>
+        <section className="basic-card"><h3>04 · {t('Inspection preferences')}</h3><p>{t(before.declaration.inspection.template?'Standard PCB inspection (planned)':'Not selected')}</p>{([['overview','Whole PCB photograph'],['oblique','Oblique views'],['details','Detailed photographs'],['customRoi','Individual regions of interest']] as const).map(([k,label])=><p key={k}>{t(label)}: {t(before.declaration!.inspection[k]?'Yes':'No')}</p>)}<p>{before.declaration.inspection.notes}</p></section>
+      </div>:<>
         <label htmlFor="library-preview-section">{t('Section')}</label><Select id="library-preview-section" value={section} onChange={e=>setSection(e.target.value as LibrarySectionName)}>
           {librarySections.map((name,i)=><option value={name} key={name}>{i+1}. {t(editorSections[name].title)}</option>)}
         </Select>

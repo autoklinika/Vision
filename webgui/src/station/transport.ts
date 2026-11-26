@@ -101,10 +101,11 @@ async function editorRequest<T extends DraftReport | DraftValidation | DraftAsse
   const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072,editorTimeoutMs);
   if(result.status==='AVAILABLE'&&action==='open_generation'&&(!('snapshotId' in result.report)||result.report.snapshotId!==args.snapshotId))return unavailable;
   if(result.status==='AVAILABLE'&&action!=='open_generation'&&'snapshotId' in result.report)return unavailable;
+  if(result.status==='AVAILABLE'&&['create_basic','save_basic','clone_basic'].includes(action)&&!('declaration' in result.report))return unavailable;
   if(result.status==='AVAILABLE'&&action==='publish_review'&&(!('lifecycle' in result.report)||result.report.lifecycle!=='RELEASED'))return unavailable;
   if(result.status==='AVAILABLE'&&action==='asset_preview'&&(!('assetId' in result.report)||result.report.assetId!==args.assetId))return unavailable;
   if (result.status === 'AVAILABLE' && (result.report.instanceId !== args.instanceId ||
-      result.report.key !== (action === 'clone' ? args.newKey : args.key))) return unavailable;
+      result.report.key !== ((action === 'clone'||action==='clone_basic') ? args.newKey : args.key))) return unavailable;
   return result;
 }
 export function editDraft(action: Exclude<DraftAction,'validate'|'validate_structure'|'asset_import'|'asset_preview'>, args: Record<string,string>, document?: string): Promise<DraftResult<DraftReport>> {

@@ -65,7 +65,7 @@ def _common(value, schema, fields):
 
 
 def _entry(value):
-    if (type(value) is not dict or not ENTRY_FIELDS <= set(value) <= ENTRY_FIELDS | {"lifecycle","searchTerms","searchComplete","releaseDigest"}
+    if (type(value) is not dict or not ENTRY_FIELDS <= set(value) <= ENTRY_FIELDS | {"lifecycle","searchTerms","searchComplete","releaseDigest","simplified"}
             or not _hex(value["entryId"], 32)
             or not all(_id(value[k]) for k in ("profileId", "family", "variant", "revision"))
             or not _text(value["displayName"], 160) or value["readiness"] != "NOT_READY"):
@@ -79,6 +79,8 @@ def _entry(value):
             or ("searchTerms" in value) != ("searchComplete" in value)
             or (value.get("lifecycle")=="RELEASED") != ("releaseDigest" in value)
             or ("releaseDigest" in value and not _hex(value["releaseDigest"],64))):
+        return False
+    if "simplified" in value and (value["simplified"] is not True or value.get("lifecycle","ACTIVE") not in ("ACTIVE","ARCHIVED")):
         return False
     if "searchTerms" in value:
         terms = value["searchTerms"]
@@ -182,6 +184,7 @@ def _summary(kind, summary):
     if kind == "REFERENCE_DRAFT":
         if summary.lifecycle != "ACTIVE": result["lifecycle"] = summary.lifecycle
         if summary.release_digest: result["releaseDigest"] = summary.release_digest
+        if summary.simplified: result["simplified"] = True
         if summary.search_terms or not summary.search_complete:
             result.update(searchTerms=summary.search_terms,searchComplete=summary.search_complete)
     return result

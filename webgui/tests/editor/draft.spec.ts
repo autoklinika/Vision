@@ -21,6 +21,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   const newProfile = library.getByRole('button',{name:'New profile',exact:true});
   await expect(newProfile).toHaveClass(/fui-Button/);
   await newProfile.click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   const editor=library.getByRole('region',{name:'ECU reference editor'});
   const button=(name:string)=>editor.getByRole('button',{name,exact:true});
   const label=(name:string)=>editor.getByLabel(name,{exact:true});
@@ -145,6 +146,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await library.getByRole('button',{name:'Refresh library',exact:true}).click();
   await library.getByRole('button',{name:'Browse Synthetic form fixture r1',exact:true}).click();
   await library.getByRole('button',{name:'Open reference editor',exact:true}).click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   await button('Load draft fixture-reference').click();
   await expect(editor).toContainText('Draft loaded from Core.');
   for(const name of librarySections){
@@ -214,6 +216,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   // Archive an existing saved revision, filter the catalog by lifecycle
   // and by the actual declared OEM number, then restore it.
   await library.getByRole('button',{name:'Open reference editor',exact:true}).click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   await button('Load draft browser-neutral').click();
   await expect(editor).toContainText('Draft loaded from Core.');
   page.once('dialog',dialog=>dialog.accept());
@@ -230,6 +233,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   await expect(entries).toContainText('Archived profile');
   await entries.getByRole('button',{name:'Browse Browser neutral draft r1',exact:true}).click();
   await library.getByRole('button',{name:'Open reference editor',exact:true}).click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   await button('Load draft browser-neutral').click();
   await expect(editor).toContainText('Archived profile');
   page.once('dialog',dialog=>dialog.accept());
@@ -247,6 +251,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   // Responsive regression using the same authorized fixture.
   await page.setViewportSize({width:390,height:844});
   await library.getByRole('button',{name:'New profile',exact:true}).click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   for(const name of ['ECU family','Variant ID','New profile ID','Display name']) {
     await expect(editor.getByLabel(name,{exact:true})).toHaveValue('');
   }
