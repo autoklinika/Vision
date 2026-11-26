@@ -51,6 +51,10 @@ placeholders. The LAB shell is unchanged. This is not an inspection workflow.
   failure may retain only that bounded last image with a warning and no
   live IR controls. Authorization or source changes clear images. Parameter
   reads expire after 8 seconds and observer observations after 4 seconds.
+  Lease and snapshot freshness are evaluated with a clock taken after reading
+  the atomically replaced document. A replaced inode with zero links is
+  reopened once; shared/hardlinked files are still rejected. This prevents a
+  newer publication from being misclassified as future during a read race.
 
 ## API and deployment
 

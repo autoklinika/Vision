@@ -103,6 +103,25 @@ class PreviewTests(unittest.TestCase):
             (root/"other").write_text("{}");(root/"observation.json").symlink_to(root/"other")
             self.assertEqual(m.report("a"*32,preview=True)["observer"],"UNAVAILABLE")
 
+    def test_atomic_observation_published_during_read_is_not_future(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            atomic_json(root/"observation.json",observation(NOW),MAX_SNAPSHOT)
+            times=iter((NOW-.01,NOW+.01))
+            m=LuxonisMonitor(root,clock=lambda:next(times),usb=lambda:{"luxonis":"USB_DETECTED"})
+            r=m.report("a"*32,preview=True)
+            self.assertEqual(r["observer"],"ACTIVE")
+            self.assertTrue(all(r["frames"].values()))
+            self.assertTrue(validate_luxonis_report(r))
+            self.assertEqual(r["capturedAt"],NOW+.01)
+            # The production lease check must take its timestamp after read.
+            with patch("vision_station.luxonis.read_json",return_value={"requestedAt":NOW}), \
+                 patch("vision_station.luxonis.time.time",return_value=NOW+.01):
+                self.assertTrue(lease_active(root))
+            with patch("vision_station.luxonis.read_json",return_value={"requestedAt":NOW+1}), \
+                 patch("vision_station.luxonis.time.time",return_value=NOW):
+                self.assertFalse(lease_active(root))
+
     def test_schema_and_source_rejections(self):
         r=observation()
         r["settings"]["serial"]="private"

@@ -163,25 +163,32 @@ def private_directory(path):
 
 
 def read_json(path, limit):
-    try:
-        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-        with os.fdopen(fd,"rb") as stream:
-            info=os.fstat(stream.fileno())
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_nlink!=1
-                    or stat.S_IMODE(info.st_mode)!=0o600 or info.st_size>limit):
+    # Atomic replacement can unlink an already opened old inode just before
+    # fstat. Reopen the expected private filename once in that case; never
+    # accept a shared or hardlinked file.
+    for _ in range(2):
+        try:
+            fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+            with os.fdopen(fd,"rb") as stream:
+                info=os.fstat(stream.fileno())
+                if info.st_nlink==0:
+                    continue
+                if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_nlink!=1
+                        or stat.S_IMODE(info.st_mode)!=0o600 or info.st_size>limit):
+                    return None
+                raw=stream.read(limit+1)
+            if len(raw)>limit:
                 return None
-            raw=stream.read(limit+1)
-        if len(raw)>limit:
+            def unique(pairs):
+                value={}
+                for key,item in pairs:
+                    if key in value:raise ValueError("duplicate snapshot field")
+                    value[key]=item
+                return value
+            return json.loads(raw,object_pairs_hook=unique)
+        except (OSError,ValueError,TypeError,RecursionError):
             return None
-        def unique(pairs):
-            value={}
-            for key,item in pairs:
-                if key in value:raise ValueError("duplicate snapshot field")
-                value[key]=item
-            return value
-        return json.loads(raw,object_pairs_hook=unique)
-    except (OSError,ValueError,TypeError,RecursionError):
-        return None
+    return None
 
 
 def atomic_json(path, value, limit):
@@ -197,8 +204,12 @@ def atomic_json(path, value, limit):
         if os.path.exists(name):os.unlink(name)
 
 
-def lease_active(directory, now):
+def lease_active(directory, now=None):
     value=read_json(Path(directory)/"viewer.json",256)
+    # A renewal may be atomically published while the reader is running.
+    # Compare against a clock taken AFTER reading the exact lease, not the
+    # earlier observer-loop timestamp. Genuine future leases still fail.
+    now=time.time() if now is None else now
     return type(value) is dict and set(value)=={"requestedAt"} and fresh(value["requestedAt"],now,LEASE_AGE)
 
 
@@ -229,6 +240,10 @@ class LuxonisMonitor:
                     # it cannot start a driver, open USB or command hardware.
                     atomic_json(directory/"viewer.json",{"requestedAt":now},256)
                 value=read_json(directory/"observation.json",MAX_SNAPSHOT)
+                # The producer can publish a newer snapshot while USB
+                # enumeration or lease renewal is in progress. Timestamp
+                # the report after the read, not before it.
+                now=self.clock()
                 if valid_observation(value) and fresh(value["capturedAt"],now,SNAPSHOT_AGE):
                     observation=value
                     observer="ACTIVE"

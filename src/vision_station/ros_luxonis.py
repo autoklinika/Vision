@@ -250,7 +250,7 @@ class Observer:
                 self.settings={};self.settings_at=None
         if fresh(self.settings_at,now,SETTINGS_AGE):
             result["settings"]=self.settings;result["settingsAt"]=self.settings_at
-        interested=lease_active(self.directory,now)
+        interested=lease_active(self.directory)
         topics={"rgb":name+"/rgb/image_raw","depth":name+"/stereo/image_raw"}
         for key,topic in topics.items():
             state,gid=endpoint(node,topic,name)
@@ -280,10 +280,9 @@ class Observer:
                             stamp=header_stamp(message)
                             if self.frames[stream] is not None and self.frames[stream]["stamp"]>=(stamp or 0):
                                 return
-                            observed=time.time()
-                            if not lease_active(self.directory,observed):
+                            if not lease_active(self.directory):
                                 return
-                            frame=preview_image(message,stream,observed)
+                            frame=preview_image(message,stream,time.time())
                             if frame is None:
                                 # A bad sample is not a disconnect. Keep the
                                 # previous valid frame only until its original
