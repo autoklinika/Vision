@@ -80,7 +80,7 @@ export function InspectionContent({station}: {station: StationPresentation}) {
   const statusBadge = (value: DeviceReport['availability'] | DeviceReport['readiness']) =>
     <Badge appearance="tint" color={value==='ACTIVE'||value==='READY'?'success':value==='NOT_READY'||value==='INACTIVE'?'warning':'informative'} title={value} data-reported-state={value}>{t(labels[value])}</Badge>;
   return <section className="station-device-section" aria-label={t("Inspection orchestration")}>
-    <div className="station-section-heading"><div><h2>{t("Devices and services")}</h2><span>{t("Live service availability is not physical readiness.")}</span></div>
+    <div className="station-section-heading"><div><h2>{t("Devices and services")}</h2><span>{t("Monitored service availability does not establish physical connectivity or device readiness.")}</span></div>
       {current&&<div className="station-device-report-meta"><Badge appearance="tint" color={current.startAllowed?'success':'warning'}>{t(current.startAllowed?"Core permits session start":"Session start blocked")}</Badge><span className="station-report-time">{t("Last report:")} <time dateTime={current.capturedAt}>{current.capturedAt}</time></span></div>}
     </div>
     {current ? <>

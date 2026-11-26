@@ -21,11 +21,16 @@ from vision_modules.ecu_reference import compile_profile
 from vision_runtime import VisionRuntimeCoordinator
 
 DEVICES = ("luxonis", "nero", "moveit", "sony")
-UNITS = {
-    "luxonis": "vision-luxonis-etc3-guidance-186.service",
-    "nero": "vision-nero-factory-driver-trial.service",
-    "moveit": "vision-nero-factory-moveit-trial.service",
-}
+# Explicit, installed ROS 2 service bindings for the current station.
+# The guarded NERO service only proves service liveness (no motion permission).
+# The two alternative plan-only scenes include Luxonis and MoveIt. An active
+# scene service is NOT evidence that either individual ROS node or device works.
+# Do not infer Sony acquisition availability from USB presence or a legacy app.
+UNITS = MappingProxyType({
+    "luxonis": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service"),
+    "nero": ("vision-nero-guarded-lab.service",),
+    "moveit": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service"),
+})
 MAX_AGE = 5.0
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", re.ASCII)
 USER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", re.ASCII)
@@ -86,24 +91,46 @@ class DeviceStatus:
 
 
 def systemd_diagnostics():
-    """Read fixed service liveness only; never assert physical readiness.
+    """Read only the liveness of explicitly bound ROS 2 services.
 
-    The Sony transport has no accepted live readiness source in this release.
-    No ROS discovery, subprocess shell, or device command is used here.
+    Missing/unloaded units and unrecognized/transitional states are UNKNOWN,
+    not INACTIVE. A loaded active alternative establishes service liveness;
+    INACTIVE requires every bound alternative to be known stopped or failed.
+    Physical readiness is never established by this provider.
     """
+    names = tuple(dict.fromkeys(unit for units in UNITS.values() for unit in units))
+    values = {}
     try:
-        result = subprocess.run(["systemctl", "--user", "show", "--property=Id,ActiveState",
-                                 *UNITS.values()], capture_output=True, text=True, timeout=0.65, check=False)
-        values = {}
+        result = subprocess.run(
+            ["systemctl", "--user", "show", "--property=Id,LoadState,ActiveState", *names],
+            capture_output=True, text=True, timeout=0.65, check=False)
+        duplicates = set()
         for block in result.stdout.split("\n\n"):
             fields = dict(line.split("=", 1) for line in block.splitlines() if "=" in line)
-            values[fields.get("Id")] = fields.get("ActiveState")
+            name = fields.get("Id")
+            if name not in names:
+                continue
+            if name in values:
+                duplicates.add(name)
+            values[name] = (
+                fields.get("ActiveState") if fields.get("LoadState") == "loaded" else None
+            )
+        for name in duplicates:
+            values[name] = None
     except (OSError, subprocess.SubprocessError, ValueError):
         values = {}
+
+    def availability(device):
+        states = tuple(values.get(name) for name in UNITS.get(device, ()))
+        if "active" in states:
+            return "ACTIVE"
+        if states and all(state in ("inactive", "failed") for state in states):
+            return "INACTIVE"
+        return "UNKNOWN"
+
     now = time.time()
-    return tuple(DeviceStatus(device, "ACTIVE" if values.get(UNITS.get(device)) == "active"
-                              else "INACTIVE" if values.get(UNITS.get(device)) in ("inactive", "failed")
-                              else "UNKNOWN", "UNKNOWN", now) for device in DEVICES)
+    return tuple(DeviceStatus(device, availability(device), "UNKNOWN", now)
+                 for device in DEVICES)
 
 
 @dataclass(frozen=True)

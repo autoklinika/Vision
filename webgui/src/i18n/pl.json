@@ -684,5 +684,6 @@
   "Active": "Aktywna",
   "Inactive": "Nieaktywna",
   "Ready": "Gotowe",
-  "Not ready": "Niegotowe"
+  "Not ready": "Niegotowe",
+  "Monitored service availability does not establish physical connectivity or device readiness.": "Stan monitorowanych usług nie potwierdza fizycznego połączenia ani gotowości urządzeń."
 }
