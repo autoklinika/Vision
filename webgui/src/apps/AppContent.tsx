@@ -15,10 +15,10 @@ const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 
   sony: { heading: 'Camera acquisition', columns: ['Camera', 'Parameters', 'Capture', 'Transfer'], message: 'No acquisition report or photographs available. This client has no camera connection.', action: 'Capture photograph' },
   images: { heading: 'Image archive', columns: ['Asset', 'Source', 'Timestamp', 'Metadata'], message: 'No archive connected. Image browsing, A/B comparison and overlays are proposed for GUI-06.', action: 'Open image' },
 };
-export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation }) {
+export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station, onNavigate }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation; onNavigate?: (id: AppId) => void }) {
   const {t}=useTranslation();
   if (id === 'settings') return <SettingsContent station={station}/>;
-  if (id === 'status' && station && sessionControls) return <StationStatusContent station={station} session={sessionControls}/>;
+  if (id === 'status' && station && sessionControls) return <StationStatusContent station={station} session={sessionControls} openInspection={onNavigate?()=>onNavigate("inspection"):undefined}/>;
   if (id === 'ecu') return libraryControls ? <LibraryContent controls={libraryControls} station={station}/> : <p>{t("Protected library reads are unavailable in this view.")}</p>;
   if (id === 'inspection' || id === 'events') return sessionControls
     ? <SessionContent section={id} controls={sessionControls}/>

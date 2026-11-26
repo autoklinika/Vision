@@ -1,7 +1,8 @@
 import { useTranslation } from '../i18n/LanguageProvider';
+import { Badge, Button, Label, MessageBar, MessageBarBody, MessageBarTitle, Select, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow } from '@fluentui/react-components';
 import { useEffect, useRef, useState } from 'react';
 import type { StationPresentation } from './client';
-import type { InspectionBlocker, InspectionReport } from './contract';
+import type { DeviceReport, InspectionBlocker, InspectionReport } from './contract';
 import { readInspection, startInspection, closeInspection } from './transport';
 
 const blockerText: Record<InspectionBlocker, string> = {
@@ -75,25 +76,41 @@ export function InspectionContent({station}: {station: StationPresentation}) {
     } finally { operation.current = false; setBusy(false); }
   }
 
-  return <section aria-label={t("Inspection orchestration")}>
-    <h3>{t("Inspection readiness")}</h3>
+  const labels = {ACTIVE:'Active',INACTIVE:'Inactive',READY:'Ready',NOT_READY:'Not ready',UNKNOWN:'Unknown'} as const;
+  const statusBadge = (value: DeviceReport['availability'] | DeviceReport['readiness']) =>
+    <Badge appearance="tint" color={value==='ACTIVE'||value==='READY'?'success':value==='NOT_READY'||value==='INACTIVE'?'warning':'informative'} title={value} data-reported-state={value}>{t(labels[value])}</Badge>;
+  return <section className="station-device-section" aria-label={t("Inspection orchestration")}>
+    <div className="station-section-heading"><div><h2>{t("Devices and services")}</h2><span>{t("Live service availability is not physical readiness.")}</span></div>
+      {current&&<div className="station-device-report-meta"><Badge appearance="tint" color={current.startAllowed?'success':'warning'}>{t(current.startAllowed?"Core permits session start":"Session start blocked")}</Badge><span className="station-report-time">{t("Last report:")} <time dateTime={current.capturedAt}>{current.capturedAt}</time></span></div>}
+    </div>
     {current ? <>
-      <div className="sunken-panel report"><table>
-        <thead><tr><th scope="col">{t("Device")}</th><th scope="col">{t("Availability")}</th><th scope="col">{t("Readiness")}</th></tr></thead>
-        <tbody>{current.devices.map(d => <tr key={d.device}><th scope="row">{t(deviceLabel[d.device])}</th><td>{d.availability}</td><td>{d.readiness}</td></tr>)}</tbody>
-      </table></div>
-      <p className="fine-print">{t("Live service availability is not physical readiness. Last report:")+" "}{current.capturedAt} UTC.</p>
-      {current.blockers.length > 0 && <ul>{current.blockers.map(b => <li key={b}>{t(blockerText[b])}</li>)}</ul>}
-      {isOperator ? <>
-        <label htmlFor="inspection-selection">{t("Declared ECU and recipe")}</label>{' '}
-        <select id="inspection-selection" value={chosen?.selectionId ?? ''} onChange={e => setSelection(e.target.value)} disabled={busy || current.sessionId !== null || current.selections.length === 0}>
-          <option value="">{t("Select an approved recipe")}</option>
-          {current.selections.map(item => <option value={item.selectionId} key={item.selectionId}>{item.family} / {item.variant} / {item.revision} / {item.physicalState} / {item.recipe}</option>)}
-        </select>
-        <div className="startup-actions"><button disabled={!current.startAllowed || !chosen || busy} onClick={() => { void command('start'); }}>{t("Start inspection session")}</button>
-        <button disabled={!current.closeAllowed || busy} onClick={() => { void command('close'); }}>{t("Close session")}</button></div>
-      </> : <p>{t("Read-only account. Starting or closing a session requires operator permission.")}</p>}
-    </> : <p>{t("Inspection readiness report unavailable. No session command is enabled.")}</p>}
-    {message && <p role="status">{t(message)}</p>}
+      <div className="station-device-table">
+        <Table aria-label={t("Devices and services")}>
+          <TableHeader><TableRow><TableHeaderCell>{t("Device")}</TableHeaderCell><TableHeaderCell>{t("Availability")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell><TableHeaderCell>{t("Last observation (UTC)")}</TableHeaderCell></TableRow></TableHeader>
+          <TableBody>{current.devices.map(d=><TableRow key={d.device} data-device={d.device}>
+            <TableCell className="station-device-name">{t(deviceLabel[d.device])}</TableCell>
+            <TableCell>{statusBadge(d.availability)}</TableCell>
+            <TableCell>{statusBadge(d.readiness)}</TableCell>
+            <TableCell><time dateTime={d.observedAt}>{d.observedAt}</time></TableCell>
+          </TableRow>)}</TableBody>
+        </Table>
+      </div>
+      <div className="station-readiness-heading"><h3>{t("Inspection readiness")}</h3></div>
+      {current.blockers.length>0&&<MessageBar intent="warning" className="station-blocker-message"><MessageBarBody><MessageBarTitle>{t("Conditions reported by Core")}</MessageBarTitle><ul className="station-blocker-list">{current.blockers.map(b=><li key={b}>{t(blockerText[b])}</li>)}</ul></MessageBarBody></MessageBar>}
+      {isOperator ? <div className="station-inspection-actions">
+        <div className="station-inspection-selection">
+          <Label htmlFor="inspection-selection">{t("Declared ECU and recipe")}</Label>
+          <Select id="inspection-selection" value={chosen?.selectionId??''} onChange={e=>setSelection(e.target.value)} disabled={busy||current.sessionId!==null||current.selections.length===0}>
+            <option value="">{t("Select an approved recipe")}</option>
+            {current.selections.map(item=><option value={item.selectionId} key={item.selectionId}>{item.family} / {item.variant} / {item.revision} / {item.physicalState} / {item.recipe}</option>)}
+          </Select>
+        </div>
+        <div className="station-inspection-buttons">
+          <Button appearance="primary" disabled={!current.startAllowed||!chosen||busy} onClick={()=>{void command('start');}}>{t("Start inspection session")}</Button>
+          <Button disabled={!current.closeAllowed||busy} onClick={()=>{void command('close');}}>{t("Close session")}</Button>
+        </div>
+      </div> : <p className="fine-print">{t("Read-only account. Starting or closing a session requires operator permission.")}</p>}
+    </> : <MessageBar intent="warning"><MessageBarBody>{t("Inspection readiness report unavailable. No session command is enabled.")}</MessageBarBody></MessageBar>}
+    {message&&<p role="status">{t(message)}</p>}
   </section>;
 }

@@ -139,3 +139,56 @@ body { margin: 0; }
   .vision-station-root .station-startup .mode-banner { height:auto; min-height:48px; flex-wrap:wrap; padding:8px 12px; }
   .vision-station-root .station-startup .mode-banner .vision-language-selector { margin-left:0; }
 }
+
+/* System Status V1 — a report surface, never a parallel readiness engine. */
+.vision-system-status { display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; max-width: 1460px; min-width: 0; margin: 0 auto; }
+.vision-system-status > * { min-width: 0; }
+.vision-system-status .station-overview { border: 1px solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusMedium); padding: 12px 16px 10px; min-width: 0; }
+.vision-system-status .station-overview-heading, .vision-system-status .station-section-heading, .vision-system-status .station-session-title, .vision-system-status .station-readiness-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.vision-system-status .station-overview-title { display: flex; gap: 12px; align-items: center; }
+.vision-system-status .station-overview-icon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 6px; background: var(--colorBrandBackground2); color: var(--colorBrandForeground1); }
+.vision-system-status .station-overview-title h2, .vision-system-status .station-section-heading h2, .vision-system-status .station-session-title h2 { margin: 0 0 2px; }
+.vision-system-status .station-overview-title > div > span, .vision-system-status .station-section-heading > div > span, .vision-system-status .station-report-time { font-size: 12px; color: var(--colorNeutralForeground3); }
+.vision-system-status .station-status-toolbar { padding: 0; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.vision-system-status .station-status-toolbar button { white-space: normal; text-align: left; }
+.vision-system-status .station-overview-facts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px 18px; margin: 12px 0 8px; }
+.vision-system-status .station-overview-facts > div { min-width: 0; border-left: 1px solid var(--colorNeutralStroke2); padding-left: 14px; }
+.vision-system-status .station-overview-facts > div:first-child { border: 0; padding-left: 0; }
+.vision-system-status .station-overview-facts dt { font-size: 12px; margin-bottom: 6px; }
+.vision-system-status .station-overview-facts dd { font-size: 14px; }
+.vision-system-status .station-overview-facts small { display: block; color: var(--colorNeutralForeground3); margin-top: 3px; font-size: 12px; }
+.vision-system-status .station-overview-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--colorNeutralForeground3); border-top: 1px solid var(--colorNeutralStroke2); padding-top: 10px; }
+.vision-system-status time { font-variant-numeric: tabular-nums; }
+.vision-system-status .station-device-section { min-width: 0; }
+.vision-system-status .station-section-heading { margin-bottom: 10px; align-items: flex-end; }
+.vision-system-status .station-device-report-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.vision-system-status .station-device-table { min-width: 0; overflow-x: auto; border: 1px solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusMedium); }
+.vision-system-status .station-device-table .fui-Table { min-width: 570px; }
+.vision-system-status .station-device-table .fui-TableCell { vertical-align: middle; padding-top: 7px; padding-bottom: 7px; }
+.vision-system-status .station-device-table .fui-TableHeaderCell { font-weight: 600; }
+.vision-system-status .station-device-table time { font-size: 12px; color: var(--colorNeutralForeground2); white-space: nowrap; }
+.vision-system-status .station-device-name { font-weight: 600; }
+.vision-system-status .station-readiness-heading { margin-top: 16px; margin-bottom: 10px; }
+.vision-system-status .station-readiness-heading h3 { margin: 0; }
+.vision-system-status .station-blocker-list { margin: 6px 0 0; padding-left: 20px; line-height: 1.5; }
+.vision-system-status .station-inspection-actions { display: flex; gap: 12px 18px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
+.vision-system-status .station-inspection-selection { flex: 1 1 300px; max-width: 640px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.vision-system-status .station-inspection-selection .fui-Select { width: 100%; min-width: 0; }
+.vision-system-status .station-inspection-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.vision-system-status .station-session-area { border-top: 1px solid var(--colorNeutralStroke2); padding-top: 16px; }
+.vision-system-status .session-summary { border-top: 0; padding-top: 8px; margin-top: 0; }
+.vision-system-status .session-summary .session-heading h2 { font-size: 14px; color: var(--colorNeutralForeground2); margin: 0; }
+.vision-system-status .station-status-footer { margin: 0; }
+.vision-system-status .fui-Badge { min-height: 20px; font-size: 12px; white-space: normal; height: auto; padding: 2px 8px; }
+@media (max-width: 800px) {
+  .vision-system-status .station-overview-facts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .vision-system-status .station-overview-facts > div:nth-child(odd) { padding-left: 0; border: 0; }
+}
+@media (max-width: 420px) {
+  .vision-system-status { gap: 14px; }
+  .vision-system-status .station-overview { padding: 12px; }
+  .vision-system-status .station-inspection-selection { flex-basis: 100%; }
+  .vision-system-status .station-overview-heading { align-items: flex-start; }
+  .vision-system-status .station-overview-title { min-width: 0; }
+  .vision-system-status .station-overview-title h2 { overflow-wrap: anywhere; }
+}

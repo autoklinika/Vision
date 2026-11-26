@@ -106,7 +106,7 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
           const app = apps.find(a => a.id === win.id)!;
           return <section id={'panel-'+win.id} role="tabpanel" aria-labelledby={'tab-'+win.id} data-module={win.id} key={win.id} hidden={state.active!==win.id} tabIndex={0} ref={node => { if(node)windowsRef.current.set(win.id,node);else windowsRef.current.delete(win.id); }} className="vision-module">
             <div className="vision-module-title"><h1>{t(app.title)}</h1><span>{t(app.description)}</span></div>
-            <AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={t(persistence)} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls} libraryControls={libraryControls} station={station}/>
+            <AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={t(persistence)} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls} libraryControls={libraryControls} station={station} onNavigate={launch}/>
           </section>;
         })}
         {!state.active && <div className="vision-workspace-empty"><h1>{t("Vision workspace")}</h1><p>{t("Choose a module from Navigation.")}</p><Button appearance="primary" onClick={()=>launch('status')}>{t("Open System Status")}</Button></div>}

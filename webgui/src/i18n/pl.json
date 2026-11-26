@@ -667,5 +667,22 @@
   "invalid vector length.": "nieprawidłowa długość wektora.",
   "each metric needs a unique identifier.": "każda metryka wymaga unikalnego identyfikatora.",
   "Editor document exceeds 64 KiB.": "Dokument edytora przekracza 64 KiB.",
-  "bytes · SHA-256": "bajty · SHA-256"
+  "bytes · SHA-256": "bajty · SHA-256",
+  "Station overview": "Przegląd stanowiska",
+  "Station actions": "Operacje stanowiska",
+  "Unknown": "Nieznana",
+  "Automatic refresh": "Odświeżanie automatyczne",
+  "Core report": "Raport Core",
+  "Core connection unavailable": "Brak połączenia z Core",
+  "Open inspection manager": "Przejdź do menedżera inspekcji",
+  "Devices and services": "Urządzenia i usługi",
+  "Live service availability is not physical readiness.": "Dostępność usługi nie oznacza fizycznej gotowości urządzenia.",
+  "Last observation (UTC)": "Ostatnia obserwacja (UTC)",
+  "Core permits session start": "Core zezwala na rozpoczęcie sesji",
+  "Session start blocked": "Rozpoczęcie sesji zablokowane",
+  "Conditions reported by Core": "Warunki zgłoszone przez Core",
+  "Active": "Aktywna",
+  "Inactive": "Nieaktywna",
+  "Ready": "Gotowe",
+  "Not ready": "Niegotowe"
 }

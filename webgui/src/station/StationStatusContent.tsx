@@ -1,26 +1,46 @@
+import { Badge, MessageBar, MessageBarBody, MessageBarTitle, Toolbar, ToolbarButton } from '@fluentui/react-components';
+import { ArrowClockwiseRegular, ArrowRightRegular, DesktopPulseRegular } from '@fluentui/react-icons';
 import { useTranslation } from '../i18n/LanguageProvider';
 import type { StationPresentation } from './client';
 import type { SessionControls } from '../api/useSessionView';
 import { SessionContent } from '../apps/SessionContent';
 import { InspectionContent } from './InspectionContent';
 
-export function StationStatusContent({station, session}: {station: StationPresentation; session: SessionControls}) {
+export function StationStatusContent({station, session, openInspection}: {
+  station: StationPresentation; session: SessionControls; openInspection?: () => void;
+}) {
   const {t}=useTranslation();
   const {report, identity} = station;
-  return <>
-    <div className="app-heading"><span className="status-mark">i</span><div><h2>{t("VENTUNO workstation")}</h2><p>{t("Connected · {role}",{role:t(identity.role==='operator'?'inspection operator':'read-only access')})}</p></div></div>
-    <div className="report sunken-panel"><dl>
-      <dt>{t("Signed in as")}</dt><dd>{identity.username}</dd>
-      <dt>Vision Core</dt><dd>{report.coreConnection === 'CONNECTED' ? t("Connected") : t("Not connected")}</dd>
-      <dt>{t("Inspection session")}</dt><dd>{report.coreConnection === 'NOT_CONNECTED' ? t("Unavailable") : report.state === 'SESSION_ACTIVE' ? report.sessionId : t("No active inspection session")}</dd>
-      <dt>{t("System readiness")}</dt><dd>{t("Unknown until verified — see inspection readiness below")}</dd>
-      <dt>{t("Last update (UTC)")}</dt><dd>{report.capturedAt}</dd>
-    </dl></div>
-    <p>{report.coreConnection === 'NOT_CONNECTED' ? t("Vision Core is not connected. Inspection and library reports are unavailable.") :
-      report.state === 'NO_ACTIVE_SESSION' ? t("Vision Core is connected. No inspection session is active.") : t("The current session report comes from Vision Core.")}</p>
-    <p><button onClick={station.refresh}>{t("Refresh station")}</button></p>
-    <p className="fine-print">{t("Station information refreshes automatically. Closing this desktop leaves Vision running.")}</p>
+  const connected=report.coreConnection==='CONNECTED';
+  const active=connected&&report.state==='SESSION_ACTIVE';
+  return <div className="vision-system-status">
+    <section className="station-overview" aria-label={t("Station overview")}>
+      <div className="station-overview-heading">
+        <div className="station-overview-title"><span className="station-overview-icon" aria-hidden="true"><DesktopPulseRegular fontSize={24}/></span><div><h2>{t("VENTUNO workstation")}</h2><span>{t("Station overview")}</span></div></div>
+        <Toolbar aria-label={t("Station actions")} className="station-status-toolbar">
+          <ToolbarButton icon={<ArrowClockwiseRegular/>} onClick={station.refresh}>{t("Refresh station")}</ToolbarButton>
+          {openInspection&&<ToolbarButton icon={<ArrowRightRegular/>} onClick={openInspection}>{t("Open inspection manager")}</ToolbarButton>}
+        </Toolbar>
+      </div>
+      <dl className="station-overview-facts">
+        <div><dt>Vision Core</dt><dd><Badge appearance="tint" color={connected?'success':'warning'}>{t(connected?"Connected":"Not connected")}</Badge></dd></div>
+        <div><dt>{t("System readiness")}</dt><dd><Badge appearance="tint" color="informative">{t("Unknown")}</Badge></dd></div>
+        <div><dt>{t("Inspection session")}</dt><dd>{!connected?t("Unavailable"):active?report.sessionId:t("No active inspection session")}</dd></div>
+        <div><dt>{t("Signed in as")}</dt><dd>{identity.username}<small>{t(identity.role==='operator'?'inspection operator':'read-only access')}</small></dd></div>
+      </dl>
+      <div className="station-overview-meta"><span>{t("Last update (UTC)")} · <time dateTime={report.capturedAt}>{report.capturedAt}</time></span><span>{t("Automatic refresh")}</span></div>
+    </section>
+    <MessageBar intent={connected?'info':'warning'} className="station-status-message">
+      <MessageBarBody>
+        <MessageBarTitle>{t(connected?"Core report":"Core connection unavailable")}:</MessageBarTitle>{" "}
+        {t(!connected?"Vision Core is not connected. Inspection and library reports are unavailable.":active?"The current session report comes from Vision Core.":"Vision Core is connected. No inspection session is active.")}
+      </MessageBarBody>
+    </MessageBar>
     <InspectionContent key={[report.instanceId,report.coreConnection,report.sessionId,report.sessionViewId,station.accountBusy].join(':')} station={station}/>
-    <SessionContent section="summary" controls={session}/>
-  </>;
+    <div className="station-session-area">
+      <div className="station-session-title"><h2>{t("Inspection session")}</h2></div>
+      <SessionContent section="summary" controls={session} fluent/>
+    </div>
+    <p className="fine-print station-status-footer">{t("Station information refreshes automatically. Closing this desktop leaves Vision running.")}</p>
+  </div>;
 }

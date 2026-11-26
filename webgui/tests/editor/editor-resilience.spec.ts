@@ -181,7 +181,7 @@ test('Core reconnect discards previous READY evidence until a fresh inspection r
   });
   await page.getByRole('tab',{name:'System Status',exact:true}).click();
   const status=page.locator('[data-module="status"]');
-  const readyCells=status.getByRole('cell',{name:'READY',exact:true});
+  const readyCells=status.locator('[data-reported-state="READY"]');
   const start=status.getByRole('button',{name:'Start inspection session',exact:true});
   await page.clock.fastForward(5100);
   await expect(readyCells).toHaveCount(4);

@@ -516,3 +516,69 @@ test('interface language changes live and persists without restarting authentica
   await expect(settings.getByLabel('Interface language',{exact:true})).toHaveValue('en');
   expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
+
+test('Fluent system status presents only reported device availability/readiness, updates in place and navigates without operations',async({page})=>{
+  const state=await mockStation(page);
+  await page.clock.install();
+  const fixture=stationFixture(false,true);
+  const observedAt='2026-11-25T12:00:00Z';
+  let devices=[
+    {device:'luxonis',availability:'ACTIVE',readiness:'UNKNOWN',observedAt},
+    {device:'nero',availability:'ACTIVE',readiness:'NOT_READY',observedAt},
+    {device:'moveit',availability:'INACTIVE',readiness:'UNKNOWN',observedAt},
+    {device:'sony',availability:'ACTIVE',readiness:'READY',observedAt},
+  ];
+  let pending=false;
+  await page.route('**/api/v1/inspection',route=>pending?route.fulfill({status:503,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'REPORT_UNAVAILABLE'})}):route.fulfill({contentType,body:JSON.stringify({
+    schema:'vision.api.inspection.v1',source:'STATION',instanceId:fixture.instanceId,capturedAt:observedAt,sessionId:null,
+    intentToken:'a'.repeat(32),devices,selections:[],blockers:['NO_APPROVED_SELECTION','DEVICES_NOT_VERIFIED'],startAllowed:false,closeAllowed:false,
+  })}));
+  await page.goto('/');await login(page,'operator','mock-password');
+  const status=page.locator('[data-module="status"]');
+  const table=status.getByRole('table',{name:'Devices and services'});
+  await expect(status.getByRole('toolbar',{name:'Station actions'})).toBeVisible();
+  await expect(table).toHaveClass(/fui-Table/);
+  await expect(table.locator('tbody tr')).toHaveCount(4);
+  await expect(table.locator('[data-device="luxonis"]')).toContainText('Active');
+  await expect(table.locator('[data-device="luxonis"]')).toContainText('Unknown');
+  await expect(table.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Not ready');
+  await expect(table.locator('[data-device="sony"] [data-reported-state="READY"]')).toHaveText('Ready');
+  await expect(status).toContainText('Session start blocked');
+  await expect(status).toContainText('No approved ECU inspection recipe is available.');
+  await expect(status.getByRole('button',{name:'Start inspection session'})).toHaveCount(0);
+  const original=await table.elementHandle();
+  devices=devices.map(d=>d.device==='sony'?{...d,readiness:'NOT_READY'}:d);
+  await page.clock.fastForward(5100);
+  await expect(table.locator('[data-device="sony"] [data-reported-state="NOT_READY"]')).toBeVisible();
+  expect(await table.evaluate((element,previous)=>element===previous,original)).toBe(true);
+  await original?.dispose();
+  pending=true;
+  await page.clock.fastForward(5100);
+  await expect(table).toHaveCount(0);
+  await expect(status).toContainText('Inspection readiness report unavailable. No session command is enabled.');
+  pending=false;
+  await page.clock.fastForward(5100);
+  await expect(table.locator('tbody tr')).toHaveCount(4);
+
+  // Existing workspace routing, not a session mutation.
+  await status.getByRole('button',{name:'Open inspection manager'}).click();
+  await expect(page.getByRole('tab',{name:'Inspection Manager',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('[data-module="inspection"]')).toBeVisible();
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await expect(table).toBeVisible();
+
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Settings',exact:true}).click();
+  await page.getByLabel('Interface language',{exact:true}).selectOption('pl');
+  await page.getByRole('tab',{name:'Stan systemu',exact:true}).click();
+  const translated=status.getByRole('table',{name:'Urządzenia i usługi'});
+  await expect(translated.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Niegotowe');
+  await expect(status).toContainText('Rozpoczęcie sesji zablokowane');
+  await expect(status.getByRole('button',{name:'Przejdź do menedżera inspekcji'})).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  expect(await status.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  const area=translated.locator('..');
+  expect(await area.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
