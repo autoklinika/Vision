@@ -20,8 +20,9 @@ not an operational inspection or a second camera implementation.
   checksum was verified and the installed profile is a byte-identical copy.
   Do not silently return to the earlier 640x400 diagnostic profile.
   RGB is configured to 1920x1080, stereo output parameters to 1280x800,
-  both at 15 FPS, FAST_ACCURACY, IR disabled, no NN and no automatic
-  calibration. The live source topics were both verified at 1920x1080
+  both at 15 FPS, FAST_ACCURACY, no NN and no automatic calibration.
+  The later manual IR feature enables the driver capability but sets both
+  emitter intensities to zero at startup (see VISION_LUXONIS_IR_V1.md). The live source topics were both verified at 1920x1080
   (depth aligned to RGB, 16UC1). The driver reports left/right settings
   of 640x400; this profile is not proof of native 800p stereo acquisition.
   Subpixel and left-right check are enabled; extended disparity is disabled.

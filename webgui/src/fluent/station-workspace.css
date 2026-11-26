@@ -264,3 +264,9 @@ body { margin: 0; }
 .vision-devices .fui-Badge { white-space:normal; height:auto; padding:3px 8px; }
 @media (max-width:1000px) { .luxonis-settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:680px) { .luxonis-facts { grid-template-columns:repeat(2,minmax(0,1fr)); } .luxonis-facts>div:nth-child(odd) { padding-left:0; border:0; } .luxonis-preview-grid,.luxonis-settings-grid { grid-template-columns:minmax(0,1fr); } .luxonis-settings-source { max-width:100%; } .luxonis-settings-source select { max-width:100%; } }
+
+/* Luxonis manual illumination: compact independent controls. */
+.luxonis-ir-card { border:1px solid var(--colorNeutralStroke2); border-radius:6px; padding:14px; }
+.luxonis-ir-controls { display:flex; flex-wrap:wrap; gap:12px 28px; margin:8px 0; }
+.luxonis-ir-controls>div { display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:min(260px,100%); padding:4px 10px; background:var(--colorNeutralBackground2); border-radius:4px; }
+.luxonis-ir-controls>div>span { font-variant-numeric:tabular-nums; font-size:12px; color:var(--colorNeutralForeground3); }

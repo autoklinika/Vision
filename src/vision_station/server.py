@@ -10,6 +10,7 @@ import time
 from vision_api.access import Credentials, CursorRejected, ReportUnavailable
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
+from .luxonis_ir import IRRejected, validate_request
 from .draft_editor import DraftConflict, DraftNotFound, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
                        check_peer, checked_path, checked_socket, exchange_timeout, receive, send)
@@ -31,6 +32,8 @@ def dispatch(host, request):
         return host.station_report()
     if operation == "luxonis" and not query:
         return host.luxonis_report()
+    if operation == "luxonis_ir" and validate_request(query):
+        return host.luxonis_ir(**query)
     if operation == "luxonis_preview" and not query:
         return host.luxonis_report(preview=True)
     if operation == "inspection" and not query:
@@ -70,6 +73,8 @@ class _Handler(socketserver.BaseRequestHandler):
             response = {"schema": PROTOCOL, "error": "DRAFT_CONFLICT"}
         except DraftNotFound:
             response = {"schema": PROTOCOL, "error": "DRAFT_NOT_FOUND"}
+        except IRRejected:
+            response = {"schema": PROTOCOL, "error": "IR_REJECTED"}
         except InspectionRejected:
             response = {"schema": PROTOCOL, "error": "INSPECTION_REJECTED"}
         except NoActiveSession:

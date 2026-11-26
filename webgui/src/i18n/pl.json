@@ -893,5 +893,15 @@
   "IR dot intensity": "Natężenie projektora punktów IR",
   "IR flood intensity": "Natężenie oświetlacza IR",
   "Auto-calibration mode": "Tryb autokalibracji",
-  "Parameter": "Parametr"
+  "Parameter": "Parametr",
+  "IR control enabled in driver": "Obsługa IR aktywna w sterowniku",
+  "Manual control · 60% when enabled · off at camera startup.": "Sterowanie ręczne · 60% po włączeniu · wyłączone po starcie kamery.",
+  "IR dot projector": "Projektor punktów IR",
+  "IR flood illuminator": "Oświetlacz IR",
+  "Applying IR setting…": "Zmienianie ustawienia IR…",
+  "IR change confirmed by driver.": "Sterownik potwierdził zmianę IR.",
+  "IR change rejected by Core.": "Core odrzucił zmianę IR.",
+  "IR change not confirmed. Check current values before retrying.": "Nie potwierdzono zmiany IR. Sprawdź aktualne wartości przed ponowieniem.",
+  "IR control requires the standalone camera, fresh parameters and an idle operator session.": "Sterowanie IR wymaga samodzielnej kamery, aktualnych parametrów i bezczynnego stanowiska z kontem operatora.",
+  "Read-only parameter overview. Use IR controls above to change illumination.": "Podgląd parametrów tylko do odczytu. Oświetlenie zmieniaj przełącznikami IR powyżej."
 }

@@ -10,6 +10,7 @@ from vision_api.reports import _timestamp, validate_session_report, validate_eve
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
 from .luxonis import validate_luxonis_report
+from .luxonis_ir import IRRejected, validate_request, validate_result
 from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
 from .protocol import (ERRORS, exchange_timeout, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
@@ -80,6 +81,8 @@ class RemoteStationOwner:
                     raise DraftNotFound()
                 if code == "BAD_REQUEST" and operation == "draft_editor":
                     raise DraftRequestInvalid()
+                if code == "IR_REJECTED":
+                    raise IRRejected()
                 if code == "INSPECTION_REJECTED":
                     raise InspectionRejected()
                 if code == "NO_ACTIVE_SESSION":
@@ -95,7 +98,7 @@ class RemoteStationOwner:
             if operation in ("library", "entry", "history") and report["libraryId"] != "vision-ecu-library":
                 raise ValueError("station library identity mismatch")
             return report
-        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected, DraftConflict, DraftNotFound, DraftRequestInvalid):
+        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected, DraftConflict, DraftNotFound, DraftRequestInvalid, IRRejected):
             raise
         except Exception:
             raise ReportUnavailable() from None
@@ -121,6 +124,14 @@ class RemoteStationOwner:
                             validate_events_report)
         if (report["viewId"] != view or report["afterSequence"] != after
                 or report["throughSequence"] != through):
+            raise ReportUnavailable()
+        return report
+
+    def luxonis_ir(self, **intent):
+        if not validate_request(intent):
+            raise ValueError("invalid IR command")
+        report=self._read("luxonis_ir",intent,validate_result)
+        if any(report[k]!=intent[k] for k in intent):
             raise ReportUnavailable()
         return report
 

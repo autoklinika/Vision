@@ -758,3 +758,45 @@ test('Devices Luxonis distinguishes saved settings and current frames, and stops
   expect(errors).toEqual([]);
   expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
+
+test('Luxonis IR switches use independent verified readback and fixed command scope',async({page})=>{
+  const state=await mockStation(page);state.role='operator';
+  let dot=0,flood=0,reject=false;
+  const commands:unknown[]=[];
+  await page.route('**/api/v1/devices/luxonis**',async route=>{
+    const now=Date.now()/1000;
+    if(route.request().method()==='POST'){
+      const body=route.request().postDataJSON();commands.push(body);
+      expect(Object.keys(body).sort()).toEqual(['channel','enabled','instanceId']);
+      if(reject)return route.fulfill({status:409,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'IR_REJECTED'})});
+      if(body.channel==='dot')dot=body.enabled ? 0.6 : 0;
+      else if(body.channel==='flood')flood=body.enabled ? 0.6 : 0;
+      else throw new Error('Unexpected IR command');
+      return route.fulfill({contentType,body:JSON.stringify({schema:'vision.api.luxonis-ir.v1',source:'STATION',...body,dot,flood,capturedAt:now})});
+    }
+    const r=luxonisFixture(true,false,now);
+    return route.fulfill({contentType,body:JSON.stringify({...r,settings:{...r.settings,'driver.i_enable_ir':true,
+      'driver.r_laser_dot_intensity':dot,'driver.r_floodlight_intensity':flood},irControlAvailable:true})});
+  });
+  await page.goto('/');await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Luxonis',exact:true}).click();
+  const panel=page.locator('[data-module="luxonis"]');
+  const laser=panel.getByRole('switch',{name:'IR dot projector',exact:true});
+  const light=panel.getByRole('switch',{name:'IR flood illuminator',exact:true});
+  await expect(laser).toBeEnabled();await expect(laser).not.toBeChecked();await expect(light).not.toBeChecked();
+  await laser.click();await expect(laser).toBeChecked();await expect(light).not.toBeChecked();
+  await expect(panel).toContainText('IR change confirmed by driver.');
+  await expect(laser).toBeEnabled();
+  await light.click();await expect(light).toBeChecked();await expect(laser).toBeChecked();
+  await expect(light).toBeEnabled();
+  reject=true;await laser.click();
+  await expect(panel).toContainText('IR change rejected by Core.');
+  await expect(laser).toBeChecked();
+  expect(commands).toHaveLength(3);
+  expect(commands).toEqual([
+    {instanceId:'f'.repeat(32),channel:'dot',enabled:true},
+    {instanceId:'f'.repeat(32),channel:'flood',enabled:true},
+    {instanceId:'f'.repeat(32),channel:'dot',enabled:false}
+  ]);
+});

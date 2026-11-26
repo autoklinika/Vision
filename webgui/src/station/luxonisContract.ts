@@ -18,7 +18,7 @@ export const parameterGroups = [
   ]},
   {title:'Pipeline and illumination',rows:[
     ['pipeline_gen.i_pipeline_type','Pipeline type'],['pipeline_gen.i_enable_rgbd','RGB-D pipeline'],
-    ['driver.i_enable_ir','IR illumination'],['driver.r_laser_dot_intensity','IR dot intensity'],
+    ['driver.i_enable_ir','IR control enabled in driver'],['driver.r_laser_dot_intensity','IR dot intensity'],
     ['driver.r_floodlight_intensity','IR flood intensity'],
     ['driver.i_pipeline_auto_calibration_mode','Auto-calibration mode'],
   ]},
@@ -33,7 +33,7 @@ export type LuxonisReport=Readonly<{
   hardwareConnection:'USB_DETECTED'|'USB_NOT_DETECTED'|'UNKNOWN';observer:'ACTIVE'|'UNAVAILABLE';
   graph:'UNKNOWN'|'NO_NODE'|'ACTIVE'|'AMBIGUOUS';node:{domain:181|186;name:'/oak'|'/oak800'}|null;
   endpoints:{rgb:Endpoint;depth:Endpoint};settings:Settings;settingsAt:number|null;
-  profiles:Partial<Record<'rgbd_lab'|'stereo800_lab',Settings>>;frames:{rgb:PreviewFrame|null;depth:PreviewFrame|null};previewAllowed:boolean;
+  profiles:Partial<Record<'rgbd_lab'|'stereo800_lab',Settings>>;frames:{rgb:PreviewFrame|null;depth:PreviewFrame|null};previewAllowed:boolean;irControlAvailable?:boolean;
 }>;
 type Endpoint='UNKNOWN'|'AVAILABLE'|'UNAVAILABLE'|'AMBIGUOUS';
 const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
@@ -54,7 +54,7 @@ function frame(v:unknown,stream:string,now:number):v is PreviewFrame|null{
   try{const raw=atob(v.jpeg);return raw.length>=4&&raw.length<=40960&&raw.startsWith('\xff\xd8')&&raw.endsWith('\xff\xd9')&&btoa(raw)===v.jpeg;}catch{return false;}
 }
 export function isLuxonisReport(v:unknown):v is LuxonisReport{
-  if(!record(v,['schema','source','instanceId','capturedAt','model','hardwareConnection','observer','graph','node','endpoints','settings','settingsAt','profiles','frames','previewAllowed'])||
+  if(!record(v,['schema','source','instanceId','capturedAt','model','hardwareConnection','observer','graph','node','endpoints','settings','settingsAt','profiles','frames','previewAllowed',...(object(v)&&Object.hasOwn(v,'irControlAvailable')?['irControlAvailable']:[])])||
     v.schema!=='vision.api.luxonis.v1'||v.source!=='STATION'||v.model!=='OAK-D Pro AF'||typeof v.instanceId!=='string'||!/^[a-f0-9]{32}$/.test(v.instanceId)||
     !number(v.capturedAt)||v.capturedAt<=0||v.capturedAt>=253402300800||!['USB_DETECTED','USB_NOT_DETECTED','UNKNOWN'].includes(String(v.hardwareConnection))||
     !['ACTIVE','UNAVAILABLE'].includes(String(v.observer))||!['UNKNOWN','NO_NODE','ACTIVE','AMBIGUOUS'].includes(String(v.graph))||
@@ -73,5 +73,23 @@ export function isLuxonisReport(v:unknown):v is LuxonisReport{
   for(const stream of ['rgb','depth'] as const){
     if(v.frames[stream]!==null&&(!v.previewAllowed||v.endpoints[stream]!=='AVAILABLE'))return false;
   }
+  if(Object.hasOwn(v,'irControlAvailable')){
+    const can=v.previewAllowed&&v.observer==='ACTIVE'&&v.graph==='ACTIVE'&&
+      v.node!==null&&object(v.node)&&v.node.domain===186&&v.node.name==='/oak'&&
+      v.hardwareConnection==='USB_DETECTED'&&Object.values(v.endpoints).every(s=>s==='AVAILABLE')&&
+      v.settings['driver.i_enable_ir']===true&&level(v.settings['driver.r_laser_dot_intensity'])&&
+      level(v.settings['driver.r_floodlight_intensity']);
+    if(typeof v.irControlAvailable!=='boolean'||v.irControlAvailable!==can)return false;
+  }
   return true;
+}
+
+export type IRChannel='dot'|'flood';
+export type IRResult=Readonly<{schema:'vision.api.luxonis-ir.v1';source:'STATION';instanceId:string;channel:IRChannel;enabled:boolean;dot:number;flood:number;capturedAt:number}>;
+export function level(v:unknown):v is number{return number(v)&&v>=0&&v<=1;}
+export function isIRResult(v:unknown):v is IRResult{
+  return record(v,['schema','source','instanceId','channel','enabled','dot','flood','capturedAt'])&&
+    v.schema==='vision.api.luxonis-ir.v1'&&v.source==='STATION'&&typeof v.instanceId==='string'&&/^[a-f0-9]{32}$/.test(v.instanceId)&&
+    (v.channel==='dot'||v.channel==='flood')&&typeof v.enabled==='boolean'&&level(v.dot)&&level(v.flood)&&
+    number(v.capturedAt)&&v.capturedAt>0&&v.capturedAt<253402300800&&Math.abs((v.channel==='dot'?v.dot:v.flood)-(v.enabled?0.6:0))<1e-6;
 }

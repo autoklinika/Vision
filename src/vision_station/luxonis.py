@@ -251,7 +251,7 @@ class LuxonisMonitor:
 
 def validate_luxonis_report(value):
     try:
-        if (type(value) is not dict or set(value)!={"schema","source","instanceId","capturedAt","model",
+        if (type(value) is not dict or set(value)-{"irControlAvailable"}!={"schema","source","instanceId","capturedAt","model",
                 "hardwareConnection","observer","graph","node","endpoints","settings","settingsAt",
                 "profiles","frames","previewAllowed"} or value["schema"]!=SCHEMA
                 or value["source"]!="STATION" or value["model"]!="OAK-D Pro AF"
@@ -260,6 +260,10 @@ def validate_luxonis_report(value):
                 or value["observer"] not in ("ACTIVE","UNAVAILABLE")
                 or type(value["previewAllowed"]) is not bool):
             return False
+        if "irControlAvailable" in value:
+            from .luxonis_ir import controllable
+            if type(value["irControlAvailable"]) is not bool or value["irControlAvailable"]!=controllable(value):
+                return False
         observation={k:value[k] for k in ("capturedAt","graph","node","endpoints","settings","settingsAt","profiles","frames")}
         observation["schema"]=OBS_SCHEMA
         if not valid_observation(observation):

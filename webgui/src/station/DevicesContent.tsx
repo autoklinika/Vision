@@ -1,10 +1,10 @@
-import {Badge,Button,Select,MessageBar,MessageBarBody,Table,TableHeader,TableHeaderCell,TableBody,TableRow,TableCell} from '@fluentui/react-components';
+import {Badge,Button,Select,Switch,MessageBar,MessageBarBody,Table,TableHeader,TableHeaderCell,TableBody,TableRow,TableCell} from '@fluentui/react-components';
 import {VideoRegular,PlayRegular,StopRegular,ImageRegular} from '@fluentui/react-icons';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import type {StationPresentation} from './client';
-import {readLuxonis} from './transport';
-import {parameterGroups} from './luxonisContract';
-import type {LuxonisReport,PreviewFrame} from './luxonisContract';
+import {readLuxonis,setLuxonisIR} from './transport';
+import {parameterGroups,level} from './luxonisContract';
+import type {LuxonisReport,PreviewFrame,IRResult,IRChannel} from './luxonisContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 
 type Timed={report:LuxonisReport;received:number;owner:string};
@@ -18,6 +18,10 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
   const [failure,setFailure]=useState(false);
   const [tick,setTick]=useState(()=>performance.now());
   const [badFrames,setBadFrames]=useState<{rgb:number|null;depth:number|null}>({rgb:null,depth:null});
+  const [irBusy,setIrBusy]=useState(false);
+  const irRunning=useRef(false);
+  const [irReply,setIrReply]=useState<{report:IRResult;received:number;owner:string}|null>(null);
+  const [irMessage,setIrMessage]=useState('');
   const [selected,setSelected]=useState<keyof typeof profiles|'live'|null>(null);
   const owner=[station.report.instanceId,station.identity.username,station.identity.role].join(':');
   const enabled=active&&visible&&!station.accountBusy&&station.report.coreConnection==='CONNECTED';
@@ -26,6 +30,7 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
   if(scope.enabled!==enabled||scope.permitted!==permitted||scope.owner!==owner){
     setScope({enabled,permitted,owner});
     setSample(null);setFailure(false);setBadFrames({rgb:null,depth:null});
+    setIrReply(null);setIrMessage('');
     if(!permitted||scope.owner!==owner)setPreview(false);
   }
   const viewing=preview&&permitted;
@@ -69,6 +74,29 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
   const source=selected==='live'||(selected&&report?.profiles[selected])?selected:
     graph==='ACTIVE'?'live':report?.profiles.rgbd_lab?'rgbd_lab':report?.profiles.stereo800_lab?'stereo800_lab':'live';
   const data=source==='live'?(report?.settingsAt!==null&&report?.settingsAt!==undefined&&elapsed+report.capturedAt-report.settingsAt<=8?report.settings:{}):report?.profiles[source]??{};
+  const liveSettings=report?.settingsAt!==null&&report?.settingsAt!==undefined&&elapsed+report.capturedAt-report.settingsAt<=8?report.settings:{};
+  const newerReply=report?.irControlAvailable&&irReply?.owner===owner&&
+    tick-irReply.received<=8000&&irReply.report.capturedAt>(report.settingsAt??0)?irReply.report:null;
+  const dot=newerReply?.dot??liveSettings['driver.r_laser_dot_intensity'];
+  const flood=newerReply?.flood??liveSettings['driver.r_floodlight_intensity'];
+  const known=liveSettings['driver.i_enable_ir']===true&&level(dot)&&level(flood);
+  const canIR=permitted&&report?.irControlAvailable===true&&known&&!irBusy;
+  async function toggleIR(channel:IRChannel,value:boolean){
+    if(!canIR||irRunning.current)return;
+    irRunning.current=true;setIrBusy(true);setIrMessage('');
+    try{
+      const result=await setLuxonisIR(station.report.instanceId,channel,value);
+      if(result.status==='AVAILABLE'){
+        setIrReply({report:result.report,received:performance.now(),owner});
+        setIrMessage('IR change confirmed by driver.');
+      }else{
+        setIrReply(null);
+        setIrMessage(result.status==='IR_REJECTED'||result.status==='OPERATOR_REQUIRED'?'IR change rejected by Core.':'IR change not confirmed. Check current values before retrying.');
+      }
+    }catch{setIrReply(null);setIrMessage('IR change not confirmed. Check current values before retrying.');}
+    finally{irRunning.current=false;setIrBusy(false);}
+  }
+  const irLevel=(value:unknown)=>known&&level(value)?Math.round(value*100)+'%':'—';
   const describe=(stream:'rgb'|'depth')=>t(report?.endpoints[stream]==='AVAILABLE'?'Topic available':report?.endpoints[stream]==='UNAVAILABLE'?'Topic unavailable':report?.endpoints[stream]==='AMBIGUOUS'?'Ambiguous source':'Unknown');
   const badgeColor=(v:boolean)=>v?'success':'informative';
   const renderPreview=(key:'rgb'|'depth',frame:PreviewFrame|null)=>{
@@ -94,6 +122,14 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
     {(!report||report.observer==='UNAVAILABLE')&&<MessageBar intent="warning"><MessageBarBody>{t(failure?'Device report unavailable.':'No current Luxonis observer report.')}</MessageBarBody></MessageBar>}
     {graph==='NO_NODE'&&<MessageBar intent="info"><MessageBarBody>{t('The camera node is not running in the monitored ROS domains. Saved settings are not active parameters.')}</MessageBarBody></MessageBar>}
     {graph==='AMBIGUOUS'&&<MessageBar intent="warning"><MessageBarBody>{t('Multiple camera sources detected. Live settings and preview are withheld.')}</MessageBarBody></MessageBar>}
+    <section className="luxonis-ir-card" aria-label={t('IR illumination')}>
+      <div className="luxonis-section-heading"><div><h2>{t('IR illumination')}</h2><p>{t('Manual control · 60% when enabled · off at camera startup.')}</p></div></div>
+      <div className="luxonis-ir-controls">
+        <div><Switch label={t('IR dot projector')} checked={known&&level(dot)&&dot>0} disabled={!canIR} onChange={(_,d)=>{void toggleIR('dot',d.checked);}}/><span>{irLevel(dot)}</span></div>
+        <div><Switch label={t('IR flood illuminator')} checked={known&&level(flood)&&flood>0} disabled={!canIR} onChange={(_,d)=>{void toggleIR('flood',d.checked);}}/><span>{irLevel(flood)}</span></div>
+      </div>
+      {irBusy?<p role="status">{t('Applying IR setting…')}</p>:irMessage?<p role="status">{t(irMessage)}</p>:!canIR?<p className="fine-print">{t('IR control requires the standalone camera, fresh parameters and an idle operator session.')}</p>:null}
+    </section>
     <section className="luxonis-preview-section" aria-label={t('Live preview')}>
       <div className="luxonis-section-heading"><div><h2>{t('Live preview')}</h2><p>{t('Read-only preview of existing ROS 2 streams.')}</p></div>
         <Button appearance={viewing?'secondary':'primary'} icon={viewing?<StopRegular/>:<PlayRegular/>} disabled={!permitted||report?.observer!=='ACTIVE'||report.previewAllowed===false} onClick={()=>{setPreview(!viewing);setSample(old=>old?{...old,report:{...old.report,frames:{rgb:null,depth:null}}}:null);}}>{t(viewing?'Stop preview':'Enable preview')}</Button>
@@ -103,7 +139,7 @@ export function DevicesContent({station,active}:{station:StationPresentation;act
       <p className="fine-print">{t('Preview is reduced for display and is not inspection evidence. Closing or leaving this tab stops the preview request.')}</p>
     </section>
     <section className="luxonis-settings" aria-label={t('Camera settings')}>
-      <div className="luxonis-section-heading"><div><h2>{t('Camera settings')}</h2><p>{t('Read-only settings; no parameters are changed.')}</p></div>
+      <div className="luxonis-section-heading"><div><h2>{t('Camera settings')}</h2><p>{t('Read-only parameter overview. Use IR controls above to change illumination.')}</p></div>
         <label className="luxonis-settings-source"><span>{t('Settings source')}</span><Select value={source} onChange={e=>setSelected(e.target.value as typeof selected)}><option value="live">{t('Live ROS 2 parameters')}</option>{Object.keys(profiles).filter(k=>report?.profiles[k as keyof typeof profiles]).map(k=><option key={k} value={k}>{t(profiles[k as keyof typeof profiles])}</option>)}</Select></label>
       </div>
       {source!=='live'&&<p className="fine-print">{t('Saved diagnostic configuration — not applied or approved by this view.')}</p>}

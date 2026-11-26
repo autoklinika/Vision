@@ -21,6 +21,8 @@ EDITOR_EXCHANGE_TIMEOUT = 30.0
 def exchange_timeout(operation):
     # Complete, bounded history verification is disk work. It gets its own
     # response deadline; request reception and operational exchanges stay short.
+    if operation == "luxonis_ir":
+        return 12.0
     if operation == "draft_editor":
         return EDITOR_EXCHANGE_TIMEOUT
     if operation in ("library", "entry", "history"):
@@ -28,7 +30,7 @@ def exchange_timeout(operation):
     return EXCHANGE_TIMEOUT
 
 PROTOCOL = "vision.station.ipc.v1"
-ERRORS = frozenset({"NO_ACTIVE_SESSION", "CURSOR_REJECTED", "REPORT_UNAVAILABLE", "BAD_REQUEST", "INSPECTION_REJECTED", "DRAFT_CONFLICT", "DRAFT_NOT_FOUND"})
+ERRORS = frozenset({"NO_ACTIVE_SESSION", "CURSOR_REJECTED", "REPORT_UNAVAILABLE", "BAD_REQUEST", "INSPECTION_REJECTED", "DRAFT_CONFLICT", "DRAFT_NOT_FOUND", "IR_REJECTED"})
 FIELDS = {"schema", "source", "instanceId", "stationId", "capturedAt", "libraryId",
           "state", "coreConnection", "coreReadiness", "sessionId", "sessionViewId"}
 

@@ -21,6 +21,7 @@ from .server import EVENTS_PATH, LIBRARY_ENTRY, LIBRARY_HISTORY, LIBRARY_PAGE
 from .station_owner import NoActiveSession
 from .status import boot_status
 from vision_station.inspection import InspectionRejected, ID, HEX32
+from vision_station.luxonis_ir import IRRejected, validate_request
 from vision_station.draft_editor import DraftConflict, DraftNotFound, FIELDS, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 
 # Two 1024-byte passwords can each expand sixfold with JSON escaping.
@@ -199,6 +200,8 @@ class StationApplication:
             return self._error(start_response, 409, "DRAFT_CONFLICT", head=head)
         except DraftNotFound:
             return self._error(start_response, 404, "DRAFT_NOT_FOUND", head=head)
+        except IRRejected:
+            return self._error(start_response, 409, "IR_REJECTED", head=head)
         except InspectionRejected:
             return self._error(start_response, 409, "INSPECTION_REJECTED", head=head)
         except NoActiveSession:
@@ -265,6 +268,16 @@ class StationApplication:
                 self.identity.logout(token)
             return self._json(start_response, 200, {"schema": "vision.api.logout.v1", "loggedOut": True},
                               extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
+        if method == "POST" and target == "/api/v1/devices/luxonis/ir":
+            if environ.get("HTTP_ORIGIN") != origin or environ.get("HTTP_X_VISION_CLIENT") != "webgui":
+                return self._error(start_response,403,"ORIGIN_REJECTED")
+            identity=self._authorize(environ,touch=False)
+            if identity["role"]!="operator":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            value=self._body(environ,{"instanceId","channel","enabled"},1024)
+            if not validate_request(value):
+                raise ValueError("invalid IR command")
+            return self._json(start_response,200,self.owner.luxonis_ir(**value))
         if method == "POST" and target in {"/api/v1/library/editor/" + action for action in FIELDS}:
             if (environ.get("HTTP_ORIGIN") != origin
                     or environ.get("HTTP_X_VISION_CLIENT") != "webgui"):

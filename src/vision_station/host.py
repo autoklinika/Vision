@@ -8,6 +8,7 @@ from vision_runtime import VisionRuntimeCoordinator
 from .inspection import InspectionOwner, InspectionRejected
 from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 from .luxonis import LuxonisMonitor
+from .luxonis_ir import IRRejected, controllable, validate_request
 
 
 class CoreHost:
@@ -20,7 +21,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -38,6 +39,8 @@ class CoreHost:
         self._view_id = None
         self._draft_editor = DraftEditor(self)
         self._luxonis = LuxonisMonitor(luxonis_directory)
+        self._luxonis_ir = luxonis_ir
+        self._luxonis_ir_interlock = luxonis_ir_interlock
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
 
     def attach_runtime(self, runtime):
@@ -75,8 +78,32 @@ class CoreHost:
 
     def luxonis_report(self, *, preview=False):
         station=self.station_report()
-        return self._luxonis.report(station["instanceId"],preview=preview,
+        report=self._luxonis.report(station["instanceId"],preview=preview,
             idle=station["state"]=="NO_ACTIVE_SESSION")
+        if self._luxonis_ir is not None:
+            report["irControlAvailable"]=controllable(report)
+        return report
+
+    def luxonis_ir(self, **intent):
+        if not validate_request(intent):
+            raise ValueError("invalid IR command")
+        if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
+            raise IRRejected()
+        try:
+            r=self.luxonis_report()
+            if (self._luxonis_ir is None or r["instanceId"]!=intent["instanceId"]
+                    or not controllable(r) or self._inspection._poisoned
+                    or self._inspection._marker_exists()):
+                raise IRRejected()
+            # DEV does not own PROD sessions. A separately configured,
+            # read-only production interlock must also report idle.
+            if self._luxonis_ir_interlock is not None:
+                other=self._luxonis_ir_interlock()
+                if other["coreConnection"]!="CONNECTED" or other["state"]!="NO_ACTIVE_SESSION":
+                    raise IRRejected()
+            return self._luxonis_ir.change(intent["instanceId"],intent["channel"],intent["enabled"])
+        finally:
+            self._lifecycle_lock.release()
 
     def session_report(self):
         return self._reader.session_report()

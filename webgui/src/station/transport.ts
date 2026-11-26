@@ -1,5 +1,5 @@
-import {isLuxonisReport} from './luxonisContract';
-import type {LuxonisReport} from './luxonisContract';
+import {isLuxonisReport,isIRResult} from './luxonisContract';
+import type {LuxonisReport,IRResult,IRChannel} from './luxonisContract';
 import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
 import {isDraftReport, isDraftValidation, isDraftAssetReport, isDraftAssetPreview} from './draftContract';
 import type {DraftAction, DraftReport, DraftValidation, DraftAssetReport, DraftAssetPreview} from './draftContract';
@@ -7,7 +7,7 @@ import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport,
 
 export type StationResult<T> = Readonly<{status: 'AVAILABLE'; report: T}> | Readonly<{status: 'ACCESS_DENIED' | 'RATE_LIMITED' | 'UNAVAILABLE'; report: null}>;
 type PasswordError = 'CURRENT_PASSWORD_INVALID' | 'PASSWORD_REJECTED';
-type InspectionError = 'OPERATOR_REQUIRED' | 'INSPECTION_REJECTED';
+type InspectionError = 'OPERATOR_REQUIRED' | 'INSPECTION_REJECTED' | 'IR_REJECTED';
 type DraftError = 'OPERATOR_REQUIRED' | 'DRAFT_CONFLICT' | 'DRAFT_NOT_FOUND' | 'BAD_REQUEST';
 export type DraftResult<T> = StationResult<T> | Readonly<{status: DraftError; report: null}>;
 export type InspectionCommandResult = StationResult<StationReport> | Readonly<{status: InspectionError; report: null}>;
@@ -83,6 +83,13 @@ export async function readLuxonis(preview:boolean):Promise<StationResult<Luxonis
   if(result.status==='AVAILABLE'&&!preview&&Object.values(result.report.frames).some(f=>f!==null))return unavailable;
   return result;
 }
+export async function setLuxonisIR(instanceId:string,channel:IRChannel,enabled:boolean){
+  const result=await request('/api/v1/devices/luxonis/ir',isIRResult,JSON.stringify({instanceId,channel,enabled}),
+      {403:'OPERATOR_REQUIRED',409:'IR_REJECTED'} as const,4096,15000);
+  if(result.status==='AVAILABLE'&&(result.report.instanceId!==instanceId||result.report.channel!==channel||result.report.enabled!==enabled))return unavailable;
+  return result satisfies StationResult<IRResult>|Readonly<{status:'OPERATOR_REQUIRED'|'IR_REJECTED';report:null}>;
+}
+
 export function readInspection(): Promise<StationResult<InspectionReport>> {
   return request<InspectionReport, never>('/api/v1/inspection', isInspectionReport, undefined, undefined, 16384);
 }
