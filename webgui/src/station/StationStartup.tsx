@@ -1,6 +1,6 @@
 import { useTranslation } from '../i18n/LanguageProvider';
 import { LanguageSelector } from '../i18n/LanguageSelector';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Desktop } from '../shell/Desktop';
 import type { Snapshot } from '../api/types';
 import { createStationClient } from './client';
@@ -75,11 +75,16 @@ export function StationStartup() {
   const {t}=useTranslation();
   const [auth, setAuth] = useState<AuthState>({phase: 'CHECKING', identity: null, message: 'Checking your session…'});
   const authHeading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    // A modal navigation drawer may disappear on logout or token revocation.
-    // Transfer focus to the newly mounted authentication screen.
-    if (!auth.identity) authHeading.current?.focus({preventScroll:true});
-  }, [auth.phase, auth.identity]);
+  const wasAuthenticated = useRef(false);
+  useLayoutEffect(() => {
+    // Move focus only when the authenticated workspace actually disappears.
+    // Never steal focus from login fields during the initial session check
+    // or subsequent unauthenticated status updates.
+    if (wasAuthenticated.current && !auth.identity) {
+      authHeading.current?.focus({preventScroll:true});
+    }
+    wasAuthenticated.current = auth.identity !== null;
+  }, [auth.identity]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const control = useRef({version: 0, busy: false, pendingLogout: false, changingPassword: false, forceSignIn: false, identity: null as IdentityReport | null, unavailable: false});

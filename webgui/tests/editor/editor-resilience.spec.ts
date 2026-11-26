@@ -6,6 +6,7 @@ async function newEditor(page:Page,key:string,create=true){
   await page.clock.install();
   const credentials=JSON.parse(readFileSync('../.station-test-auth.json','utf8'));
   await page.goto('/');
+  await expect(page.getByLabel('User name',{exact:true})).toBeEnabled();
   await page.getByLabel('User name',{exact:true}).fill(credentials.username);
   await page.getByLabel('Password',{exact:true}).fill(credentials.password);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
