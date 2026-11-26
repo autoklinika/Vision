@@ -714,8 +714,13 @@ test('Devices Luxonis distinguishes saved settings and current frames, and stops
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/');await login(page,'operator','mock-password');
   await page.getByRole('button',{name:'Open navigation',exact:true}).click();
-  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Devices',exact:true}).click();
-  await expect(page.getByRole('tab',{name:'Devices',exact:true})).toHaveAttribute('aria-selected','true');
+  const drawer=page.getByRole('dialog',{name:'Navigation',exact:true});
+  const devices=drawer.getByRole('region',{name:'Devices',exact:true});
+  await expect(devices.getByRole('button')).toHaveText(['Luxonis','NERO','Sony']);
+  const workspace=drawer.getByRole('region',{name:'Workspace',exact:true});
+  await expect(workspace.getByRole('button')).toHaveText(['System Status','ECU Library','Inspection Manager','Images']);
+  await devices.getByRole('button',{name:'Luxonis',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'Luxonis',exact:true})).toHaveAttribute('aria-selected','true');
   const panel=page.locator('[data-module="luxonis"]');
   await expect(panel).toContainText('Luxonis OAK-D Pro AF');
   await expect(panel).toContainText('USB detected');
@@ -745,7 +750,7 @@ test('Devices Luxonis distinguishes saved settings and current frames, and stops
   await page.waitForTimeout(1200);
   const stopped=previewReads;await page.waitForTimeout(1100);
   expect(previewReads).toBe(stopped);
-  await page.getByRole('tab',{name:'Devices',exact:true}).click();
+  await page.getByRole('tab',{name:'Luxonis',exact:true}).click();
   await expect(panel.getByRole('button',{name:'Enable preview',exact:true})).toBeEnabled();
   await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
   await page.setViewportSize({width:390,height:844});

@@ -10,7 +10,7 @@ import { useSessionView } from '../api/useSessionView';
 import { useLibraryView } from '../api/useLibraryView';
 import type { StationPresentation } from '../station/client';
 import { modeLabel, modeDescription, connectionLabel } from '../api/presentation';
-import { apps, clamp, decodeLayout, encodeLayout, reduce, storageKey, stationAppTitle, stationAppDescription } from './model';
+import { apps, clamp, decodeLayout, encodeLayout, reduce, storageKey } from './model';
 import type { Action, AppId, Bounds, Rect, WindowState } from './model';
 function bounds(stationMode = false): Bounds { return { width: Math.max(1, window.innerWidth), height: Math.max(1, window.innerHeight - (stationMode ? 78 : 72)) }; }
 export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
@@ -124,8 +124,8 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
           onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))delete event.currentTarget.dataset.keyboardNavigation;}}
           onTabSelect={(_, data) => dispatch({type:'focus',id:data.value as AppId})}>
           {openModules.map(app => <div key={app.id} role="presentation" className="vision-tab-item">
-            <Tab value={app.id} id={'tab-'+app.id} aria-controls={'panel-'+app.id} aria-keyshortcuts="Delete" onKeyDown={event => { if (event.key==='Delete') { event.preventDefault(); closeStationTab(app.id); } }}>{t(stationAppTitle(app.id))}</Tab>
-            <Button className="vision-tab-close" appearance="subtle" size="small" icon={<DismissRegular/>} tabIndex={-1} aria-label={t('Close {module}',{module:t(stationAppTitle(app.id))})} title={t('Close {module}',{module:t(stationAppTitle(app.id))})} onClick={() => closeStationTab(app.id)}/>
+            <Tab value={app.id} id={'tab-'+app.id} aria-controls={'panel-'+app.id} aria-keyshortcuts="Delete" onKeyDown={event => { if (event.key==='Delete') { event.preventDefault(); closeStationTab(app.id); } }}>{t(app.title)}</Tab>
+            <Button className="vision-tab-close" appearance="subtle" size="small" icon={<DismissRegular/>} tabIndex={-1} aria-label={t('Close {module}',{module:t(app.title)})} title={t('Close {module}',{module:t(app.title)})} onClick={() => closeStationTab(app.id)}/>
           </div>)}
         </TabList>
       }/>
@@ -133,7 +133,7 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
         {state.windows.map(win => {
           const app = apps.find(a => a.id === win.id)!;
           return <section id={'panel-'+win.id} role="tabpanel" aria-labelledby={'tab-'+win.id} data-module={win.id} key={win.id} hidden={state.active!==win.id} tabIndex={0} ref={node => { if(node)windowsRef.current.set(win.id,node);else windowsRef.current.delete(win.id); }} className="vision-module">
-            <div className="vision-module-title"><h1>{t(stationAppTitle(app.id))}</h1><span>{t(stationAppDescription(app.id))}</span></div>
+            <div className="vision-module-title"><h1>{t(app.title)}</h1><span>{t(app.description)}</span></div>
             <AppContent id={win.id} snapshot={snapshot} reset={reset} persistence={t(persistence)} refresh={client.canRefresh ? refresh : undefined} sessionControls={sessionControls} libraryControls={libraryControls} station={station} active={state.active===win.id&&stationAvailable} onNavigate={launch}/>
           </section>;
         })}

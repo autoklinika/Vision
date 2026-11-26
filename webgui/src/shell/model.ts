@@ -11,10 +11,6 @@ export const apps = [
   { id: 'settings', title: 'Settings', glyph: '⚙', description: 'Your account & password' },
 ] as const;
 export type AppId = typeof apps[number]['id'];
-// Keep the existing saved module ID compatible; in station mode it is the
-// central Devices workspace (Luxonis first), not a separate LAB window.
-export function stationAppTitle(id:AppId){return id==='luxonis'?'Devices':apps.find(a=>a.id===id)!.title;}
-export function stationAppDescription(id:AppId){return id==='luxonis'?'Device availability, settings & live preview':apps.find(a=>a.id===id)!.description;}
 export type Bounds = { width: number; height: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 export type WindowState = { id: AppId; rect: Rect; minimized: boolean; maximized: boolean };

@@ -1,8 +1,8 @@
 # Devices workspace — Luxonis V1
 
-The station WebGUI reuses the old Luxonis module ID for the Devices tab. The
-LAB shell is unchanged. Luxonis is the first implemented device; NERO and Sony
-device management are deferred. This feature is not an inspection workflow.
+The approved navigation retains the Devices group with separate Luxonis, NERO
+and Sony tabs. Luxonis is the first implemented device; NERO and Sony remain
+placeholders. The LAB shell is unchanged. This is not an inspection workflow.
 
 ## Read-only architecture
 
@@ -31,7 +31,7 @@ device management are deferred. This feature is not an inspection workflow.
 - The observer has no image subscriptions without a short viewer lease.
   A preview request renews a four-second lease in a private volatile directory.
   Image subscriptions are released after samples and after lease expiry. The
-  browser only polls while Devices is selected, visible, authenticated and
+  browser only polls while Luxonis is selected, visible, authenticated and
   explicitly enabled by an operator on an idle Core. This does not authorize
   inspection or change physical device state. Preview is withheld during an
   active session in that Core. The independent DEV Core does not govern PROD
