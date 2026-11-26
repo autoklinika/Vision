@@ -1,3 +1,5 @@
+import {isDiagnosticsReport,isHistoryReport,isAttemptReport,isClearEnvelope} from './neroDiagnosticsContract';
+import type {DiagnosticsReport,HistoryReport,AttemptReport,ClearEnvelope,SourceFilter,HistoryFilter,ClearScope} from './neroDiagnosticsContract';
 import {isNeroReport} from './neroContract';
 import type {NeroReport} from './neroContract';
 import {isLuxonisReport,isIRResult} from './luxonisContract';
@@ -82,6 +84,25 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
 
 export function readNero():Promise<StationResult<NeroReport>>{
   return request<NeroReport,never>('/api/v1/devices/nero',isNeroReport,undefined,undefined,16384);
+}
+
+export function readNeroDiagnostics():Promise<StationResult<DiagnosticsReport>>{
+  return request<DiagnosticsReport,never>('/api/v1/devices/nero/diagnostics',isDiagnosticsReport,undefined,undefined,131072);
+}
+export async function readNeroHistory(source:SourceFilter,status:HistoryFilter,before:number):Promise<StationResult<HistoryReport>>{
+  const result=await request<HistoryReport,never>('/api/v1/devices/nero/history?source='+source+'&status='+status+'&before='+before,isHistoryReport,undefined,undefined,131072);
+  if(result.status==='AVAILABLE'&&(result.report.filterSource!==source||result.report.filterStatus!==status||result.report.before!==before))return unavailable;
+  return result;
+}
+export async function readNeroClearHistory(source:SourceFilter,before:number):Promise<StationResult<AttemptReport>>{
+  const result=await request<AttemptReport,never>('/api/v1/devices/nero/clear-history?source='+source+'&before='+before,isAttemptReport,undefined,undefined,131072);
+  if(result.status==='AVAILABLE'&&(result.report.filterSource!==source||result.report.before!==before))return unavailable;
+  return result;
+}
+export async function clearNero(instanceId:string,operationId:string,scope:ClearScope):Promise<StationResult<ClearEnvelope>>{
+  const result=await request<ClearEnvelope,never>('/api/v1/devices/nero/clear',isClearEnvelope,JSON.stringify({instanceId,operationId,scope}),undefined,16384,15000);
+  if(result.status==='AVAILABLE'&&(result.report.instanceId!==instanceId||result.report.operation.operationId!==operationId||result.report.operation.scope!==scope))return unavailable;
+  return result;
 }
 
 export async function readLuxonis(preview:boolean):Promise<StationResult<LuxonisReport>>{

@@ -22,6 +22,7 @@ from .station_owner import NoActiveSession
 from .status import boot_status
 from vision_station.inspection import InspectionRejected, ID, HEX32
 from vision_station.luxonis_ir import IRRejected, validate_request
+from vision_station.nero_clear_coordinator import valid_intent
 from vision_station.draft_editor import DraftConflict, DraftNotFound, FIELDS, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 
 # Two 1024-byte passwords can each expand sixfold with JSON escaping.
@@ -268,6 +269,16 @@ class StationApplication:
                 self.identity.logout(token)
             return self._json(start_response, 200, {"schema": "vision.api.logout.v1", "loggedOut": True},
                               extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
+        if method == "POST" and target == "/api/v1/devices/nero/clear":
+            if environ.get("HTTP_ORIGIN") != origin or environ.get("HTTP_X_VISION_CLIENT") != "webgui":
+                return self._error(start_response,403,"ORIGIN_REJECTED")
+            identity=self._authorize(environ,touch=False)
+            if identity["role"]!="operator":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            value=self._body(environ,{"instanceId","operationId","scope"},1024)
+            if not valid_intent(value):
+                raise ValueError("invalid NERO clear intent")
+            return self._json(start_response,200,self.owner.clear_nero(**value,operator=identity["username"]))
         if method == "POST" and target == "/api/v1/devices/luxonis/ir":
             if environ.get("HTTP_ORIGIN") != origin or environ.get("HTTP_X_VISION_CLIENT") != "webgui":
                 return self._error(start_response,403,"ORIGIN_REJECTED")
@@ -319,6 +330,21 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
+        if target == "/api/v1/devices/nero/diagnostics":
+            self._authorize(environ,touch=False)
+            return self._json(start_response,200,self.owner.nero_diagnostics_report())
+        if path == "/api/v1/devices/nero/clear-history":
+            self._authorize(environ,touch=False)
+            match=re.fullmatch(r"source=(ALL|ARM|J[1-7])&before=([0-9]{1,16})",query)
+            if match is None or int(match[2])>2**53-1:
+                return self._error(start_response,400,"BAD_REQUEST")
+            return self._json(start_response,200,self.owner.nero_clear_history_report(match[1],int(match[2])))
+        if path == "/api/v1/devices/nero/history":
+            self._authorize(environ,touch=False)
+            match = re.fullmatch(r"source=(ALL|ARM|J[1-7])&status=(ALL|ACTIVE|RESOLVED)&before=([0-9]{1,16})",query)
+            if match is None or int(match[3]) > 2**53-1:
+                return self._error(start_response,400,"BAD_REQUEST")
+            return self._json(start_response,200,self.owner.nero_history_report(match[1],match[2],int(match[3])))
         if target == "/api/v1/devices/nero":
             self._authorize(environ,touch=False)
             return self._json(start_response,200,self.owner.nero_report())

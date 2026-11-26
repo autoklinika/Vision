@@ -9,6 +9,10 @@ from .inspection import InspectionOwner, InspectionRejected
 from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 from .luxonis import LuxonisMonitor
 from .nero import NeroMonitor
+from .nero_diagnostics import projection
+from .nero_history import FaultHistory, HistorySampler
+from .nero_clear import result as clear_result, validate_result as validate_clear_result
+from .nero_clear_coordinator import eligible as nero_eligible, envelope as nero_clear_envelope, valid_actor, valid_intent
 from .luxonis_ir import IRRejected, controllable, validate_request
 
 
@@ -22,7 +26,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -44,6 +48,84 @@ class CoreHost:
         self._luxonis_ir = luxonis_ir
         self._luxonis_ir_interlock = luxonis_ir_interlock
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
+        self._nero_history = None
+        self._nero_clear_transport = nero_clear_transport
+        self._nero_clear_interlock = nero_clear_interlock
+        if nero_clear_transport is not None and (nero_history_directory is None or nero_clear_interlock is None):
+            raise ValueError("NERO clear requires durable history and separate idle interlock")
+        if nero_history_directory is not None:
+            if nero_directory is None:
+                raise ValueError("NERO history requires its observer")
+            self._nero_history = HistorySampler(FaultHistory(nero_history_directory),
+                self._nero, lambda: self.station_report()["instanceId"])
+
+    def close_nero_history(self):
+        if self._nero_history is not None:
+            sampler, self._nero_history = self._nero_history, None
+            sampler.close()
+
+    def nero_diagnostics_report(self):
+        r=self.nero_report()
+        history=self._nero_history is not None and self._nero_history.available
+        return projection(r,history_available=history,
+            clear_available=bool(history and self._nero_clear_transport is not None
+                                 and self.station_report()["state"]=="NO_ACTIVE_SESSION" and nero_eligible(r)))
+
+    def nero_history_report(self, source="ALL", status="ALL", before=0):
+        if self._nero_history is None:
+            raise ReportUnavailable()
+        return self._nero_history.history.page(self.station_report()["instanceId"],source,status,before)
+
+
+    def nero_clear_history_report(self, source="ALL", before=0):
+        if self._nero_history is None:
+            raise ReportUnavailable()
+        return self._nero_history.history.attempts(self.station_report()["instanceId"],source,before)
+
+    def clear_nero(self, *, operator, **intent):
+        import time
+        if not valid_intent(intent) or not valid_actor(operator):
+            raise ValueError("invalid NERO clear request")
+        instance,operation,scope=(intent[k] for k in ("instanceId","operationId","scope"))
+        def reply(status,reason,**kwargs):
+            return nero_clear_envelope(instance,clear_result(operation,scope,status,reason,**kwargs))
+        if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
+            return reply("REJECTED","BUSY")
+        try:
+            if self.station_report()["instanceId"]!=instance:
+                return reply("REJECTED","INTERLOCK")
+            if self._nero_history is None or not self._nero_history.available:
+                return reply("REJECTED","HISTORY_UNAVAILABLE")
+            history=self._nero_history.history
+            # Refresh observed episodes before reserving and linking the attempt.
+            r=self.nero_report()
+            history.observe(r)
+            prior=history.begin_clear(operation,scope,operator,time.time())
+            if prior is not None:
+                return nero_clear_envelope(instance,prior)
+            def rejected(reason):
+                return clear_result(operation,scope,"REJECTED",reason)
+            v=rejected("NOT_COMMISSIONED")
+            if self._nero_clear_transport is not None:
+                v=rejected("INTERLOCK")
+                if (self.station_report()["state"]=="NO_ACTIVE_SESSION"
+                        and not self._inspection._poisoned and not self._inspection._marker_exists()
+                        and nero_eligible(r)):
+                    try:
+                        other=self._nero_clear_interlock()
+                    except Exception:
+                        other={}
+                    if other.get("coreConnection")=="CONNECTED" and other.get("state")=="NO_ACTIVE_SESSION":
+                        try:
+                            v=self._nero_clear_transport.change(operation,scope)
+                            if not validate_clear_result(v) or v["operationId"]!=operation or v["scope"]!=scope:
+                                raise ValueError("invalid driver response")
+                        except Exception:
+                            v=clear_result(operation,scope,"UNVERIFIED","TRANSPORT_UNAVAILABLE",invoked=None)
+            history.finish_clear(operation,v,time.time())
+            return nero_clear_envelope(instance,v)
+        finally:
+            self._lifecycle_lock.release()
 
     def attach_runtime(self, runtime):
         if not isinstance(runtime, VisionRuntimeCoordinator):

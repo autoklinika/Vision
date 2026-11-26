@@ -10,6 +10,8 @@ import time
 from vision_api.access import Credentials, CursorRejected, ReportUnavailable
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
+from .nero_history import valid_query as valid_nero_history_query
+from .nero_clear_coordinator import valid_intent, valid_actor
 from .luxonis_ir import IRRejected, validate_request
 from .draft_editor import DraftConflict, DraftNotFound, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
@@ -32,6 +34,15 @@ def dispatch(host, request):
         return host.station_report()
     if operation == "nero" and not query:
         return host.nero_report()
+    if operation == "nero_diagnostics" and not query:
+        return host.nero_diagnostics_report()
+    if operation == "nero_history" and set(query) == {"source","status","before"} and valid_nero_history_query(**query):
+        return host.nero_history_report(**query)
+    if operation == "nero_clear_history" and set(query) == {"source","before"} and valid_nero_history_query(query["source"],"ALL",query["before"]):
+        return host.nero_clear_history_report(**query)
+    if operation == "nero_clear" and set(query) == {"instanceId","operationId","scope","operator"}:
+        if valid_actor(query["operator"]) and valid_intent({k:v for k,v in query.items() if k!="operator"}):
+            return host.clear_nero(**query)
     if operation == "luxonis" and not query:
         return host.luxonis_report()
     if operation == "luxonis_ir" and validate_request(query):
@@ -165,6 +176,8 @@ class CoreServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
         super().server_close()
         if self.host is not None and hasattr(self.host, "shutdown_inspection") and self._inode is not None:
             self.host.shutdown_inspection()
+        if self.host is not None and hasattr(self.host, "close_nero_history"):
+            self.host.close_nero_history()
         if self._inode is not None:
             try:
                 info = self._path.lstat()

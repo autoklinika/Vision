@@ -11,6 +11,9 @@ from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
 from .luxonis import validate_luxonis_report
 from .nero import validate_nero_report
+from .nero_diagnostics import validate_report as validate_nero_diagnostics
+from .nero_history import validate_history as validate_nero_history, valid_query as valid_nero_history_query, validate_attempts
+from .nero_clear_coordinator import valid_intent, valid_actor, validate_envelope
 from .luxonis_ir import IRRejected, validate_request, validate_result
 from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
 from .protocol import (ERRORS, exchange_timeout, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
@@ -138,6 +141,34 @@ class RemoteStationOwner:
 
     def nero_report(self):
         return self._read("nero",{},validate_nero_report)
+
+    def nero_diagnostics_report(self):
+        return self._read("nero_diagnostics",{},validate_nero_diagnostics)
+
+    def nero_history_report(self, source="ALL", status="ALL", before=0):
+        if not valid_nero_history_query(source,status,before):
+            raise ValueError("invalid NERO history query")
+        report = self._read("nero_history",{"source":source,"status":status,"before":before},validate_nero_history)
+        if (report["filterSource"],report["filterStatus"],report["before"]) != (source,status,before):
+            raise ReportUnavailable()
+        return report
+
+    def nero_clear_history_report(self, source="ALL", before=0):
+        if not valid_nero_history_query(source,"ALL",before):
+            raise ValueError("invalid NERO clear history query")
+        r=self._read("nero_clear_history",{"source":source,"before":before},validate_attempts)
+        if (r["filterSource"],r["before"])!=(source,before):
+            raise ReportUnavailable()
+        return r
+
+    def clear_nero(self, *, operator, **intent):
+        if not valid_intent(intent) or not valid_actor(operator):
+            raise ValueError("invalid NERO clear intent")
+        r=self._read("nero_clear",{**intent,"operator":operator},validate_envelope)
+        if (r["instanceId"]!=intent["instanceId"] or r["operation"]["operationId"]!=intent["operationId"]
+                or r["operation"]["scope"]!=intent["scope"]):
+            raise ReportUnavailable()
+        return r
 
     def luxonis_report(self, *, preview=False):
         report=self._read("luxonis_preview" if preview else "luxonis",{},validate_luxonis_report)

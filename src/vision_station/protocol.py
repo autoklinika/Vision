@@ -21,7 +21,7 @@ EDITOR_EXCHANGE_TIMEOUT = 30.0
 def exchange_timeout(operation):
     # Complete, bounded history verification is disk work. It gets its own
     # response deadline; request reception and operational exchanges stay short.
-    if operation == "luxonis_ir":
+    if operation in ("luxonis_ir", "nero_clear"):
         return 12.0
     if operation == "draft_editor":
         return EDITOR_EXCHANGE_TIMEOUT

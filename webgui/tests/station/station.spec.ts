@@ -8,6 +8,8 @@ import { libraryFixture, libraryDetailFixture, libraryHistoryFixture, draftEntry
 import { sessionFixture, eventsFixture } from '../fixtures/session';
 import {luxonisFixture} from '../fixtures/luxonis';
 import {neroFixture} from '../fixtures/nero';
+import {diagnosticsFixture,neroHistoryFixture,neroAttemptFixture,rejectedOperation} from '../fixtures/neroDiagnostics';
+import type {SourceFilter,HistoryFilter,ClearScope} from '../../src/station/neroDiagnosticsContract';
 
 const contentType = 'application/json; charset=utf-8';
 async function login(page: Page, username: string, password: string) {
@@ -833,4 +835,54 @@ test('NERO live read-only telemetry clears expired feedback and never writes con
  await expect(panel).toBeHidden();
  await page.waitForTimeout(1000);const stopped=reads;await page.waitForTimeout(1000);
  expect(reads).toBe(stopped);expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('NERO diagnostics shows source codes, filtered history and explicit clear confirmation',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ let commissioned=false,commands:unknown[]=[];
+ await page.route('**/api/v1/devices/nero',route=>route.fulfill({contentType,body:JSON.stringify(neroFixture())}));
+ await page.route('**/api/v1/devices/nero/diagnostics',route=>route.fulfill({contentType,body:JSON.stringify(diagnosticsFixture(commissioned))}));
+ await page.route('**/api/v1/devices/nero/history?*',route=>{
+   const p=new URL(route.request().url()).searchParams;
+   return route.fulfill({contentType,body:JSON.stringify(neroHistoryFixture(p.get('source') as SourceFilter,p.get('status') as HistoryFilter,Number(p.get('before'))))});
+ });
+ await page.route('**/api/v1/devices/nero/clear-history?*',route=>{
+   const p=new URL(route.request().url()).searchParams;
+   return route.fulfill({contentType,body:JSON.stringify(neroAttemptFixture(p.get('source') as SourceFilter,Number(p.get('before'))))});
+ });
+ await page.route('**/api/v1/devices/nero/clear',route=>{
+   const body=route.request().postDataJSON() as {operationId:string;scope:ClearScope};
+   commands.push(body);
+   return route.fulfill({contentType,body:JSON.stringify({schema:'vision.api.nero-clear.v1',source:'STATION',instanceId:'f'.repeat(32),operation:rejectedOperation(body.operationId,body.scope)})});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Diagnostics',exact:true}).click();
+ const table=panel.getByRole('table',{name:'Current diagnostic codes'});
+ await expect(table).toContainText('0x20');
+ await expect(table).toContainText('DRIVE_STATUS');
+ await expect(panel.getByRole('button',{name:'Prepare clear'})).toBeDisabled();
+ commissioned=true;
+ await expect(panel.getByRole('button',{name:'Prepare clear'})).toBeEnabled();
+ await panel.getByLabel('Clear scope').selectOption('5');
+ await panel.getByRole('button',{name:'Prepare clear'}).click();
+ expect(commands).toHaveLength(0);
+ await expect(panel).toContainText('local VENTUNO console');
+ await panel.getByRole('button',{name:'Execute confirmed clear'}).click();
+ await expect(panel).toContainText('NO_LOCAL_CONFIRMATION');
+ expect(commands).toHaveLength(1);
+ await panel.getByRole('tab',{name:'Fault history',exact:true}).click();
+ const history=panel.getByRole('table',{name:'Fault episodes'});
+ await expect(history).toContainText('Driver error');
+ await panel.getByLabel('Source',{exact:true}).selectOption('J1');
+ await expect(panel).toContainText('No matching fault episodes.');
+ await panel.getByLabel('Source',{exact:true}).selectOption('J5');
+ await expect(history).toContainText('Driver error');
+ await panel.getByLabel('Status',{exact:true}).selectOption('RESOLVED');
+ await expect(panel).toContainText('No matching fault episodes.');
+ await page.setViewportSize({width:390,height:844});
+ expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ expect(commands).toHaveLength(1);
 });
