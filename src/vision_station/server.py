@@ -29,6 +29,10 @@ def dispatch(host, request):
         raise ValueError("legacy request too large")
     if operation == "station" and not query:
         return host.station_report()
+    if operation == "luxonis" and not query:
+        return host.luxonis_report()
+    if operation == "luxonis_preview" and not query:
+        return host.luxonis_report(preview=True)
     if operation == "inspection" and not query:
         return host.inspection_report()
     if operation == "inspection_start" and set(query) == {"selection_id", "instance_id", "intent_token", "operator"}:

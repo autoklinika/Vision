@@ -9,14 +9,16 @@ import { StationStatusContent } from '../station/StationStatusContent';
 import { connectionLabel } from '../api/presentation';
 import type { AppId } from '../shell/model';
 import { SettingsContent } from './SettingsContent';
+import { DevicesContent } from '../station/DevicesContent';
 const placeholders: Record<Exclude<AppId, 'status' | 'control' | 'inspection' | 'events' | 'ecu' | 'settings'>, { heading: string; columns: string[]; message: string; action: string }> = {
   luxonis: { heading: 'RGB-D observation', columns: ['RGB', 'Depth', 'Point cloud', 'Timestamp'], message: 'No sensor media available. Frames, geometry and measurements must come from the Vision interface.', action: 'Acquire frame' },
   nero: { heading: 'Motion & planning', columns: ['Robot report', 'Scene', 'Plan', 'Operation'], message: 'No robot or planner report available. No local kinematics, trajectory generation or motion execution.', action: 'Request motion' },
   sony: { heading: 'Camera acquisition', columns: ['Camera', 'Parameters', 'Capture', 'Transfer'], message: 'No acquisition report or photographs available. This client has no camera connection.', action: 'Capture photograph' },
   images: { heading: 'Image archive', columns: ['Asset', 'Source', 'Timestamp', 'Metadata'], message: 'No archive connected. Image browsing, A/B comparison and overlays are proposed for GUI-06.', action: 'Open image' },
 };
-export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station, onNavigate }: { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation; onNavigate?: (id: AppId) => void }) {
+export function AppContent({ id, snapshot, reset, persistence, refresh, sessionControls, libraryControls, station, onNavigate, active=false }:  { id: AppId; snapshot: Snapshot | null; reset: () => void; persistence: string; refresh?: () => void; sessionControls?: SessionControls; libraryControls?: LibraryControls; station?: StationPresentation; onNavigate?: (id: AppId) => void; active?:boolean }) {
   const {t}=useTranslation();
+  if (id === 'luxonis' && station) return <DevicesContent station={station} active={active}/>;
   if (id === 'settings') return <SettingsContent station={station}/>;
   if (id === 'status' && station && sessionControls) return <StationStatusContent station={station} session={sessionControls} openInspection={onNavigate?()=>onNavigate("inspection"):undefined}/>;
   if (id === 'ecu') return libraryControls ? <LibraryContent controls={libraryControls} station={station}/> : <p>{t("Protected library reads are unavailable in this view.")}</p>;

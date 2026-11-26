@@ -3,15 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeaderTitle, FluentProvider, OverlayDrawer, webLightTheme } from '@fluentui/react-components';
 import { NavigationRegular, DismissRegular, AppsRegular, LibraryRegular, ClipboardTaskList16Regular, CameraRegular, VideoRegular, ImageRegular, SettingsRegular, SignOutRegular, PulseRegular, WrenchRegular, DocumentRegular } from '@fluentui/react-icons';
-import { apps } from './model';
+import { stationAppTitle } from './model';
 import type { AppId } from './model';
 import { loadStationLogo } from '../startup/brand';
 import './station-navigation.css';
 
 const icons = { status: PulseRegular, ecu: LibraryRegular, inspection: ClipboardTaskList16Regular, luxonis: VideoRegular, nero: AppsRegular, sony: CameraRegular, images: ImageRegular, control: WrenchRegular, events: DocumentRegular, settings: SettingsRegular };
 const groups: { name: string; ids: AppId[] }[] = [
-  { name: 'Workspace', ids: ['status', 'ecu', 'inspection', 'images'] },
-  { name: 'Devices', ids: ['luxonis', 'nero', 'sony'] },
+  { name: 'Workspace', ids: ['status', 'luxonis', 'ecu', 'inspection', 'images'] },
   { name: 'System', ids: ['events', 'control', 'settings'] },
 ];
 
@@ -59,9 +58,8 @@ export function StationNavigation({active, onNavigate, onSignOut, accountBusy, a
           {groups.map(group => <section key={group.name} aria-label={t(group.name)}>
             <h2>{t(group.name)}</h2>
             {group.ids.map(id => {
-              const app = apps.find(a => a.id === id)!;
               const ModuleIcon = icons[id];
-              return <Button key={id} appearance="subtle" icon={<ModuleIcon/>} className="vision-navigation-item" aria-current={active === id ? 'page' : undefined} onClick={() => { setOpen(false); onNavigate(id); }}>{t(app.title)}</Button>;
+              return <Button key={id} appearance="subtle" icon={<ModuleIcon/>} className="vision-navigation-item" aria-current={active === id ? 'page' : undefined} onClick={() => { setOpen(false); onNavigate(id); }}>{t(stationAppTitle(id))}</Button>;
             })}
           </section>)}
         </nav>

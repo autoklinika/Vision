@@ -9,6 +9,7 @@ from vision_api.library_reports import (validate_library_report, validate_librar
 from vision_api.reports import _timestamp, validate_session_report, validate_events_report
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
+from .luxonis import validate_luxonis_report
 from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
 from .protocol import (ERRORS, exchange_timeout, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
@@ -120,6 +121,12 @@ class RemoteStationOwner:
                             validate_events_report)
         if (report["viewId"] != view or report["afterSequence"] != after
                 or report["throughSequence"] != through):
+            raise ReportUnavailable()
+        return report
+
+    def luxonis_report(self, *, preview=False):
+        report=self._read("luxonis_preview" if preview else "luxonis",{},validate_luxonis_report)
+        if not preview and any(frame is not None for frame in report["frames"].values()):
             raise ReportUnavailable()
         return report
 

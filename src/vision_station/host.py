@@ -7,6 +7,7 @@ from vision_modules.ecu_library_backend import ECULibraryService
 from vision_runtime import VisionRuntimeCoordinator
 from .inspection import InspectionOwner, InspectionRejected
 from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
+from .luxonis import LuxonisMonitor
 
 
 class CoreHost:
@@ -19,7 +20,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -36,6 +37,7 @@ class CoreHost:
         self._runtime = None
         self._view_id = None
         self._draft_editor = DraftEditor(self)
+        self._luxonis = LuxonisMonitor(luxonis_directory)
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
 
     def attach_runtime(self, runtime):
@@ -70,6 +72,11 @@ class CoreHost:
         # Connection is independent of whether a specimen inspection exists.
         report["coreConnection"] = "CONNECTED"
         return report
+
+    def luxonis_report(self, *, preview=False):
+        station=self.station_report()
+        return self._luxonis.report(station["instanceId"],preview=preview,
+            idle=station["state"]=="NO_ACTIVE_SESSION")
 
     def session_report(self):
         return self._reader.session_report()

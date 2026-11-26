@@ -306,6 +306,14 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
+        if target in ("/api/v1/devices/luxonis","/api/v1/devices/luxonis/preview"):
+            identity=self._authorize(environ,touch=False)
+            preview=target.endswith("/preview")
+            if preview and identity["role"]!="operator":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            # The proxy cannot access ROS or the observer directory itself.
+            # This is a closed Core projection, not a generic parameter endpoint.
+            return self._json(start_response,200,self.owner.luxonis_report(preview=preview))
         protected = (target in ("/api/v1/station", "/api/v1/session", "/api/v1/library", "/api/v1/inspection")
                      or EVENTS_PATH.fullmatch(target) or LIBRARY_PAGE.fullmatch(target)
                      or LIBRARY_ENTRY.fullmatch(target) or LIBRARY_HISTORY.fullmatch(target))

@@ -1,3 +1,5 @@
+import {isLuxonisReport} from './luxonisContract';
+import type {LuxonisReport} from './luxonisContract';
 import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
 import {isDraftReport, isDraftValidation, isDraftAssetReport, isDraftAssetPreview} from './draftContract';
 import type {DraftAction, DraftReport, DraftValidation, DraftAssetReport, DraftAssetPreview} from './draftContract';
@@ -76,6 +78,11 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
     {400: 'PASSWORD_REJECTED', 403: 'CURRENT_PASSWORD_INVALID'} as const);
 }
 
+export async function readLuxonis(preview:boolean):Promise<StationResult<LuxonisReport>>{
+  const result=await request<LuxonisReport,never>('/api/v1/devices/luxonis'+(preview?'/preview':''),isLuxonisReport,undefined,undefined,131072);
+  if(result.status==='AVAILABLE'&&!preview&&Object.values(result.report.frames).some(f=>f!==null))return unavailable;
+  return result;
+}
 export function readInspection(): Promise<StationResult<InspectionReport>> {
   return request<InspectionReport, never>('/api/v1/inspection', isInspectionReport, undefined, undefined, 16384);
 }

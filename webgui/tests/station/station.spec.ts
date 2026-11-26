@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { identityFixture, stationFixture } from '../fixtures/station';
 import { libraryFixture, libraryDetailFixture, libraryHistoryFixture, draftEntry } from '../fixtures/library';
 import { sessionFixture, eventsFixture } from '../fixtures/session';
+import {luxonisFixture} from '../fixtures/luxonis';
 
 const contentType = 'application/json; charset=utf-8';
 async function login(page: Page, username: string, password: string) {
@@ -24,13 +25,13 @@ async function fillPasswordChange(page: Page, current: string, next: string, con
 async function mockStation(page: Page) {
   const state = {authenticated: false, offline: false, coreConnected: true, active: false, revoked: false, logoutOffline: false,
     holdSession: null as null | (() => Promise<void>), libraryCount: 2, libraryView: 'c'.repeat(64), reads: [] as string[], writes: [] as string[], holdDetail: null as null | (() => Promise<void>),
-    holdPassword: null as null | (() => Promise<void>), passwordResult: 'success' as 'success' | 'wrong' | 'rejected' | 'limited' | 'unconfirmed'};
+    role: 'reader' as 'reader'|'operator', holdPassword: null as null | (() => Promise<void>), passwordResult: 'success' as 'success' | 'wrong' | 'rejected' | 'limited' | 'unconfirmed'};
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname;
     if (route.request().method() === 'POST') state.writes.push(path); else state.reads.push(path + url.search);
     if (state.offline || path.endsWith('/logout') && state.logoutOffline) return route.abort('failed');
     const reply = (value: unknown, status = 200) => route.fulfill({status, contentType, body: JSON.stringify(value)});
-    if (path === '/api/v1/auth/login') { state.authenticated = true; state.revoked = false; return reply(identityFixture()); }
+    if (path === '/api/v1/auth/login') { state.authenticated = true; state.revoked = false; return reply({...identityFixture(),role:state.role}); }
     if (path === '/api/v1/auth/logout') { state.authenticated = false; return reply({schema: 'vision.api.logout.v1', loggedOut: true}); }
     if (!state.authenticated || state.revoked) return reply({schema: 'vision.api.error.v1', code: 'ACCESS_DENIED'}, 401);
     if (path === '/api/v1/auth/password') {
@@ -42,7 +43,7 @@ async function mockStation(page: Page) {
       state.authenticated = false;
       return reply({schema: 'vision.api.password-change.v1', changed: true});
     }
-    if (path === '/api/v1/auth/session') return reply(identityFixture());
+    if (path === '/api/v1/auth/session') return reply({...identityFixture(),role:state.role});
     if (path === '/api/v1/station') return reply(stationFixture(state.coreConnected && state.active, state.coreConnected));
     const session = {...sessionFixture(), source: 'STATION', sessionId: 'station-session'} as const;
     if (!state.coreConnected && (path === '/api/v1/session' || path === '/api/v1/events')) return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
@@ -698,5 +699,57 @@ test('library searches all authorized pages, filters record type and browses the
   await query.fill('missing-profile');
   await library.getByRole('button',{name:'Search library',exact:true}).click();
   await expect(library).toContainText('No matching ECU entries.');
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('Devices Luxonis distinguishes saved settings and current frames, and stops polling preview when hidden',async({page})=>{
+  const state=await mockStation(page);state.role='operator';
+  let active=false,fail=false,previewReads=0,statusReads=0;
+  await page.route('**/api/v1/devices/luxonis**',route=>{
+    const preview=new URL(route.request().url()).pathname.endsWith('/preview');
+    if(preview)previewReads++;else statusReads++;
+    if(fail)return route.fulfill({status:503,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'REPORT_UNAVAILABLE'})});
+    return route.fulfill({contentType,body:JSON.stringify(luxonisFixture(active,preview))});
+  });
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Devices',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'Devices',exact:true})).toHaveAttribute('aria-selected','true');
+  const panel=page.locator('[data-module="luxonis"]');
+  await expect(panel).toContainText('Luxonis OAK-D Pro AF');
+  await expect(panel).toContainText('USB detected');
+  await expect(panel).toContainText('The camera node is not running');
+  const select=panel.getByRole('combobox',{name:'Settings source',exact:true});
+  await expect(select).toHaveValue('rgbd_lab');
+  await select.selectOption('stereo800_lab');
+  await expect(panel.getByRole('table',{name:'Stereo depth'})).toContainText('1280');
+  await expect(panel).toContainText('Saved diagnostic configuration');
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
+  expect(previewReads).toBe(0);expect(statusReads).toBeGreaterThan(0);
+  await panel.getByRole('button',{name:'Enable preview',exact:true}).click();
+  active=true;
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(2);
+  await expect.poll(()=>panel.locator('.luxonis-image-viewport img').first().evaluate((el:HTMLImageElement)=>el.naturalWidth)).toBe(32);
+  await expect(panel.getByRole('region',{name:'RGB preview'})).toContainText('1920 × 1080');
+  await select.selectOption('live');
+  await expect(panel.getByRole('table',{name:'RGB camera'})).toContainText('15');
+  await expect(panel).toContainText('/oak · ROS 186');
+  fail=true;
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
+  await expect(panel).toContainText('Device report unavailable.');
+  fail=false;
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(2);
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await expect(panel).toBeHidden();
+  await page.waitForTimeout(1200);
+  const stopped=previewReads;await page.waitForTimeout(1100);
+  expect(previewReads).toBe(stopped);
+  await page.getByRole('tab',{name:'Devices',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Enable preview',exact:true})).toBeEnabled();
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
+  await page.setViewportSize({width:390,height:844});
+  expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  expect(errors).toEqual([]);
   expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
