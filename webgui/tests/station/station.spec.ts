@@ -839,9 +839,13 @@ test('NERO live read-only telemetry clears expired feedback and never writes con
 
 test('NERO diagnostics shows source codes, filtered history and explicit clear confirmation',async({page})=>{
  const state=await mockStation(page);state.role='operator';
- let commissioned=false,commands:unknown[]=[];
+ let commissioned=false,partial=false,commands:unknown[]=[];
  await page.route('**/api/v1/devices/nero',route=>route.fulfill({contentType,body:JSON.stringify(neroFixture())}));
- await page.route('**/api/v1/devices/nero/diagnostics',route=>route.fulfill({contentType,body:JSON.stringify(diagnosticsFixture(commissioned))}));
+ await page.route('**/api/v1/devices/nero/diagnostics',route=>{
+   const d=diagnosticsFixture(commissioned);
+   if(partial)d.coverage=d.coverage.filter(c=>!(c.source==='J2'&&c.family==='DRIVE_STATUS')&&!(c.source==='J5'&&c.family==='ARM_MASK'));
+   return route.fulfill({contentType,body:JSON.stringify(d)});
+ });
  await page.route('**/api/v1/devices/nero/history?*',route=>{
    const p=new URL(route.request().url()).searchParams;
    return route.fulfill({contentType,body:JSON.stringify(neroHistoryFixture(p.get('source') as SourceFilter,p.get('status') as HistoryFilter,Number(p.get('before'))))});
@@ -863,6 +867,18 @@ test('NERO diagnostics shows source codes, filtered history and explicit clear c
  const table=panel.getByRole('table',{name:'Current diagnostic codes'});
  await expect(table).toContainText('0x20');
  await expect(table).toContainText('DRIVE_STATUS');
+ const normal=table.getByRole('row').filter({has:page.getByRole('cell',{name:'J1',exact:true})});
+ await expect(normal.getByRole('cell',{name:'0x00',exact:true})).toBeVisible();
+ await expect(normal.getByText('Normal',{exact:true})).toBeVisible();
+ partial=true;
+ const missing=table.getByRole('row').filter({has:page.getByRole('cell',{name:'J2',exact:true})}).filter({hasText:'DRIVE_STATUS'});
+ await expect(missing.getByRole('cell',{name:'—',exact:true})).toBeVisible();
+ await expect(missing.getByText('Unknown',{exact:true})).toBeVisible();
+ await expect(table.getByRole('row').filter({has:page.getByRole('cell',{name:'J2',exact:true})}).getByText('Normal',{exact:true})).toHaveCount(0);
+ await expect(table.getByRole('row').filter({has:page.getByRole('cell',{name:'J5',exact:true})}).filter({hasText:'ARM_MASK'})).toContainText('Unknown');
+ await expect(table).toContainText('0x20');
+ partial=false;
+ await expect(table.getByRole('row').filter({has:page.getByRole('cell',{name:'J2',exact:true})}).getByText('Normal',{exact:true})).toBeVisible();
  await expect(panel.getByRole('button',{name:'Prepare clear'})).toBeDisabled();
  commissioned=true;
  await expect(panel.getByRole('button',{name:'Prepare clear'})).toBeEnabled();

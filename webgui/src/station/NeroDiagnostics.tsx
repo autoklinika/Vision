@@ -71,11 +71,20 @@ export function NeroDiagnostics({station,active}:{station:StationPresentation;ac
    <TableHeader><TableRow>{['Source','Code family','HEX code','Description','Severity'].map(k=><TableHeaderCell key={k}>{t(k)}</TableHeaderCell>)}</TableRow></TableHeader>
    <TableBody>{sources.flatMap(source=>{
      const entries=current.filter(e=>e.source===source);
-     const known=report?.coverage.filter(c=>c.source===source).length===2;
-     if(entries.length)return entries.map(e=><TableRow key={source+e.family+e.hex}><TableCell><strong>{source}</strong></TableCell><TableCell>{e.family}</TableCell><TableCell>{e.hex}</TableCell><TableCell>{t(e.description)}</TableCell><TableCell><Badge appearance="tint" color={color(e.severity)}>{t(e.severity)}</Badge></TableCell></TableRow>);
-     return [<TableRow key={source}><TableCell><strong>{source}</strong></TableCell><TableCell>—</TableCell><TableCell>—</TableCell><TableCell>{t(known?'No active fault flags':'Unknown')}</TableCell><TableCell>—</TableCell></TableRow>];
+     const expected=source==='ARM'?['ARM_STATUS','ARM_MASK']:['DRIVE_STATUS','ARM_MASK'];
+     const missing=expected.filter(f=>!report?.coverage.some(c=>c.source===source&&c.family===f));
+     const known=missing.length===0;
+     const rows=entries.map(e=>{
+       const normal=known&&source==='ARM'&&e.family==='ARM_STATUS'&&e.code===0&&entries.length===1;
+       return <TableRow key={source+e.family+e.hex}><TableCell><strong>{source}</strong></TableCell><TableCell>{e.family}</TableCell><TableCell>{e.hex}</TableCell><TableCell>{t(e.description)}</TableCell><TableCell><Badge appearance="tint" color={normal?'success':color(e.severity)}>{t(normal?'Normal':e.severity)}</Badge></TableCell></TableRow>;
+     });
+     // An absent fault is normal only with both independently validated code
+     // families. 0x00 is the drive fault mask, not the raw enable bit.
+     if(!entries.length&&known)return [<TableRow key={source}><TableCell><strong>{source}</strong></TableCell><TableCell>{source==='ARM'?'ARM_MASK':t('Joint fault mask')}</TableCell><TableCell>{source==='ARM'?'0x0000':'0x00'}</TableCell><TableCell>{t('No active fault flags')}</TableCell><TableCell><Badge appearance="tint" color="success">{t('Normal')}</Badge></TableCell></TableRow>];
+     return [...rows,...missing.map(f=><TableRow key={source+f+'missing'}><TableCell><strong>{source}</strong></TableCell><TableCell>{f}</TableCell><TableCell>—</TableCell><TableCell>{t('No current diagnostic data')}</TableCell><TableCell><Badge appearance="tint" color="informative">{t('Unknown')}</Badge></TableCell></TableRow>)];
    })}</TableBody>
   </Table></div>
+  <p className="fine-print">{t("Joint fault mask 0x00 means no active diagnostic faults, not that the drive is enabled or ready for motion.")}</p>
   <div className="luxonis-settings-card nero-clear-panel">
     <h3>{t('Clear joint errors')}</h3>
     <p>{t('Clearing is separate from motion reset and never enables the drives.')}</p>
