@@ -623,6 +623,10 @@ test('compact header keeps tabs beside the logo, closes the requested tab and su
   await expect(libraryClose).toHaveCSS('opacity','0');
   await library.hover();
   await expect(libraryClose).toHaveCSS('opacity','1');
+  await settings.click();
+  await library.hover();
+  await expect(strip.getByRole('button',{name:'Close Settings',exact:true})).toHaveCSS('opacity','0');
+  await expect(libraryClose).toHaveCSS('opacity','1');
   await libraryClose.click();
   await expect(library).toHaveCount(0);
   await expect(settings).toHaveAttribute('aria-selected','true');
@@ -632,6 +636,7 @@ test('compact header keeps tabs beside the logo, closes the requested tab and su
   await settings.focus();
   await page.keyboard.press('ArrowLeft');
   await expect(status).toBeFocused();
+  await expect(strip.getByRole('button',{name:'Close System Status',exact:true})).toHaveCSS('opacity','1');
   await page.keyboard.press('Enter');
   await expect(status).toHaveAttribute('aria-selected','true');
   await expect(status).toBeFocused();

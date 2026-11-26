@@ -68,7 +68,8 @@
   margin: 4px 0 0;
   border-radius: var(--borderRadiusMedium) var(--borderRadiusMedium) 0 0;
 }
-.vision-tab-item:hover, .vision-tab-item:focus-within {
+.vision-tab-item:hover, .vision-tab-item:has(:focus-visible),
+.vision-workspace-tabs[data-keyboard-navigation="true"] .vision-tab-item:focus-within {
   background: var(--colorNeutralBackground1Hover);
 }
 .vision-tab-item .fui-Tab {
@@ -86,7 +87,8 @@
   opacity: 0;
 }
 .vision-tab-item:hover .vision-tab-close,
-.vision-tab-item:focus-within .vision-tab-close {
+.vision-tab-item:has(:focus-visible) .vision-tab-close,
+.vision-workspace-tabs[data-keyboard-navigation="true"] .vision-tab-item:focus-within .vision-tab-close {
   opacity: 1;
 }
 @media (hover: none), (pointer: coarse) {

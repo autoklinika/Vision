@@ -118,7 +118,11 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
     const openModules = apps.filter(app => state.windows.some(win => win.id === app.id));
     return <main className="desktop station-fluent-shell vision-workspace">
       <StationNavigation available={stationAvailable} active={state.active} onNavigate={launch} accountBusy={station.accountBusy} onSignOut={() => { if (allowEditorExit()) station.logout(); }} tabs={
-        <TabList className="vision-workspace-tabs" aria-label={t("Open modules")} selectedValue={state.active ?? undefined} onTabSelect={(_, data) => dispatch({type:'focus',id:data.value as AppId})}>
+        <TabList className="vision-workspace-tabs" aria-label={t("Open modules")} selectedValue={state.active ?? undefined}
+          onKeyDownCapture={event=>{event.currentTarget.dataset.keyboardNavigation='true';}}
+          onPointerDownCapture={event=>{delete event.currentTarget.dataset.keyboardNavigation;}}
+          onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))delete event.currentTarget.dataset.keyboardNavigation;}}
+          onTabSelect={(_, data) => dispatch({type:'focus',id:data.value as AppId})}>
           {openModules.map(app => <div key={app.id} role="presentation" className="vision-tab-item">
             <Tab value={app.id} id={'tab-'+app.id} aria-controls={'panel-'+app.id} aria-keyshortcuts="Delete" onKeyDown={event => { if (event.key==='Delete') { event.preventDefault(); closeStationTab(app.id); } }}>{t(app.title)}</Tab>
             <Button className="vision-tab-close" appearance="subtle" size="small" icon={<DismissRegular/>} tabIndex={-1} aria-label={t('Close {module}',{module:t(app.title)})} title={t('Close {module}',{module:t(app.title)})} onClick={() => closeStationTab(app.id)}/>
