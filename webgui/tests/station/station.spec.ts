@@ -231,7 +231,7 @@ test('late denial from a previous login cannot sign out a new login', async ({pa
   await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
   await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'System Status', exact: true}).click();
   await page.locator('[data-module="status"]').getByRole('button', {name: 'Refresh station'}).click();
-  await expect(page.locator('.mode-banner')).toContainText('CONNECTED · VENTUNO');
+  await expect(page.locator('.vision-workspace-status')).toContainText('Core connected');
 });
 
 test('unconfirmed logout hides protected data and retries without restoring the desktop', async ({page}) => {
@@ -592,5 +592,63 @@ test('Fluent system status presents only reported hardware/availability/readines
   expect(await status.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
   const area=translated.locator('..');
   expect(await area.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('compact header keeps tabs beside the logo, closes the requested tab and supports keyboard and narrow screens', async ({page}) => {
+  const state=await mockStation(page);
+  await page.goto('/');
+  await login(page,'operator','mock-password');
+  const header=page.locator('.vision-topbar');
+  const strip=header.getByRole('tablist',{name:'Open modules'});
+  const drawer=page.getByRole('dialog',{name:'Navigation',exact:true});
+  const open=async(name:string)=>{
+    await header.getByRole('button',{name:'Open navigation',exact:true}).click();
+    await drawer.getByRole('button',{name,exact:true}).click();
+    await expect(drawer).toHaveCount(0);
+  };
+  await expect(strip).toBeVisible();
+  await expect(header).not.toContainText('Core connected');
+  await expect(page.locator('.vision-workspace-status')).toContainText('Core connected');
+  expect(await page.locator('.vision-workspace').evaluate(el=>getComputedStyle(el).gridTemplateRows.split(' ').length)).toBe(3);
+  await open('ECU Library');
+  await open('Settings');
+  const status=strip.getByRole('tab',{name:'System Status',exact:true});
+  const library=strip.getByRole('tab',{name:'ECU Library',exact:true});
+  const settings=strip.getByRole('tab',{name:'Settings',exact:true});
+  const libraryClose=strip.getByRole('button',{name:'Close ECU Library',exact:true});
+  await expect(settings).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('[data-module="settings"]')).toBeVisible();
+  await page.mouse.move(10,200);
+  await expect(libraryClose).toHaveCSS('opacity','0');
+  await library.hover();
+  await expect(libraryClose).toHaveCSS('opacity','1');
+  await libraryClose.click();
+  await expect(library).toHaveCount(0);
+  await expect(settings).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('[data-module="settings"]')).toBeVisible();
+
+  // An inactive tab can be reached by arrows, selected and closed via Delete.
+  await settings.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(status).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveAttribute('aria-selected','true');
+  await expect(status).toBeFocused();
+  await expect(page.locator('[data-module="status"]')).toBeVisible();
+  await page.keyboard.press('Delete');
+  await expect(status).toHaveCount(0);
+  await expect(settings).toBeFocused();
+  await expect(settings).toHaveAttribute('aria-selected','true');
+
+  await open('System Status');
+  await open('ECU Library');
+  await page.setViewportSize({width:390,height:844});
+  await open('Event Viewer');
+  await expect(strip.getByRole('tab',{name:'Event Viewer',exact:true})).toHaveAttribute('aria-selected','true');
+  expect(await strip.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const selected=strip.getByRole('tab',{name:'Event Viewer',exact:true});
+  await expect.poll(()=>selected.evaluate(el=>{const a=el.getBoundingClientRect(),b=el.closest('.vision-workspace-tabs')!.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1;})).toBe(true);
   expect(state.writes).toEqual(['/api/v1/auth/login']);
 });

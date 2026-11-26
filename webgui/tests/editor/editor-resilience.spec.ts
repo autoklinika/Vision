@@ -43,6 +43,15 @@ test('unsaved editor survives transient station/auth failures, Core outage and s
   page.once('dialog',dialog=>dialog.dismiss());
   await page.getByRole('button',{name:'Close ECU Library',exact:true}).click();
   await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('resilience-family');
+  // Closing a dirty, inactive tab must preserve both the working copy and
+  // the currently selected module if the operator cancels the confirmation.
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).hover();
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('button',{name:'Close ECU Library',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'System Status',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).click();
+  await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('resilience-family');
   page.once('dialog',dialog=>dialog.dismiss());
   await editor.getByRole('button',{name:'Close editor',exact:true}).click();
   await expect(editor.getByLabel('New profile ID',{exact:true})).toHaveValue('resilience-profile');
@@ -153,7 +162,7 @@ for(const change of ['role','user'] as const){
     })}));
     await page.clock.fastForward(15100);
     await expect(page.locator('.vision-workspace')).toBeVisible();
-    await expect(page.locator('.desktop .mode-banner')).toContainText(change==='role'?'Read only':'synthetic-other-owner');
+    await expect(page.locator('.vision-workspace-status')).toContainText(change==='role'?'Read only':'synthetic-other-owner');
     await expect(editor).toHaveCount(0);
     await expect(page.locator('[data-editor-dirty]')).toHaveCount(0);
   });

@@ -12,7 +12,7 @@ import type { StationPresentation } from '../station/client';
 import { modeLabel, modeDescription, connectionLabel } from '../api/presentation';
 import { apps, clamp, decodeLayout, encodeLayout, reduce, storageKey } from './model';
 import type { Action, AppId, Bounds, Rect, WindowState } from './model';
-function bounds(stationMode = false): Bounds { return { width: Math.max(1, window.innerWidth), height: Math.max(1, window.innerHeight - (stationMode ? 86 : 72)) }; }
+function bounds(stationMode = false): Bounds { return { width: Math.max(1, window.innerWidth), height: Math.max(1, window.innerHeight - (stationMode ? 78 : 72)) }; }
 export function Icon({ id, small = false }: { id: AppId; small?: boolean }) {
   const index = apps.findIndex(a => a.id === id);
   // Original geometric SVG artwork; no imported OS icons or branding.
@@ -48,9 +48,21 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
   useEffect(() => {
     if (state.active) {
       const target = windowsRef.current.get(state.active);
-      if (!target?.contains(document.activeElement)) target?.focus({ preventScroll: true });
+      // Switching via the tab strip must leave keyboard focus on the tab.
+      const tabFocused = stationMode && document.activeElement?.closest('.vision-workspace-tabs');
+      if (!tabFocused && !target?.contains(document.activeElement)) target?.focus({ preventScroll: true });
     }
-  }, [state.active]);
+  }, [state.active, stationMode]);
+  useEffect(() => {
+    if (!stationMode || !state.active) return;
+    const tab = document.getElementById('tab-'+state.active);
+    const strip = tab?.closest('.vision-workspace-tabs');
+    if (!tab || !strip) return;
+    const item = tab.parentElement!.getBoundingClientRect();
+    const visible = strip.getBoundingClientRect();
+    if (item.left < visible.left) strip.scrollLeft += item.left-visible.left;
+    else if (item.right > visible.right) strip.scrollLeft += item.right-visible.right;
+  }, [state.active, stationMode]);
   useEffect(() => {
     if (!start) return;
     menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
@@ -86,6 +98,17 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
     }
     return !root?.querySelector('[data-editor-dirty="true"]')||window.confirm(t('Discard unsaved ECU draft changes?'));
   }
+  function closeStationTab(id: AppId) {
+    if(!allowEditorExit(id)) return;
+    const next=reduce(state,{type:'close',id},bounds(true));
+    // The close button is a sibling of its tab, so closing an inactive
+    // module never activates it. Restore focus after the removal.
+    dispatch({type:'close',id});
+    requestAnimationFrame(() => {
+      const target=next.active?document.getElementById('tab-'+next.active):document.getElementById('vision-open-navigation');
+      target?.focus({preventScroll:true});
+    });
+  }
   function reset() {
     if(!allowEditorExit())return;
     try { localStorage.removeItem(layoutKey); setPersistence('Layout reset. Only desktop preferences were affected.'); } catch { setPersistence('Browser storage unavailable. Layout reset for this tab.'); }
@@ -94,13 +117,14 @@ export function Desktop({ client, snapshot, refresh, station, stationAvailable =
   if (station) {
     const openModules = apps.filter(app => state.windows.some(win => win.id === app.id));
     return <main className="desktop station-fluent-shell vision-workspace">
-      <StationNavigation available={stationAvailable} mode={mode} description={description} active={state.active} onNavigate={launch} accountBusy={station.accountBusy} onSignOut={() => { if (allowEditorExit()) station.logout(); }}/>
-      <div className="vision-workspace-tabs">
-        <TabList aria-label={t("Open modules")} selectedValue={state.active ?? undefined} onTabSelect={(_, data) => dispatch({type:'focus',id:data.value as AppId})}>
-          {openModules.map(app => <Tab key={app.id} value={app.id} id={'tab-'+app.id} aria-controls={'panel-'+app.id}>{t(app.title)}</Tab>)}
+      <StationNavigation available={stationAvailable} active={state.active} onNavigate={launch} accountBusy={station.accountBusy} onSignOut={() => { if (allowEditorExit()) station.logout(); }} tabs={
+        <TabList className="vision-workspace-tabs" aria-label={t("Open modules")} selectedValue={state.active ?? undefined} onTabSelect={(_, data) => dispatch({type:'focus',id:data.value as AppId})}>
+          {openModules.map(app => <div key={app.id} role="presentation" className="vision-tab-item">
+            <Tab value={app.id} id={'tab-'+app.id} aria-controls={'panel-'+app.id} aria-keyshortcuts="Delete" onKeyDown={event => { if (event.key==='Delete') { event.preventDefault(); closeStationTab(app.id); } }}>{t(app.title)}</Tab>
+            <Button className="vision-tab-close" appearance="subtle" size="small" icon={<DismissRegular/>} tabIndex={-1} aria-label={t('Close {module}',{module:t(app.title)})} title={t('Close {module}',{module:t(app.title)})} onClick={() => closeStationTab(app.id)}/>
+          </div>)}
         </TabList>
-        {state.active && <Button appearance="subtle" icon={<DismissRegular/>} aria-label={t('Close {module}',{module:t(apps.find(app=>app.id===state.active)!.title)})} onClick={() => { if(state.active && allowEditorExit(state.active))dispatch({type:'close',id:state.active}); }}/>}
-      </div>
+      }/>
       <div className="vision-workspace-body">
         {state.windows.map(win => {
           const app = apps.find(a => a.id === win.id)!;
