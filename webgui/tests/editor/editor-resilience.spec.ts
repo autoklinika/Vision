@@ -36,7 +36,7 @@ test('unsaved editor survives transient station/auth failures, Core outage and s
   // identity and library polling. Advancing a fake clock can expire real
   // network requests while their responses are still being processed.
   // Test actual polling with bounded expectations instead.
-  test.setTimeout(150000);
+  test.setTimeout(210000);
   // Exercise pre-create discard protection in the same authenticated flow.
   // The suite stays within the real five-login limit; no throttling override.
   const {editor}=await newEditor(page,'resilience-profile',false,false);
@@ -52,6 +52,37 @@ test('unsaved editor survives transient station/auth failures, Core outage and s
   await editor.getByLabel('Manufacturer (optional)',{exact:true}).fill('Unsaved synthetic manufacturer');
   const manufacturer=editor.getByLabel('Manufacturer (optional)',{exact:true});
   const save=editor.getByRole('button',{name:'Save draft generation',exact:true});
+  // A real identity store extends its idle deadline on protected reads.
+  // Healthy renewals must not hide/remount the workspace or steal focus.
+  await manufacturer.focus();
+  const input=await manufacturer.elementHandle();
+  const originalEditor=await editor.elementHandle();
+  const wrapper=page.locator('.desktop').locator('..');
+  await wrapper.evaluate(el=>{
+    el.setAttribute('data-test-hidden-transitions','0');
+    const observer=new MutationObserver(records=>{
+      el.setAttribute('data-test-hidden-transitions',String(Number(el.getAttribute('data-test-hidden-transitions'))+records.length));
+    });
+    observer.observe(el,{attributes:true,attributeFilter:['hidden']});
+  });
+  const identityBefore=await (await page.request.get('/api/v1/auth/session')).json();
+  let expiry=identityBefore.expiresAt as string;
+  for(let i=0;i<2;i++){
+    const identityPoll=await page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/auth/session'&&r.request().method()==='GET'&&r.status()===200,{timeout:22000});
+    const next=await identityPoll.json();
+    expect(next.expiresAt>expiry,'real sliding idle deadline advanced').toBe(true);
+    expiry=next.expiresAt;
+    await page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/station'&&r.status()===200,{timeout:10000});
+    await expect(editor).toBeVisible();
+    await expect(manufacturer).toHaveValue('Unsaved synthetic manufacturer');
+    await expect(manufacturer).toBeFocused();
+    expect(await manufacturer.evaluate((el,previous)=>el===previous,input)).toBe(true);
+    expect(await editor.evaluate((el,previous)=>el===previous,originalEditor)).toBe(true);
+    await expect(wrapper).toHaveAttribute('data-test-hidden-transitions','0');
+  }
+  await input?.dispose();
+  await originalEditor?.dispose();
+
   const station=await (await page.request.get('/api/v1/station')).json();
   const inspection=await (await page.request.get('/api/v1/inspection')).json();
   // Keep transport states deterministic while the actual form/storage/API

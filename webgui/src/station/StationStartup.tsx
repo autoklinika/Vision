@@ -118,7 +118,12 @@ export function StationStartup() {
     if (version !== control.current.version) return;
     control.current.busy = false;
     if (result.status === 'AVAILABLE') {
-      if (control.current.identity && (control.current.identity.username !== result.report.username || control.current.identity.role !== result.report.role || control.current.identity.expiresAt !== result.report.expiresAt)) control.current.version++;
+      // expiresAt is a sliding idle deadline, not an authentication owner.
+      // Protected reads extend it routinely. Invalidating the observation
+      // epoch on each extension briefly hides the workspace and steals focus.
+      // Owner/role changes, failed checks, revocation and credential mutations
+      // retain their existing invalidation paths; the server still enforces expiry.
+      if (control.current.identity && (control.current.identity.username !== result.report.username || control.current.identity.role !== result.report.role)) control.current.version++;
       control.current.identity = result.report; control.current.unavailable = false;
       setAuth({phase: 'SIGNED_IN', identity: result.report, message: '', epoch: control.current.version});
     } else if (result.status === 'ACCESS_DENIED') {
