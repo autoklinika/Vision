@@ -175,7 +175,6 @@ body { margin: 0; }
 .vision-system-status .station-session-area { border-top: 1px solid var(--colorNeutralStroke2); padding-top: 16px; }
 .vision-system-status .session-summary { border-top: 0; padding-top: 8px; margin-top: 0; }
 .vision-system-status .session-summary .session-heading h2 { font-size: 14px; color: var(--colorNeutralForeground2); margin: 0; }
-.vision-system-status .station-status-footer { margin: 0; }
 .vision-system-status .fui-Badge { min-height: 20px; font-size: 12px; white-space: normal; height: auto; padding: 2px 8px; }
 @media (max-width: 800px) {
   .vision-system-status .station-overview-facts { grid-template-columns: repeat(2,minmax(0,1fr)); }

@@ -91,7 +91,10 @@ test('connected idle Core creates no session and its outage clears library data 
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
   const status = page.locator('[data-module="status"]');
-  await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(status).toContainText('No active inspection session');
+  await expect(status.locator('.station-status-message')).toHaveCount(0);
+  await expect(status.locator('.station-status-footer')).toHaveCount(0);
+  await expect(status.getByText('Station information refreshes automatically. Closing this desktop leaves Vision running.',{exact:true})).toHaveCount(0);
   await expect(status).toContainText('Unknown');
   await expect(status.getByRole('button', {name: 'Refresh session'})).toBeDisabled();
   expect(state.reads.some(path => path === '/api/v1/session' || path.startsWith('/api/v1/events'))).toBe(false);
@@ -113,7 +116,7 @@ test('connected idle Core creates no session and its outage clears library data 
   await expect(library.getByRole('region', {name: 'Library entry details'})).toHaveCount(0);
   state.coreConnected = true;
   await page.clock.fastForward(5100);
-  await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(status).toContainText('No active inspection session');
   await expect(library.getByRole('table', {name: 'ECU library entries'}).locator('tbody tr')).toHaveCount(2);
   await expect(library.getByRole('region', {name: 'Library entry details'})).toHaveCount(0);
   expect(state.reads.some(path => path === '/api/v1/session' || path.startsWith('/api/v1/events'))).toBe(false);
@@ -153,7 +156,7 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   await expect(page.getByRole('table', {name: 'Reported inspection stages'}).locator('tbody tr')).toHaveCount(11);
   state.active = false;
   await page.clock.fastForward(5100);
-  await expect(page.locator('[data-module="status"]')).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(page.locator('[data-module="status"]')).toContainText('No active inspection session');
   await expect(page.getByRole('table', {name: 'Reported inspection stages'})).toHaveCount(0);
   await expect(page.locator('[data-module="inspection"]')).toContainText('No active inspection session');
   state.revoked = true;
@@ -370,7 +373,7 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
   await expect(section.getByRole('table').locator('tbody tr')).toHaveCount(4);
   await expect(section.getByRole('button', {name: 'Start inspection session'})).toHaveCount(0);
   const status = page.locator('[data-module="status"]');
-  await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(status).toContainText('No active inspection session');
   const core = await (await page.request.get('/api/v1/station')).json();
   expect(core).toMatchObject({coreConnection: 'CONNECTED', state: 'NO_ACTIVE_SESSION', sessionId: null, sessionViewId: null, coreReadiness: 'UNKNOWN'});
   expect((await context.cookies()).some(cookie => cookie.name === 'vision_session' && cookie.httpOnly && cookie.sameSite === 'Strict')).toBe(true);

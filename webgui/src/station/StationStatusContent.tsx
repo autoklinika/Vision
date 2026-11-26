@@ -30,17 +30,16 @@ export function StationStatusContent({station, session, openInspection}: {
       </dl>
       <div className="station-overview-meta"><span>{t("Last update (UTC)")} · <time dateTime={report.capturedAt}>{report.capturedAt}</time></span><span>{t("Automatic refresh")}</span></div>
     </section>
-    <MessageBar intent={connected?'info':'warning'} className="station-status-message">
+    {!connected && <MessageBar intent="warning" className="station-status-message">
       <MessageBarBody>
-        <MessageBarTitle>{t(connected?"Core report":"Core connection unavailable")}:</MessageBarTitle>{" "}
-        {t(!connected?"Vision Core is not connected. Inspection and library reports are unavailable.":active?"The current session report comes from Vision Core.":"Vision Core is connected. No inspection session is active.")}
+        <MessageBarTitle>{t("Core connection unavailable")}:</MessageBarTitle>{" "}
+        {t("Vision Core is not connected. Inspection and library reports are unavailable.")}
       </MessageBarBody>
-    </MessageBar>
+    </MessageBar>}
     <InspectionContent key={[report.instanceId,report.coreConnection,report.sessionId,report.sessionViewId,station.accountBusy].join(':')} station={station}/>
     <div className="station-session-area">
       <div className="station-session-title"><h2>{t("Inspection session")}</h2></div>
       <SessionContent section="summary" controls={session} fluent/>
     </div>
-    <p className="fine-print station-status-footer">{t("Station information refreshes automatically. Closing this desktop leaves Vision running.")}</p>
   </div>;
 }
