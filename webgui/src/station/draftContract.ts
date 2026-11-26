@@ -1,11 +1,12 @@
-import {librarySections} from '../api/libraryContract';
+import {librarySections,isDraftLifecycle} from '../api/libraryContract';
+import type {DraftLifecycle} from '../api/libraryContract';
 import {record} from './contract';
 
-export type DraftAction = 'open' | 'create' | 'create_empty' | 'save' | 'clone' | 'validate' | 'validate_structure' | 'asset_import' | 'asset_preview';
+export type DraftAction = 'open' | 'open_generation' | 'archive' | 'restore' | 'submit_review' | 'withdraw_review' | 'publish_review' | 'create' | 'create_empty' | 'save' | 'clone' | 'validate' | 'validate_structure' | 'asset_import' | 'asset_preview';
 export type DraftDocument = Record<typeof librarySections[number], unknown>;
 export type DraftReport = Readonly<{
   schema: 'vision.api.ecu-draft.v1'; source: 'STATION'; instanceId: string;
-  key: string; etag: string; document: DraftDocument;
+  key: string; etag: string; document: DraftDocument; lifecycle?:DraftLifecycle; snapshotId?:string; releaseDigest?:string; reviewAvailable?:true;
 }>;
 export type DraftValidation = Readonly<{
   schema: 'vision.api.ecu-draft-validation.v1'; source: 'STATION'; instanceId: string;
@@ -22,7 +23,15 @@ function hex32(value: unknown): value is string {
   return typeof value === 'string' && value.length === 32 && !/[^a-f0-9]/.test(value);
 }
 export function isDraftReport(value: unknown): value is DraftReport {
-  if (!record(value, ['schema','source','instanceId','key','etag','document']) ||
+  const required=['schema','source','instanceId','key','etag','document'];
+  if(typeof value!=='object'||value===null||Array.isArray(value))return false;
+  const keys=Object.keys(value);
+  if (!record(value, [...required,...keys.filter(k=>['lifecycle','snapshotId','releaseDigest','reviewAvailable'].includes(k))]) ||
+      (Object.hasOwn(value,'lifecycle')&&!isDraftLifecycle(value.lifecycle)) ||
+      (Object.hasOwn(value,'snapshotId')&&!hex32(value.snapshotId)) ||
+      ((value.lifecycle==='RELEASED')!==Object.hasOwn(value,'releaseDigest')) ||
+      (Object.hasOwn(value,'releaseDigest')&&(typeof value.releaseDigest!=='string'||!/^[a-f0-9]{64}$/.test(value.releaseDigest))) ||
+      (Object.hasOwn(value,'reviewAvailable')&&value.reviewAvailable!==true) ||
       value.schema !== 'vision.api.ecu-draft.v1' || value.source !== 'STATION' ||
       !hex32(value.instanceId) || !identifier(value.key) ||
       typeof value.etag !== 'string' || value.etag.length !== 66 || !/^"[a-f0-9]{64}"$/.test(value.etag) ||

@@ -4,10 +4,11 @@ import { Button, FluentProvider, webLightTheme, TabList, Tab, Table, TableHeader
 import { AddRegular, ArrowClockwiseRegular, EditRegular, SearchRegular } from '@fluentui/react-icons';
 import '../fluent/bridge.css';
 import type { LibraryControls, LibraryView } from '../api/useLibraryView';
-import type { LibraryDetail, LibrarySectionName, LibraryEntry } from '../api/libraryContract';
+import type { LibraryDetail, LibrarySectionName, LibraryEntry, DraftLifecycle } from '../api/libraryContract';
 import type {LibraryKind} from '../api/librarySearch';
 import type {StationPresentation} from '../station/client';
 import {DraftEditorContent} from '../station/DraftEditorContent';
+import {SavedProfileInspector} from '../station/SavedProfileInspector';
 
 const labels: Record<LibrarySectionName, string> = {
   metadata: 'Profile metadata', identity: 'Declared identity', physical_states: 'Physical states',
@@ -45,22 +46,27 @@ function Overview({detail}: {detail: LibraryDetail}) {
   </>;
 }
 
-type DetailTab = 'overview' | 'sections' | 'history';
-function Detail({controls, tab, setTab}: {controls: LibraryControls; tab: DetailTab; setTab: (tab: DetailTab) => void}) {
+const lifecycleLabels={ACTIVE:'Active draft',ARCHIVED:'Archived profile',REVIEW_READY:'Submitted for review',RELEASED:'Released reference record'} as const;
+type DetailTab = 'overview' | 'sections' | 'history' | 'saved';
+function Detail({controls, tab, setTab,station}: {controls: LibraryControls; tab: DetailTab; setTab: (tab: DetailTab) => void;station?:StationPresentation}) {
   const {t}=useTranslation();
   const {detail, history} = controls.view;
   if (!detail) return null;
+  const canPreview=station?.identity.role==='operator'&&!!detail.profile;
   return <section className="library-detail" aria-label={t("Library entry details")}>
-    <div className="library-detail-title"><h3>{detail.entry.displayName}</h3><strong>{detail.entry.status}</strong></div>
+    <div className="library-detail-title"><h3>{detail.entry.displayName}</h3><strong>{detail.entry.kind==='REFERENCE_DRAFT'?t(lifecycleLabels[detail.entry.lifecycle??'ACTIVE']):detail.entry.status}</strong></div>
     <p className="library-detail-key">{detail.entry.profileId} · {detail.entry.family} / {detail.entry.variant} · {t("revision")} {detail.entry.revision}</p>
+    {detail.entry.releaseDigest&&<p className="library-detail-key">{t("Release digest")}: <code>{detail.entry.releaseDigest}</code></p>}
     <TabList className="library-tabs" aria-label={t("Reference information")} selectedValue={tab} onTabSelect={(_,data)=>setTab(data.value as DetailTab)}>
       <Tab value="overview" id="library-tab-overview" aria-controls="library-panel">{t("Overview")}</Tab>
+      {canPreview&&<Tab value="saved" id="library-tab-saved" aria-controls="library-panel">{t("Saved profile")}</Tab>}
       {detail.profile && <><Tab value="sections" id="library-tab-sections" aria-controls="library-panel">{t("15 sections")}</Tab><Tab value="history" id="library-tab-history" aria-controls="library-panel">{t("Revision history ({count})",{count:detail.profile.historyCount})}</Tab></>}
     </TabList>
     <div id="library-panel" role="tabpanel" aria-labelledby={`library-tab-${tab}`}>
       {tab === 'overview' && <Overview detail={detail}/>}
+      {tab==='saved'&&canPreview&&station&&<SavedProfileInspector key={station.report.instanceId+':'+detail.entry.entryId+':'+detail.entry.etag} station={station} detail={detail} history={history} onHistoryPage={controls.historyPage}/>}
       {tab === 'sections' && detail.profile && <><p className="fine-print">{t("Structural row counts only. Every section is NOT_EVALUATED; counts do not indicate completeness or approval.")}</p><div className="library-detail-scroll sunken-panel"><Table aria-label={t("Reference profile sections")}><TableHeader><TableRow><TableHeaderCell>{t("Section")}</TableHeaderCell><TableHeaderCell>{t("Rows")}</TableHeaderCell><TableHeaderCell>{t("Evaluation")}</TableHeaderCell></TableRow></TableHeader><TableBody>{detail.profile.sections.map((section, i) => <TableRow key={section.name}><TableCell>{String(i + 1).padStart(2, '0')} · {t(labels[section.name])}</TableCell><TableCell>{section.rowCount ?? '—'}</TableCell><TableCell>{section.status}</TableCell></TableRow>)}</TableBody></Table></div></>}
-      {tab === 'history' && history && <><p className="fine-print">{t("Saved draft generations, oldest first. Revision labels and ETags come from Vision.")}</p><div className="library-detail-scroll sunken-panel"><Table aria-label={t("Reference revision history")}><TableHeader><TableRow><TableHeaderCell>{t("Generation")}</TableHeaderCell><TableHeaderCell>{t("Revision")}</TableHeaderCell><TableHeaderCell>{t("Snapshot / ETag")}</TableHeaderCell></TableRow></TableHeader><TableBody>{history.items.map((item, i) => <TableRow key={item.snapshotId}><TableCell>{history.after + i + 1}{item.etag === history.etag ? t(" · current") : ''}</TableCell><TableCell>{item.revision}</TableCell><TableCell><code>{item.snapshotId}</code><br/><code>{item.etag}</code></TableCell></TableRow>)}</TableBody></Table></div><div className="library-pagination"><span>{t("{first}–{last} of {total} generations",{first:history.after+1,last:history.after+history.items.length,total:history.totalCount})}</span><Button onClick={() => controls.historyPage('previous')} disabled={history.after === 0 || controls.view.refreshing}>{t("Previous history page")}</Button><Button onClick={() => controls.historyPage('next')} disabled={history.nextAfter === null || controls.view.refreshing}>{t("Next history page")}</Button></div></>}
+      {tab === 'history' && history && <><p className="fine-print">{t("Saved draft generations, oldest first. Revision labels and ETags come from Vision.")}</p><div className="library-detail-scroll sunken-panel"><Table aria-label={t("Reference revision history")}><TableHeader><TableRow><TableHeaderCell>{t("Generation")}</TableHeaderCell><TableHeaderCell>{t("Revision")}</TableHeaderCell><TableHeaderCell>{t("Snapshot / ETag")}</TableHeaderCell></TableRow></TableHeader><TableBody>{history.items.map((item, i) => <TableRow key={item.snapshotId}><TableCell>{history.after + i + 1}{item.etag === history.etag ? t(" · current") : ''}</TableCell><TableCell>{item.revision}<small>{t(lifecycleLabels[item.lifecycle??'ACTIVE'])}</small></TableCell><TableCell><code>{item.snapshotId}</code><br/><code>{item.etag}</code></TableCell></TableRow>)}</TableBody></Table></div><div className="library-pagination"><span>{t("{first}–{last} of {total} generations",{first:history.after+1,last:history.after+history.items.length,total:history.totalCount})}</span><Button onClick={() => controls.historyPage('previous')} disabled={history.after === 0 || controls.view.refreshing}>{t("Previous history page")}</Button><Button onClick={() => controls.historyPage('next')} disabled={history.nextAfter === null || controls.view.refreshing}>{t("Next history page")}</Button></div></>}
     </div>
   </section>;
 }
@@ -71,6 +77,7 @@ export function LibraryContent({controls,station}: {controls: LibraryControls; s
   const [tab, setTab] = useState<DetailTab>('overview');
   const [query,setQuery]=useState('');
   const [kind,setKind]=useState<LibraryKind>('all');
+  const [lifecycle,setLifecycle]=useState<DraftLifecycle|'all'>('all');
   const {view, refreshLibrary, browseEntry, libraryPage} = controls;
   const {library, detail,search} = view;
   const entries=search?search.hits.slice(search.after,search.after+50).map(hit=>hit.entry):library?.entries??[];
@@ -78,8 +85,8 @@ export function LibraryContent({controls,station}: {controls: LibraryControls; s
   const after=search?search.after:library?.after??0;
   const hasNext=search?after+entries.length<total:library?.nextAfter!==null;
   const canSearch=view.status==='AVAILABLE'&&!view.refreshing;
-  function submitSearch(){if(canSearch){setTab('overview');controls.searchLibrary({query,kind});}}
-  function clearSearch(){if(canSearch){setQuery('');setKind('all');setTab('overview');controls.searchLibrary(null);}}
+  function submitSearch(){if(canSearch){setTab('overview');controls.searchLibrary({query,kind,lifecycle});}}
+  function clearSearch(){if(canSearch){setQuery('');setKind('all');setLifecycle('all');setTab('overview');controls.searchLibrary(null);}}
   const editorAvailable = station?.identity.role === "operator" && station.report.coreConnection === "CONNECTED" && !station.accountBusy && view.status === "AVAILABLE";
   return <FluentProvider theme={webLightTheme} className="library-content">
     <div className="library-heading"><div><h2>{t("ECU Library")}</h2><span>{t("Catalog records & reference drafts")}</span></div><FluentProvider theme={webLightTheme} className="vision-fluent-scope library-tools"><Button icon={<ArrowClockwiseRegular/>} onClick={refreshLibrary} disabled={view.status === 'LOADING' || view.status === 'DISABLED' || view.refreshing}>{t("Refresh library")}</Button><Button appearance="primary" icon={<AddRegular/>} disabled={!editorAvailable || editorEntry!==null} onClick={()=>setEditorEntry("new")}>{t("New profile")}</Button><Button icon={<EditRegular/>} disabled={!editorAvailable || !detail || editorEntry!==null} onClick={()=>{if(detail)setEditorEntry(detail.entry);}}>{t("Open reference editor")}</Button></FluentProvider></div>
@@ -90,16 +97,18 @@ export function LibraryContent({controls,station}: {controls: LibraryControls; s
     {library && !editorEntry && <>
       {library.source === 'SYNTHETIC_TEST' && <p className="synthetic-label">{t("SYNTHETIC TEST · no station library")}</p>}
       <form className="library-search" aria-label={t("Search ECU library")} onSubmit={event=>{event.preventDefault();submitSearch();}}>
-        <label className="library-search-field"><span>{t("Search ECU library")}</span><Input value={query} maxLength={160} placeholder={t("Name, family, variant, profile ID or revision")} contentBefore={<SearchRegular/>} onChange={(_,data)=>setQuery(data.value)} disabled={!canSearch}/></label>
+        <label className="library-search-field"><span>{t("Search ECU library")}</span><Input value={query} maxLength={160} placeholder={t("Name, family, variant, part number or revision")} contentBefore={<SearchRegular/>} onChange={(_,data)=>setQuery(data.value)} disabled={!canSearch}/></label>
         <label><span>{t("Record type")}</span><Select value={kind} onChange={e=>setKind(e.target.value as LibraryKind)} disabled={!canSearch}><option value="all">{t("All records")}</option><option value="CATALOG_RECORD">{t("Catalog")}</option><option value="REFERENCE_DRAFT">{t("Reference draft")}</option></Select></label>
+        <label><span>{t("Profile lifecycle")}</span><Select aria-label={t("Profile lifecycle")} value={lifecycle} onChange={e=>setLifecycle(e.target.value as DraftLifecycle|'all')} disabled={!canSearch}><option value="all">{t("All states")}</option>{Object.entries(lifecycleLabels).map(([value,label])=><option key={value} value={value}>{t(label)}</option>)}</Select></label>
         <Button type="submit" appearance="primary" disabled={!canSearch}>{t("Search library")}</Button>
-        <Button disabled={!canSearch||(!query&&kind==='all'&&!search)} onClick={clearSearch}>{t("Clear search")}</Button>
+        <Button disabled={!canSearch||(!query&&kind==='all'&&lifecycle==='all'&&!search)} onClick={clearSearch}>{t("Clear search")}</Button>
       </form>
+      {search?.incompleteIdentity&&<p role="status" className="fine-print">{t("Some legacy identity fields exceed the searchable index limit. Search by profile ID for these records.")}</p>}
       {search&&<p className="library-search-result" role="status">{t("Search results: {count} of {total}",{count:total,total:library.totalCount})}</p>}
       <div className="library-report-meta"><span>{library.libraryId}</span><span>{t("Last report:")+" "}{library.capturedAt}</span></div>
-      <div className="library-list sunken-panel"><Table aria-label={t("ECU library entries")}><TableHeader><TableRow><TableHeaderCell>{t("Name / family")}</TableHeaderCell><TableHeaderCell>{t("Variant / revision")}</TableHeaderCell><TableHeaderCell>{t("Record")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell></TableRow></TableHeader><TableBody>{entries.map(entry => <TableRow key={entry.entryId} className={detail?.entry.entryId === entry.entryId ? 'library-selected' : ''}><TableCell><Button appearance="transparent" className="library-entry-link" disabled={view.refreshing} aria-label={t("Browse {name} {revision}",{name:entry.displayName,revision:entry.revision})} onClick={() => { setTab('overview'); browseEntry(entry); }}>{entry.displayName}</Button><small>{entry.family}</small></TableCell><TableCell>{entry.variant}<small>{entry.revision}</small></TableCell><TableCell>{entry.kind === 'CATALOG_RECORD' ? t("Catalog") : t("Reference draft")}<small>{entry.status}</small></TableCell><TableCell><Badge appearance="tint" color="informative">{entry.readiness}</Badge></TableCell></TableRow>)}</TableBody></Table>{total === 0 && <p className="library-empty">{t(search?"No matching ECU entries.":"No catalog records or reference drafts are available.")}</p>}</div>
+      <div className="library-list sunken-panel"><Table aria-label={t("ECU library entries")}><TableHeader><TableRow><TableHeaderCell>{t("Name / family")}</TableHeaderCell><TableHeaderCell>{t("Variant / revision")}</TableHeaderCell><TableHeaderCell>{t("Record")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell></TableRow></TableHeader><TableBody>{entries.map(entry => <TableRow key={entry.entryId} className={detail?.entry.entryId === entry.entryId ? 'library-selected' : ''}><TableCell><Button appearance="transparent" className="library-entry-link" disabled={view.refreshing} aria-label={t("Browse {name} {revision}",{name:entry.displayName,revision:entry.revision})} onClick={() => { setTab('overview'); browseEntry(entry); }}>{entry.displayName}</Button><small>{entry.family}</small></TableCell><TableCell>{entry.variant}<small>{entry.revision}</small></TableCell><TableCell>{entry.kind === 'CATALOG_RECORD' ? t("Catalog") : t("Reference draft")}<small>{entry.kind==='REFERENCE_DRAFT'?t(lifecycleLabels[entry.lifecycle??'ACTIVE']):entry.status}</small></TableCell><TableCell><Badge appearance="tint" color="informative">{entry.readiness}</Badge></TableCell></TableRow>)}</TableBody></Table>{total === 0 && <p className="library-empty">{t(search?"No matching ECU entries.":"No catalog records or reference drafts are available.")}</p>}</div>
       <div className="library-pagination"><span>{total === 0 ? t("0 entries") : t("{first}–{last} of {total} entries",{first:after+1,last:after+entries.length,total})}</span><Button onClick={() => libraryPage('previous')} disabled={after === 0 || view.refreshing}>{t("Previous entries")}</Button><Button onClick={() => libraryPage('next')} disabled={!hasNext || view.refreshing}>{t("Next entries")}</Button></div>
-      {detail ? <Detail controls={controls} tab={tab} setTab={setTab}/> : <p className="library-empty">{t("Browse an entry to inspect its reference information.")}</p>}
+      {detail ? <Detail controls={controls} tab={tab} setTab={setTab} station={station}/> : <p className="library-empty">{t("Browse an entry to inspect its reference information.")}</p>}
       <p className="fine-print">{controls.autoRefresh ? t("Library information refreshes automatically.") : t("Last requested view · no live updates.")}{" "+t("Approval and operational decisions belong to Vision.")}</p>
     </>}
   </FluentProvider>;

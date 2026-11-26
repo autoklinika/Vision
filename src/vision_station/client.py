@@ -141,6 +141,12 @@ class RemoteStationOwner:
             validator=validate_diagnostic_report if action in ("validate","validate_structure") else validate_draft_report
         report=self._read("draft_editor",{"action":action,"args":args},validator,
             response_limit=ASSET_WIRE_LIMIT if action=="asset_preview" else RESPONSE_LIMIT)
+        if action=="open_generation" and report.get("snapshotId")!=args["snapshotId"]:
+            raise ReportUnavailable()
+        if action=="publish_review" and report.get("lifecycle")!="RELEASED":
+            raise ReportUnavailable()
+        if action!="open_generation" and "snapshotId" in report:
+            raise ReportUnavailable()
         if action=="asset_preview" and report["assetId"]!=args["assetId"]:
             raise ReportUnavailable()
         expected = args["newKey"] if action == "clone" else args["key"]

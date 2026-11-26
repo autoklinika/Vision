@@ -28,6 +28,15 @@ MAX_HISTORY_REVISIONS = 4096
 MAX_READ_PROFILES = 256
 MAX_READ_BYTES = 8 * 1024 * 1024
 READ_LOCK_TIMEOUT = 0.25
+LIFECYCLES = ("ACTIVE", "ARCHIVED", "REVIEW_READY", "RELEASED")
+# Administrative states apply to immutable draft generations, not the
+# unsigned reference document or its operational approval.
+TRANSITIONS = {
+    "ACTIVE": ("ARCHIVED", "REVIEW_READY"),
+    "ARCHIVED": ("ACTIVE",),
+    "REVIEW_READY": ("ACTIVE", "RELEASED"),
+    "RELEASED": (),
+}
 
 
 class DraftReadUnavailable(RuntimeError):
@@ -42,6 +51,8 @@ class SavedRevision:
     snapshot_id: str
     etag: str
     revision: str
+    lifecycle: str = "ACTIVE"
+    release_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +61,8 @@ class DraftReadSnapshot:
     profile: object
     etag: str
     history: tuple[SavedRevision, ...]
+    lifecycle: str = "ACTIVE"
+    release_digest: str | None = None
 
 
 class _ReadBudget:
@@ -213,13 +226,21 @@ class DraftStore:
                 budget.revision()
             raw = self._read('history', key + '--' + generation + '.json', budget=budget)
             snapshot = json.loads(raw)
-            if (not isinstance(snapshot, dict) or set(snapshot) != {'key', 'generation', 'previous', 'sha256', 'profile', 'snapshot_sha256'}
+            fields = {'key', 'generation', 'previous', 'sha256', 'profile', 'snapshot_sha256'}
+            if (not isinstance(snapshot, dict) or not fields <= set(snapshot) <= fields | {'lifecycle','release_sha256'}
+                    or snapshot.get('lifecycle','ACTIVE') not in LIFECYCLES
                     or snapshot['key'] != key or snapshot['generation'] != generation
                     or (snapshot['previous'] is not None and
                         (not isinstance(snapshot['previous'], str) or not GENERATION.fullmatch(snapshot['previous'])))
                     or not isinstance(snapshot['sha256'], str) or not SHA.fullmatch(snapshot['sha256'])
                     or not isinstance(snapshot['snapshot_sha256'], str) or not SHA.fullmatch(snapshot['snapshot_sha256'])):
                 raise ValueError('invalid snapshot')
+            release_digest = snapshot.get('release_sha256')
+            if snapshot.get('lifecycle','ACTIVE') == 'RELEASED':
+                if not isinstance(release_digest,str) or not SHA.fullmatch(release_digest):
+                    raise ValueError("released generation requires exact release digest")
+            elif 'release_sha256' in snapshot:
+                raise ValueError("unexpected release digest")
             digest = snapshot.pop('snapshot_sha256')
             if _snapshot_hash(snapshot) != digest:
                 raise ValueError('snapshot integrity failure')
@@ -228,7 +249,7 @@ class DraftStore:
             if (len(data) > MAX_DOCUMENT_BYTES or hashlib.sha256(data).hexdigest() != snapshot['sha256']
                     or profile.data['metadata']['profile_id'] != key):
                 raise ValueError('snapshot integrity failure')
-            return profile, snapshot['previous']
+            return profile, snapshot['previous'], snapshot.get('lifecycle','ACTIVE'), release_digest
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError, KeyError) as exc:
             raise ValueError('invalid snapshot') from exc
 
@@ -240,18 +261,66 @@ class DraftStore:
             if generation in seen: raise ValueError('snapshot cycle')
             if len(result) >= MAX_HISTORY_REVISIONS: raise ValueError('history too long')
             seen.add(generation)
-            profile, previous = self._snapshot(key, generation, budget=budget)
-            result.append((generation, profile))
+            profile, previous, lifecycle, release_digest = self._snapshot(key, generation, budget=budget)
+            result.append((generation, profile, lifecycle, release_digest))
             generation = previous
+        # Verify state transitions along the committed chain. Lifecycle-only
+        # generations must preserve the full unsigned document.
+        prior = None
+        for _, profile, lifecycle, _ in reversed(result):
+            if prior is None:
+                if lifecycle != "ACTIVE":
+                    raise ValueError("invalid initial lifecycle")
+            else:
+                before, before_state = prior
+                if lifecycle != before_state:
+                    if lifecycle not in TRANSITIONS[before_state] or canonical_json(before) != canonical_json(profile):
+                        raise ValueError("invalid lifecycle transition")
+                elif lifecycle != "ACTIVE":
+                    raise ValueError("immutable administrative generation")
+            prior = profile, lifecycle
         return result
 
-    def get(self, key):
+    def get_state(self,key):
         identifier(key)
         with self.lock:
-            generation, profile = self._chain(key)[0]
-            return profile, self.etag(generation.encode('ascii'))
+            generation, profile, lifecycle, release_digest = self._chain(key)[0]
+            return profile, self.etag(generation.encode('ascii')), lifecycle, release_digest
 
-    def save(self, key, profile, match=None, create=False):
+    def get(self, key):
+        profile, etag, _, _ = self.get_state(key)
+        return profile, etag
+
+    def lifecycle(self, key):
+        identifier(key)
+        with self.transaction(timeout=READ_LOCK_TIMEOUT):
+            return self._chain(key)[0][2]
+
+    def read_generation(self, key, snapshot_id, expected_etag):
+        identifier(key)
+        if not isinstance(snapshot_id,str) or not GENERATION.fullmatch(snapshot_id):
+            raise ValueError("invalid generation")
+        with self.transaction(timeout=READ_LOCK_TIMEOUT):
+            chain = self._chain(key,budget=_ReadBudget())
+            if self.etag(chain[0][0].encode("ascii")) != expected_etag:
+                raise FileExistsError("ETag conflict")
+            for generation, profile, lifecycle, release_digest in chain:
+                if generation == snapshot_id:
+                    return profile, self.etag(generation.encode("ascii")), lifecycle, release_digest
+            raise FileNotFoundError("generation not committed")
+
+    def transition(self, key, expected_etag, lifecycle, *, release_digest=None):
+        # Only trusted backend code may request RELEASED. HTTP exposes a
+        # closed subset of these transitions, never release approval.
+        with self.transaction(timeout=READ_LOCK_TIMEOUT):
+            generation, profile, before, _ = self._chain(identifier(key))[0]
+            if self.etag(generation.encode("ascii")) != expected_etag or lifecycle not in TRANSITIONS[before]:
+                raise FileExistsError("lifecycle conflict")
+            if lifecycle == "REVIEW_READY" and not profile.data["inspection_workflows"]["recipes"]:
+                raise ValueError("at least one inspection workflow required for review")
+            return self.save(key,profile,expected_etag,_lifecycle=lifecycle,_release_digest=release_digest)
+
+    def save(self, key, profile, match=None, create=False, *, _lifecycle=None, _release_digest=None):
         identifier(key)
         m = profile.data['metadata']; pr = profile.data['provenance_release']
         if m['profile_id'] != key: raise ValueError('profile key mismatch')
@@ -261,12 +330,22 @@ class DraftStore:
         if len(data) > MAX_DOCUMENT_BYTES: raise ValueError('profile too large')
         with self.transaction():
             previous = None
+            lifecycle = "ACTIVE"
             if create:
+                if _lifecycle is not None:
+                    raise ValueError("initial lifecycle must be active")
                 if self._path('drafts', key + '.json').exists(): raise FileExistsError('draft exists')
             else:
                 chain = self._chain(key)
                 if len(chain) >= MAX_HISTORY_REVISIONS: raise ValueError('history too long')
-                previous, old = chain[0]
+                previous, old, prior_state, _ = chain[0]
+                if _lifecycle is None:
+                    if prior_state != "ACTIVE":
+                        raise FileExistsError("draft is locked")
+                else:
+                    if _lifecycle not in TRANSITIONS[prior_state] or canonical_json(old) != canonical_json(profile):
+                        raise FileExistsError("lifecycle conflict")
+                    lifecycle = _lifecycle
                 etag = self.etag(previous.encode('ascii'))
                 om = old.data['metadata']; op = old.data['provenance_release']
                 if om['status'] != 'DRAFT' or om['template_only'] or om['content_sha256'] is not None or om['approval_scopes'] or op['release_approval'] is not None or op['released_snapshot_sha256'] is not None: raise ValueError('stored revision is immutable')
@@ -281,6 +360,13 @@ class DraftStore:
             generation = secrets.token_hex(16)
             snapshot = {'key': key, 'generation': generation, 'previous': previous,
                         'sha256': hashlib.sha256(data).hexdigest(), 'profile': thaw(profile.data)}
+            if lifecycle == 'RELEASED':
+                if not isinstance(_release_digest,str) or not SHA.fullmatch(_release_digest):
+                    raise ValueError("release digest required")
+                snapshot['release_sha256'] = _release_digest
+            elif _release_digest is not None:
+                raise ValueError("unexpected release digest")
+            if lifecycle != 'ACTIVE': snapshot['lifecycle'] = lifecycle
             snapshot['snapshot_sha256'] = _snapshot_hash(snapshot)
             snapshot_data = json.dumps(snapshot, ensure_ascii=True, separators=(',', ':'), allow_nan=False).encode('ascii')
             if len(snapshot_data) > MAX_DOCUMENT_BYTES: raise ValueError('snapshot too large')
@@ -293,8 +379,8 @@ class DraftStore:
         identifier(key)
         with self.lock:
             result = []
-            for generation, profile in self._chain(key):
-                result.append({'snapshot_id': generation, 'etag': self.etag(generation.encode('ascii')), 'revision': profile.data['metadata']['profile_revision'], 'profile': thaw(profile.data)})
+            for generation, profile, lifecycle, release_digest in self._chain(key):
+                result.append({'snapshot_id': generation, 'etag': self.etag(generation.encode('ascii')), 'revision': profile.data['metadata']['profile_revision'], 'profile': thaw(profile.data), **({'lifecycle': lifecycle} if lifecycle!='ACTIVE' else {}), **({'releaseDigest':release_digest} if release_digest else {})})
             return list(reversed(result))
 
     def keys(self):
@@ -363,14 +449,14 @@ class DraftStore:
             identities = set()
             for key in self._read_keys():
                 chain = self._chain(key, budget=budget)
-                current_generation, current = chain[0]
+                current_generation, current, lifecycle, release_digest = chain[0]
                 metadata = current.data['metadata']
                 identity = tuple(metadata[k] for k in ('profile_id', 'family_id', 'variant_id', 'profile_revision'))
                 if identity[1:] in identities:
                     raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
                 identities.add(identity[1:])
                 history = []
-                for generation, profile in reversed(chain):
+                for generation, profile, state, digest in reversed(chain):
                     m = profile.data['metadata']; p = profile.data['provenance_release']
                     if (tuple(m[k] for k in ('profile_id', 'family_id', 'variant_id', 'profile_revision')) != identity
                             or m['schema_version'] != '1' or m['template_only'] is not False
@@ -378,9 +464,9 @@ class DraftStore:
                             or m['approval_scopes'] or p['release_approval'] is not None
                             or p['released_snapshot_sha256'] is not None):
                         raise DraftReadUnavailable('LIBRARY_INCONSISTENT')
-                    history.append(SavedRevision(generation, self.etag(generation.encode('ascii')), m['profile_revision']))
+                    history.append(SavedRevision(generation, self.etag(generation.encode('ascii')), m['profile_revision'], state, digest))
                 result.append(DraftReadSnapshot(key, current,
-                    self.etag(current_generation.encode('ascii')), tuple(history)))
+                    self.etag(current_generation.encode('ascii')), tuple(history), lifecycle, release_digest))
             return tuple(result)
         except DraftReadUnavailable:
             raise

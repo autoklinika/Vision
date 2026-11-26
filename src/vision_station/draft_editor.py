@@ -14,7 +14,7 @@ from vision_modules.ecu_reference.validation import _id as reference_identifier
 from vision_modules.ecu_library_backend.read_model import (
     _profile_detail, _display_name, LibraryReadUnavailable)
 from vision_modules.ecu_library_backend.storage import (
-    DraftReadSnapshot, _ReadBudget, MAX_READ_PROFILES, identifier, _image_dimensions, image_type)
+    DraftReadSnapshot, _ReadBudget, MAX_READ_PROFILES, LIFECYCLES, identifier, _image_dimensions, image_type)
 from vision_modules.ecu_library_backend.service import SCOPES
 
 DOCUMENT_LIMIT = 64 * 1024
@@ -33,6 +33,12 @@ DRAFT_SCHEMA = "vision.api.ecu-draft.v1"
 VALIDATION_SCHEMA = "vision.api.ecu-draft-validation.v1"
 FIELDS = {
     "open": {"instanceId", "key"},
+    "open_generation": {"instanceId","key","etag","snapshotId"},
+    "archive": {"instanceId","key","etag"},
+    "restore": {"instanceId","key","etag"},
+    "submit_review": {"instanceId","key","etag"},
+    "withdraw_review": {"instanceId","key","etag"},
+    "publish_review": {"instanceId","key","etag","document","reviewProof"},
     "create": {"instanceId", "family", "variant", "catalogRevision", "key", "revision", "displayName"},
     "create_empty": {"instanceId", "family", "variant", "key", "revision", "displayName"},
     "save": {"instanceId", "key", "etag", "document"},
@@ -98,8 +104,10 @@ def _check_args(action, args):
         raise ValueError("invalid editor request")
     if not _match(INSTANCE, args["instanceId"]):
         raise ValueError("invalid instance")
-    for name in set(args) - {"instanceId", "etag", "document", "displayName", "scope", "data", "assetId"}:
+    for name in set(args) - {"instanceId", "etag", "document", "displayName", "scope", "data", "assetId", "snapshotId", "reviewProof"}:
         identifier(args[name])
+    if "snapshotId" in args and not _match(INSTANCE,args["snapshotId"]):
+        raise ValueError("invalid snapshot ID")
     if "assetId" in args:
         # An in-document reference ID, never a store filename or path.
         reference_identifier(args["assetId"])
@@ -107,6 +115,16 @@ def _check_args(action, args):
         raise ValueError("invalid etag")
     if "displayName" in args:
         _label(args["displayName"])
+    if action=="publish_review":
+        proof=args["reviewProof"]
+        if not isinstance(proof,str) or not 1<=len(proof)<=5464:
+            raise ValueError("bounded review proof required")
+        try:
+            decoded=base64.b64decode(proof,validate=True)
+        except (ValueError,binascii.Error):
+            raise ValueError("invalid review proof") from None
+        if not 1<=len(decoded)<=4096 or base64.b64encode(decoded).decode("ascii")!=proof:
+            raise ValueError("invalid review proof")
     if action == "validate" and args["scope"] not in SCOPES:
         raise ValueError("invalid scope")
 
@@ -216,8 +234,13 @@ def _reserve_store_budget(budget, additional):
 
 def _draft_report(value, instance):
     _profile(value["profile"], value["key"])
-    return {"schema": DRAFT_SCHEMA, "source": "STATION", "instanceId": instance,
+    report = {"schema": DRAFT_SCHEMA, "source": "STATION", "instanceId": instance,
             "key": value["key"], "etag": value["etag"], "document": value["profile"]}
+    if value.get("lifecycle","ACTIVE")!="ACTIVE": report["lifecycle"]=value["lifecycle"]
+    if "snapshotId" in value: report["snapshotId"]=value["snapshotId"]
+    if value.get("releaseDigest"): report["releaseDigest"]=value["releaseDigest"]
+    if value.get("reviewAvailable") is True: report["reviewAvailable"]=True
+    return report
 
 
 def _messages(values):
@@ -228,6 +251,9 @@ def _messages(values):
 class DraftEditor:
     def __init__(self, host):
         self.host = host
+
+    def report(self,value,instance):
+        return _draft_report({**value,"reviewAvailable":self.host._review_authority is not None},instance)
 
     def dispatch(self, action, args):
         _check_args(action, args)
@@ -254,6 +280,29 @@ class DraftEditor:
                           "errors": _messages(r["errors"]), "blockers": _messages(r["blockers"])}
             return {"schema": VALIDATION_SCHEMA, "source": "STATION", "instanceId": instance,
                     "key": key, **result}
+        if action=="publish_review":
+            if self.host._review_authority is None:
+                raise DraftConflict()
+            raw=json.dumps(args["document"],ensure_ascii=True,allow_nan=False,separators=(",",":")).encode("ascii")
+            if len(raw)>DOCUMENT_LIMIT:
+                raise ValueError("reviewed document exceeds editor limit")
+            reviewed=load_json(raw)
+            if reviewed.data["metadata"]["profile_id"]!=key:
+                raise ValueError("reviewed profile key mismatch")
+            self.host._review_authority.publish(self.host,reviewed,args["etag"],
+                                               base64.b64decode(args["reviewProof"],validate=True))
+            return self.report(lib.get_draft(key),instance)
+        if action=="open_generation":
+            try:
+                profile, etag, lifecycle, digest = lib.store.read_generation(key,args["snapshotId"],args["etag"])
+                return self.report({"key":key,"profile":thaw(profile.data),"etag":etag,
+                    "lifecycle":lifecycle,"snapshotId":args["snapshotId"],"releaseDigest":digest},instance)
+            except FileNotFoundError:
+                raise DraftNotFound() from None
+            except FileExistsError:
+                raise DraftConflict() from None
+            except LibraryReadUnavailable:
+                raise ReportUnavailable() from None
         if action in ("open","asset_preview"):
             try:
                 # The existing bounded read snapshot verifies the full chain.
@@ -261,7 +310,7 @@ class DraftEditor:
                 if row is None:
                     raise DraftNotFound()
                 if action=="open":
-                    return _draft_report({"key":key,"profile":thaw(row.profile.data),"etag":row.etag},instance)
+                    return self.report({"key":key,"profile":thaw(row.profile.data),"etag":row.etag,"lifecycle":row.lifecycle,"releaseDigest":row.release_digest},instance)
                 if row.etag!=args["etag"]:
                     raise DraftConflict()
                 item=next((x for x in row.profile.data["reference_assets"]["assets"] if x["asset_id"]==args["assetId"]),None)
@@ -300,6 +349,17 @@ class DraftEditor:
                     old = lib.get_draft(key)
                     if old["etag"] != args["etag"]:
                         raise DraftConflict()
+                    lifecycle = old.get("lifecycle","ACTIVE")
+                    transitions={"archive":("ACTIVE","ARCHIVED"),"restore":("ARCHIVED","ACTIVE"),
+                                 "submit_review":("ACTIVE","REVIEW_READY"),"withdraw_review":("REVIEW_READY","ACTIVE")}
+                    if action in transitions:
+                        before, after = transitions[action]
+                        if lifecycle!=before: raise DraftConflict()
+                        _reserve_store_budget(budget,len(canonical_json(_profile(old["profile"],key))))
+                        etag=lib.store.transition(key,args["etag"],after)
+                        return self.report({**old,"etag":etag,"lifecycle":after},instance)
+                    if action!="clone" and lifecycle!="ACTIVE":
+                        raise DraftConflict()
                     if action=="asset_import":
                         data=_decode_image(args["data"])
                         sha=hashlib.sha256(data).hexdigest()
@@ -318,7 +378,7 @@ class DraftEditor:
                             raise DraftConflict()
                         _reserve_store_budget(budget, len(canonical_json(checked)))
                         value = lib.clone_draft(key,args["newKey"],args["newRevision"])
-                return _draft_report(value,instance)
+                return self.report(value,instance)
         except FileExistsError:
             raise DraftConflict() from None
         except FileNotFoundError:
@@ -331,7 +391,14 @@ class DraftEditor:
 
 def validate_draft_report(value):
     try:
-        if (type(value) is not dict or set(value) != {"schema","source","instanceId","key","etag","document"}
+        fields={"schema","source","instanceId","key","etag","document"}
+        if (type(value) is not dict or not fields <= set(value) <= fields | {"lifecycle","snapshotId","releaseDigest","reviewAvailable"}
+                or value.get("lifecycle","ACTIVE") not in LIFECYCLES
+                or (value.get("lifecycle")=="RELEASED")!=("releaseDigest" in value)
+                or ("releaseDigest" in value and not _match(SHA256,value["releaseDigest"]))
+                or ("reviewAvailable" in value and value["reviewAvailable"] is not True)
+                or ("snapshotId" in value and (not _match(INSTANCE,value["snapshotId"]) or
+                    value["etag"] != '"'+hashlib.sha256(value["snapshotId"].encode("ascii")).hexdigest()+'"'))
                 or value["schema"] != DRAFT_SCHEMA or value["source"] != "STATION"
                 or not _match(INSTANCE,value["instanceId"]) or not _match(ETAG,value["etag"])):
             return False

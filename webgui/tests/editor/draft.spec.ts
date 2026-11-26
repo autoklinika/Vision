@@ -117,6 +117,7 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
 
   // Concurrent edit: old ETag must not overwrite the saved document.
   opened.document.identity.aliases=['other-client'];
+  opened.document.identity.oem_part_numbers=['OE-SYN-12345'];
   expect((await post('save',{instanceId:station.instanceId,key:opened.key,etag:opened.etag,document:opened.document})).status()).toBe(200);
   await section('identity');
   await label('Manufacturer (optional)').fill('stale local text');
@@ -167,11 +168,77 @@ test('actual ECU editor: neutral forms, measurements, images, conflict protectio
   const expected=structuredClone(fixture);
   expected.photography_recipes.recipes[0].views[0].camera_goal.translation_mm[2]=101.5;
   expect(final.document).toEqual(expected);
+  // Submit a saved complete structure for independent review. It remains
+  // unsigned and read-only; withdrawal creates a fresh active generation.
+  page.once('dialog',dialog=>dialog.accept());
+  await button('Submit for review').click();
+  await expect(editor).toContainText('Submitted for review');
+  await expect(editor).toContainText('Independent review authority is not configured on this Core.');
+  await expect(button('Publish reviewed release')).toHaveCount(0);
+  const exportEvent=page.waitForEvent('download');
+  await button('Export review request').click();
+  const download=await exportEvent;
+  expect(download.suggestedFilename()).toBe('fixture-reference-review-request.json');
+  const packageData=JSON.parse(readFileSync((await download.path())!,'utf8'));
+  expect(packageData.schema).toBe('vision.reference-review-request.v1');
+  expect(packageData.document).toEqual(expected);
+  expect(packageData.submittedEtag).toMatch(/^"[a-f0-9]{64}"$/);
+  await download.delete();
+  await expect(button('Save draft generation')).toBeDisabled();
+  await expect(label('Metric 1')).toBeDisabled();
+  page.once('dialog',dialog=>dialog.accept());
+  await button('Withdraw from review').click();
+  await expect(editor).toContainText('Profile lifecycle updated.');
+  await expect(label('Metric 1')).toBeEnabled();
   await button('Close editor').click();
   await library.getByRole('button',{name:'Browse Browser neutral draft r1',exact:true}).click();
   await library.getByRole('tab',{name:'Revision history (4)'}).click();
   await expect(library.getByRole('table',{name:'Reference revision history'})).toHaveClass(/fui-Table/);
   await expect(library.getByRole('table',{name:'Reference revision history'}).locator('tbody tr')).toHaveCount(4);
+  await library.getByRole('tab',{name:'Saved profile',exact:true}).click();
+  const viewer=library.getByRole('region',{name:'Saved profile viewer',exact:true});
+  const generation=viewer.getByRole('combobox',{name:'Saved generation',exact:true});
+  await generation.selectOption({index:1});
+  await viewer.getByRole('button',{name:'Preview saved profile',exact:true}).click();
+  await expect(viewer.getByRole('combobox',{name:'Section',exact:true})).toBeVisible();
+  await viewer.getByRole('combobox',{name:'Section',exact:true}).selectOption('identity');
+  await expect(viewer.getByLabel('Manufacturer (optional)',{exact:true})).toHaveValue('');
+  await expect(viewer.getByLabel('Manufacturer (optional)',{exact:true})).toBeDisabled();
+  await viewer.getByRole('button',{name:'Compare saved versions',exact:true}).click();
+  await expect(viewer.getByRole('table',{name:'Version differences'})).toContainText('Synthetic browser manufacturer');
+  await generation.selectOption('');
+  await viewer.getByLabel('Compare with profile ID (optional)',{exact:true}).fill('browser-neutral-r2');
+  await viewer.getByRole('button',{name:'Compare saved versions',exact:true}).click();
+  await expect(viewer.getByRole('table',{name:'Version differences'})).toContainText('browser-neutral-r2');
+
+  // Archive an existing saved revision, filter the catalog by lifecycle
+  // and by the actual declared OEM number, then restore it.
+  await library.getByRole('button',{name:'Open reference editor',exact:true}).click();
+  await button('Load draft browser-neutral').click();
+  await expect(editor).toContainText('Draft loaded from Core.');
+  page.once('dialog',dialog=>dialog.accept());
+  await button('Archive profile').click();
+  await expect(editor).toContainText('Archived profile');
+  await expect(button('Save draft generation')).toBeDisabled();
+  await button('Close editor').click();
+  const search=library.getByRole('textbox',{name:'Search ECU library',exact:true});
+  await search.fill('OE-SYN-12345');
+  await library.getByRole('combobox',{name:'Profile lifecycle',exact:true}).selectOption('ARCHIVED');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  const entries=library.getByRole('table',{name:'ECU library entries'});
+  await expect(entries.locator('tbody tr')).toHaveCount(1);
+  await expect(entries).toContainText('Archived profile');
+  await entries.getByRole('button',{name:'Browse Browser neutral draft r1',exact:true}).click();
+  await library.getByRole('button',{name:'Open reference editor',exact:true}).click();
+  await button('Load draft browser-neutral').click();
+  await expect(editor).toContainText('Archived profile');
+  page.once('dialog',dialog=>dialog.accept());
+  await button('Restore profile').click();
+  await expect(editor).toContainText('Profile lifecycle updated.');
+  await button('Close editor').click();
+  await expect(entries.locator('tbody tr')).toHaveCount(0);
+  await library.getByRole('button',{name:'Clear search',exact:true}).click();
+
   const after=await (await page.request.get('/api/v1/station')).json();
   expect(after).toMatchObject({instanceId:station.instanceId,state:'NO_ACTIVE_SESSION',coreConnection:'CONNECTED'});
   expect(errors).toEqual([]);

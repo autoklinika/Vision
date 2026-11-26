@@ -7,7 +7,7 @@ from .server import CoreServer
 from .inspection import systemd_diagnostics
 
 
-def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None):
+def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None, review_authority=None, composition_factory=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", required=True)
     parser.add_argument("--library-root", required=True)
@@ -25,7 +25,7 @@ def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None):
     try:
         server = CoreServer(args.socket, host_factory=lambda: CoreHost(
             args.library_root, session_root=args.session_root, composition=composition,
-            catalog_dir=catalog_dir, diagnostics=(lambda: ()) if args.diagnostics_disabled else diagnostics))
+            catalog_dir=catalog_dir, review_authority=review_authority, composition_factory=composition_factory, diagnostics=(lambda: ()) if args.diagnostics_disabled else diagnostics))
     except Exception:
         parser.exit(1, "Core station configuration rejected; check private paths and ownership.\n")
     try:

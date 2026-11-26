@@ -99,6 +99,9 @@ async function editorRequest<T extends DraftReport | DraftValidation | DraftAsse
   const assetWire=3*1024*1024;
   if (new TextEncoder().encode(body).length > (action==='asset_import'?assetWire:131072)) return {status:'BAD_REQUEST',report:null};
   const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072,editorTimeoutMs);
+  if(result.status==='AVAILABLE'&&action==='open_generation'&&(!('snapshotId' in result.report)||result.report.snapshotId!==args.snapshotId))return unavailable;
+  if(result.status==='AVAILABLE'&&action!=='open_generation'&&'snapshotId' in result.report)return unavailable;
+  if(result.status==='AVAILABLE'&&action==='publish_review'&&(!('lifecycle' in result.report)||result.report.lifecycle!=='RELEASED'))return unavailable;
   if(result.status==='AVAILABLE'&&action==='asset_preview'&&(!('assetId' in result.report)||result.report.assetId!==args.assetId))return unavailable;
   if (result.status === 'AVAILABLE' && (result.report.instanceId !== args.instanceId ||
       result.report.key !== (action === 'clone' ? args.newKey : args.key))) return unavailable;

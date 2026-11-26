@@ -182,14 +182,15 @@ class RuntimeComposition:
     def __init__(self, *, selections, profiles, calibrations, requirements, capabilities,
                  release_store, reference_release_store, reference_library, asset_store,
                  trust_verifier, readiness_provider, readiness_receipt_provider, sensor_frame, scene_frame,
-                 known_transforms, max_age, max_skew, clock=time.time):
+                 known_transforms, max_age, max_skew, clock=time.time, managed_releases=False):
         selections = tuple(selections)
-        if (not 1 <= len(selections) <= 16 or any(not isinstance(s, Selection) for s in selections)
+        if (type(managed_releases) is not bool or not (0 if managed_releases else 1) <= len(selections) <= 16 or any(not isinstance(s, Selection) for s in selections)
                 or len({s.selection_id for s in selections}) != len(selections)
                 or not callable(readiness_provider) or not callable(readiness_receipt_provider)
                 or not callable(trust_verifier) or not callable(clock)):
             raise ValueError("explicit trusted composition required")
         self.selections = MappingProxyType({s.selection_id: s for s in selections})
+        self.managed_releases = managed_releases
         self.profiles = MappingProxyType(dict(profiles))
         self.calibrations = MappingProxyType(dict(calibrations))
         self.requirements = MappingProxyType({k: frozenset(v) for k,v in requirements.items()})
@@ -201,6 +202,32 @@ class RuntimeComposition:
         self.sensor_frame, self.scene_frame = sensor_frame, scene_frame
         self.known_transforms = frozenset(known_transforms)
         self.max_age, self.max_skew, self.clock = max_age, max_skew, clock
+
+    @classmethod
+    def from_released_references(cls, library, **configuration):
+        """Explicit owner configuration; only fully compiled releases appear."""
+        from .reference_review import approved_selections
+        if "selections" in configuration:
+            raise ValueError("choose explicit selections or approved release discovery")
+        choices=approved_selections(library,reference_library=configuration["reference_library"],
+            reference_store=configuration["reference_release_store"],
+            release_store=configuration["release_store"],asset_store=configuration["asset_store"],
+            calibrations=configuration["calibrations"],capabilities=configuration["capabilities"])
+        return cls(selections=choices,managed_releases=True,**configuration)
+
+    def refresh_released_selections(self, library):
+        if not self.managed_releases:
+            return
+        from .reference_review import approved_selections
+        try:
+            choices=approved_selections(library,reference_library=self.reference_library,
+                reference_store=self.reference_release_store,release_store=self.release_store,
+                asset_store=self.asset_store,calibrations=self.calibrations,capabilities=self.capabilities)
+        except Exception:
+            # The release is retained, but an unavailable/over-limit selection
+            # view cannot authorize an inspection.
+            choices=()
+        self.selections=MappingProxyType({s.selection_id:s for s in choices})
 
     def resolve(self, library, selection_id):
         choice = self.selections[selection_id]

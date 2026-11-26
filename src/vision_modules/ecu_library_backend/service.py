@@ -96,8 +96,8 @@ class ECULibraryService:
         return {'key': profile_id, 'profile': thaw(p.data), 'etag': etag}
 
     def get_draft(self, profile_id):
-        p, etag = self.store.get(profile_id)
-        return {'key': profile_id, 'profile': thaw(p.data), 'etag': etag}
+        p, etag, lifecycle, release_digest = self.store.get_state(profile_id)
+        return {'key': profile_id, 'profile': thaw(p.data), 'etag': etag, **({'lifecycle':lifecycle} if lifecycle!='ACTIVE' else {}), **({'releaseDigest':release_digest} if release_digest else {})}
 
     def update_draft(self, profile_id, document, expected_etag):
         p = _document(document)

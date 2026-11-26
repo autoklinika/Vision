@@ -89,7 +89,7 @@ export function useLibraryView(client: ReadOnlyVisionClient, intervalMs = 0, own
     },quiet);
   }
   function searchLibrary(criteria:LibrarySearchCriteria|null){
-    refreshLibrary(true,criteria && (criteria.query.trim()||criteria.kind!=='all')?{...criteria,query:criteria.query.trim()}:null);
+    refreshLibrary(true,criteria && (criteria.query.trim()||criteria.kind!=='all'||(criteria.lifecycle&&criteria.lifecycle!=='all'))?{...criteria,query:criteria.query.trim()}:null);
   }
   function libraryPage(direction: 'previous' | 'next') {
     if(busy.current)return;

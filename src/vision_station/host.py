@@ -19,8 +19,17 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
+        if review_authority is not None:
+            from .reference_review import ReviewAuthority
+            if not isinstance(review_authority,ReviewAuthority):
+                raise ValueError("explicit review authority required")
+        self._review_authority = review_authority
+        if composition_factory is not None:
+            if composition is not None or not callable(composition_factory):
+                raise ValueError("one explicit composition source required")
+            composition=composition_factory(self.library)
         self._reader = StationOwner(self.library)
         self.library_reader = self._reader.library_reader
         self._lifecycle_lock = threading.RLock()

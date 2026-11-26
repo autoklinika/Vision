@@ -194,3 +194,10 @@ body { margin: 0; }
 .vision-module .library-search .library-search-field { flex:1 1 260px; max-width:560px; }
 .vision-module .library-search .fui-Input { width:100%; }
 .vision-module .library-search-result { color:var(--colorNeutralForeground3); font-size:13px; }
+
+.vision-module .saved-profile-inspector { display:grid; gap:10px; min-width:0; }
+.vision-module .library-review-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
+.vision-module .library-review-controls .fui-Select,.vision-module .library-review-controls .fui-Input { flex:1 1 180px; min-width:0; max-width:380px; }
+.vision-module .saved-profile-preview { min-width:0; overflow-wrap:anywhere; }
+.vision-module .saved-profile-preview .fui-TableCell { vertical-align:top; overflow-wrap:anywhere; max-width:320px; white-space:pre-wrap; }
+.vision-module .saved-profile-preview .fui-TableCell small { display:block; color:var(--colorNeutralForeground3); }

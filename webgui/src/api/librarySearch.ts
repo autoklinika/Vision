@@ -1,17 +1,18 @@
 /** Search only the bounded, authorized catalog projection. Never load draft documents. */
 import {isLibraryReport, matchesLibrary} from './libraryContract';
-import type {LibraryEntry, LibraryReport} from './libraryContract';
+import type {LibraryEntry, LibraryReport, DraftLifecycle} from './libraryContract';
 import type {ProtectedResult} from './protectedAdapter';
 
 export type LibraryKind = 'all' | LibraryEntry['kind'];
-export type LibrarySearchCriteria = Readonly<{query: string; kind: LibraryKind}>;
+export type LibrarySearchCriteria = Readonly<{query: string; kind: LibraryKind; lifecycle?:DraftLifecycle|'all'}>;
 export type LibrarySearchHit = Readonly<{entry: LibraryEntry; page: LibraryReport}>;
-export type LibrarySearch = Readonly<{criteria: LibrarySearchCriteria; hits: readonly LibrarySearchHit[]; after: number}>;
+export type LibrarySearch = Readonly<{criteria: LibrarySearchCriteria; hits: readonly LibrarySearchHit[]; after: number; incompleteIdentity?:boolean}>;
 
 const normalize = (value:string) => value.normalize('NFKC').toLowerCase();
 export function matchesSearch(entry:LibraryEntry, criteria:LibrarySearchCriteria):boolean {
   if(criteria.kind!=='all' && entry.kind!==criteria.kind)return false;
-  const fields=normalize([entry.displayName,entry.family,entry.variant,entry.profileId,entry.revision].join(' '));
+  if(criteria.lifecycle&&criteria.lifecycle!=='all'&&(entry.kind!=='REFERENCE_DRAFT'||(entry.lifecycle??'ACTIVE')!==criteria.lifecycle))return false;
+  const fields=normalize([entry.displayName,entry.family,entry.variant,entry.profileId,entry.revision,entry.searchTerms??''].join(' '));
   return normalize(criteria.query.trim()).split(/\s+/).every(token=>fields.includes(token));
 }
 
@@ -26,6 +27,7 @@ export async function searchLibraryPages(first:LibraryReport, criteria:LibrarySe
       !['all','CATALOG_RECORD','REFERENCE_DRAFT'].includes(criteria.kind))return unavailable;
   const hits:LibrarySearchHit[]=[];
   const seen=new Set<string>();
+  let incompleteIdentity=false;
   const deadline=clock()+30000;
   let page=first;
   for(let i=0;i<11;i++){
@@ -33,10 +35,11 @@ export async function searchLibraryPages(first:LibraryReport, criteria:LibrarySe
     for(const entry of page.entries){
       if(seen.has(entry.entryId))return unavailable;
       seen.add(entry.entryId);
+      incompleteIdentity ||= entry.searchComplete===false;
       if(matchesSearch(entry,criteria))hits.push({entry,page});
     }
     if(page.nextAfter===null){
-      return seen.size===first.totalCount?{status:'AVAILABLE',report:{criteria,hits,after:0}}:unavailable;
+      return seen.size===first.totalCount?{status:'AVAILABLE',report:{criteria,hits,after:0,incompleteIdentity}}:unavailable;
     }
     const after=page.nextAfter;
     const result=await read(first,after);
