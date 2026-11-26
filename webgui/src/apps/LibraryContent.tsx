@@ -1,10 +1,11 @@
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useState } from 'react';
-import { Button, FluentProvider, webLightTheme, TabList, Tab, Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, Badge } from '@fluentui/react-components';
-import { AddRegular, ArrowClockwiseRegular, EditRegular } from '@fluentui/react-icons';
+import { Button, FluentProvider, webLightTheme, TabList, Tab, Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, Badge, Input, Select } from '@fluentui/react-components';
+import { AddRegular, ArrowClockwiseRegular, EditRegular, SearchRegular } from '@fluentui/react-icons';
 import '../fluent/bridge.css';
 import type { LibraryControls, LibraryView } from '../api/useLibraryView';
 import type { LibraryDetail, LibrarySectionName, LibraryEntry } from '../api/libraryContract';
+import type {LibraryKind} from '../api/librarySearch';
 import type {StationPresentation} from '../station/client';
 import {DraftEditorContent} from '../station/DraftEditorContent';
 
@@ -68,8 +69,17 @@ export function LibraryContent({controls,station}: {controls: LibraryControls; s
   const {t}=useTranslation();
   const [editorEntry,setEditorEntry] = useState<LibraryEntry|"new"|null>(null);
   const [tab, setTab] = useState<DetailTab>('overview');
+  const [query,setQuery]=useState('');
+  const [kind,setKind]=useState<LibraryKind>('all');
   const {view, refreshLibrary, browseEntry, libraryPage} = controls;
-  const {library, detail} = view;
+  const {library, detail,search} = view;
+  const entries=search?search.hits.slice(search.after,search.after+50).map(hit=>hit.entry):library?.entries??[];
+  const total=search?search.hits.length:library?.totalCount??0;
+  const after=search?search.after:library?.after??0;
+  const hasNext=search?after+entries.length<total:library?.nextAfter!==null;
+  const canSearch=view.status==='AVAILABLE'&&!view.refreshing;
+  function submitSearch(){if(canSearch){setTab('overview');controls.searchLibrary({query,kind});}}
+  function clearSearch(){if(canSearch){setQuery('');setKind('all');setTab('overview');controls.searchLibrary(null);}}
   const editorAvailable = station?.identity.role === "operator" && station.report.coreConnection === "CONNECTED" && !station.accountBusy && view.status === "AVAILABLE";
   return <FluentProvider theme={webLightTheme} className="library-content">
     <div className="library-heading"><div><h2>{t("ECU Library")}</h2><span>{t("Catalog records & reference drafts")}</span></div><FluentProvider theme={webLightTheme} className="vision-fluent-scope library-tools"><Button icon={<ArrowClockwiseRegular/>} onClick={refreshLibrary} disabled={view.status === 'LOADING' || view.status === 'DISABLED' || view.refreshing}>{t("Refresh library")}</Button><Button appearance="primary" icon={<AddRegular/>} disabled={!editorAvailable || editorEntry!==null} onClick={()=>setEditorEntry("new")}>{t("New profile")}</Button><Button icon={<EditRegular/>} disabled={!editorAvailable || !detail || editorEntry!==null} onClick={()=>{if(detail)setEditorEntry(detail.entry);}}>{t("Open reference editor")}</Button></FluentProvider></div>
@@ -79,9 +89,16 @@ export function LibraryContent({controls,station}: {controls: LibraryControls; s
     {view.status !== 'AVAILABLE' && <p role="status" className="protected-read-status">{t(messages[view.status])}</p>}
     {library && !editorEntry && <>
       {library.source === 'SYNTHETIC_TEST' && <p className="synthetic-label">{t("SYNTHETIC TEST · no station library")}</p>}
+      <form className="library-search" aria-label={t("Search ECU library")} onSubmit={event=>{event.preventDefault();submitSearch();}}>
+        <label className="library-search-field"><span>{t("Search ECU library")}</span><Input value={query} maxLength={160} placeholder={t("Name, family, variant, profile ID or revision")} contentBefore={<SearchRegular/>} onChange={(_,data)=>setQuery(data.value)} disabled={!canSearch}/></label>
+        <label><span>{t("Record type")}</span><Select value={kind} onChange={e=>setKind(e.target.value as LibraryKind)} disabled={!canSearch}><option value="all">{t("All records")}</option><option value="CATALOG_RECORD">{t("Catalog")}</option><option value="REFERENCE_DRAFT">{t("Reference draft")}</option></Select></label>
+        <Button type="submit" appearance="primary" disabled={!canSearch}>{t("Search library")}</Button>
+        <Button disabled={!canSearch||(!query&&kind==='all'&&!search)} onClick={clearSearch}>{t("Clear search")}</Button>
+      </form>
+      {search&&<p className="library-search-result" role="status">{t("Search results: {count} of {total}",{count:total,total:library.totalCount})}</p>}
       <div className="library-report-meta"><span>{library.libraryId}</span><span>{t("Last report:")+" "}{library.capturedAt}</span></div>
-      <div className="library-list sunken-panel"><Table aria-label={t("ECU library entries")}><TableHeader><TableRow><TableHeaderCell>{t("Name / family")}</TableHeaderCell><TableHeaderCell>{t("Variant / revision")}</TableHeaderCell><TableHeaderCell>{t("Record")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell></TableRow></TableHeader><TableBody>{library.entries.map(entry => <TableRow key={entry.entryId} className={detail?.entry.entryId === entry.entryId ? 'library-selected' : ''}><TableCell><Button appearance="transparent" className="library-entry-link" disabled={view.refreshing} aria-label={t("Browse {name} {revision}",{name:entry.displayName,revision:entry.revision})} onClick={() => { setTab('overview'); browseEntry(entry); }}>{entry.displayName}</Button><small>{entry.family}</small></TableCell><TableCell>{entry.variant}<small>{entry.revision}</small></TableCell><TableCell>{entry.kind === 'CATALOG_RECORD' ? t("Catalog") : t("Reference draft")}<small>{entry.status}</small></TableCell><TableCell><Badge appearance="tint" color="informative">{entry.readiness}</Badge></TableCell></TableRow>)}</TableBody></Table>{library.totalCount === 0 && <p className="library-empty">{t("No catalog records or reference drafts are available.")}</p>}</div>
-      <div className="library-pagination"><span>{library.totalCount === 0 ? t("0 entries") : t("{first}–{last} of {total} entries",{first:library.after+1,last:library.after+library.entries.length,total:library.totalCount})}</span><Button onClick={() => libraryPage('previous')} disabled={library.after === 0 || view.refreshing}>{t("Previous entries")}</Button><Button onClick={() => libraryPage('next')} disabled={library.nextAfter === null || view.refreshing}>{t("Next entries")}</Button></div>
+      <div className="library-list sunken-panel"><Table aria-label={t("ECU library entries")}><TableHeader><TableRow><TableHeaderCell>{t("Name / family")}</TableHeaderCell><TableHeaderCell>{t("Variant / revision")}</TableHeaderCell><TableHeaderCell>{t("Record")}</TableHeaderCell><TableHeaderCell>{t("Readiness")}</TableHeaderCell></TableRow></TableHeader><TableBody>{entries.map(entry => <TableRow key={entry.entryId} className={detail?.entry.entryId === entry.entryId ? 'library-selected' : ''}><TableCell><Button appearance="transparent" className="library-entry-link" disabled={view.refreshing} aria-label={t("Browse {name} {revision}",{name:entry.displayName,revision:entry.revision})} onClick={() => { setTab('overview'); browseEntry(entry); }}>{entry.displayName}</Button><small>{entry.family}</small></TableCell><TableCell>{entry.variant}<small>{entry.revision}</small></TableCell><TableCell>{entry.kind === 'CATALOG_RECORD' ? t("Catalog") : t("Reference draft")}<small>{entry.status}</small></TableCell><TableCell><Badge appearance="tint" color="informative">{entry.readiness}</Badge></TableCell></TableRow>)}</TableBody></Table>{total === 0 && <p className="library-empty">{t(search?"No matching ECU entries.":"No catalog records or reference drafts are available.")}</p>}</div>
+      <div className="library-pagination"><span>{total === 0 ? t("0 entries") : t("{first}–{last} of {total} entries",{first:after+1,last:after+entries.length,total})}</span><Button onClick={() => libraryPage('previous')} disabled={after === 0 || view.refreshing}>{t("Previous entries")}</Button><Button onClick={() => libraryPage('next')} disabled={!hasNext || view.refreshing}>{t("Next entries")}</Button></div>
       {detail ? <Detail controls={controls} tab={tab} setTab={setTab}/> : <p className="library-empty">{t("Browse an entry to inspect its reference information.")}</p>}
       <p className="fine-print">{controls.autoRefresh ? t("Library information refreshes automatically.") : t("Last requested view · no live updates.")}{" "+t("Approval and operational decisions belong to Vision.")}</p>
     </>}

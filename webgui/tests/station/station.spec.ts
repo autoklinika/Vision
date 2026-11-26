@@ -54,8 +54,15 @@ async function mockStation(page: Page) {
     if (path.startsWith('/api/v1/library')) {
       if (!state.coreConnected) return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
       if (state.holdDetail && path.endsWith(draftEntry.entryId)) { await state.holdDetail(); return reply({schema: 'vision.api.error.v1', code: 'ACCESS_DENIED'}, 401); }
-      const data = path.endsWith('/history') ? libraryHistoryFixture(undefined, Number(url.searchParams.get('after'))) :
+      let data = path.endsWith('/history') ? libraryHistoryFixture(undefined, Number(url.searchParams.get('after'))) :
         path.includes('/entries/') ? libraryDetailFixture(path.endsWith(draftEntry.entryId) ? 'draft' : 'catalog') : libraryFixture(state.libraryCount, Number(url.searchParams.get('after')));
+      if(path.includes('/entries/')&&!path.endsWith('/history')){
+        const match=path.split('/').at(-1);
+        for(let after=0;after<state.libraryCount;after+=50){
+          const entry=libraryFixture(state.libraryCount,after).entries.find(item=>item.entryId===match);
+          if(entry){data={...libraryDetailFixture(entry.kind==='REFERENCE_DRAFT'?'draft':'catalog'),entry};break;}
+        }
+      }
       return reply({...data, source: 'STATION', libraryId: 'vision-ecu-library', viewId: state.libraryView});
     }
     return reply({schema: 'vision.api.error.v1', code: 'NOT_FOUND'}, 404);
@@ -658,5 +665,38 @@ test('compact header keeps tabs beside the logo, closes the requested tab and su
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   const selected=strip.getByRole('tab',{name:'Event Viewer',exact:true});
   await expect.poll(()=>selected.evaluate(el=>{const a=el.getBoundingClientRect(),b=el.closest('.vision-workspace-tabs')!.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1;})).toBe(true);
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('library searches all authorized pages, filters record type and browses the exact matching entry',async({page})=>{
+  const state=await mockStation(page);
+  state.libraryCount=101;
+  await page.goto('/');
+  await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'ECU Library',exact:true}).click();
+  const library=page.locator('[data-module="ecu"]');
+  const table=library.getByRole('table',{name:'ECU library entries'});
+  const query=library.getByRole('textbox',{name:'Search ECU library',exact:true});
+  await expect(table.locator('tbody tr')).toHaveCount(50);
+  await query.fill('CATALOG_100');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  await expect(library).toContainText('Search results: 1 of 101');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await table.getByRole('button',{name:'Browse Catalog 100 v1',exact:true}).click();
+  await expect(library.getByRole('region',{name:'Library entry details'})).toContainText('Catalog 100');
+  expect(state.reads.some(path=>path.includes('after=100'))).toBe(true);
+  await query.fill('');
+  await library.getByRole('combobox',{name:'Record type',exact:true}).selectOption('REFERENCE_DRAFT');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  await expect(library).toContainText('Search results: 1 of 101');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await expect(table.getByRole('button',{name:'Browse API-03 synthetic reference r1',exact:true})).toBeVisible();
+  await library.getByRole('button',{name:'Clear search',exact:true}).click();
+  await expect(table.locator('tbody tr')).toHaveCount(50);
+  await expect(library).not.toContainText('Search results:');
+  await query.fill('missing-profile');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  await expect(library).toContainText('No matching ECU entries.');
   expect(state.writes).toEqual(['/api/v1/auth/login']);
 });

@@ -188,3 +188,9 @@ body { margin: 0; }
   .vision-system-status .station-overview-title { min-width: 0; }
   .vision-system-status .station-overview-title h2 { overflow-wrap: anywhere; }
 }
+
+.vision-module .library-search { display:flex; align-items:flex-end; flex-wrap:wrap; gap:10px; margin:12px 0; }
+.vision-module .library-search label { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.vision-module .library-search .library-search-field { flex:1 1 260px; max-width:560px; }
+.vision-module .library-search .fui-Input { width:100%; }
+.vision-module .library-search-result { color:var(--colorNeutralForeground3); font-size:13px; }
