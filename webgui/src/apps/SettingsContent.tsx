@@ -1,8 +1,11 @@
+import { useTranslation } from '../i18n/LanguageProvider';
+import { LanguageSelector } from '../i18n/LanguageSelector';
 import { useEffect, useRef, useState } from 'react';
 import type { StationPresentation } from '../station/client';
 import { passwordChangeProblem } from '../station/password';
 
 export function SettingsContent({station}: {station?: StationPresentation}) {
+  const {t}=useTranslation();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -27,19 +30,24 @@ export function SettingsContent({station}: {station?: StationPresentation}) {
   }
 
   return <div className="settings-content">
-    <div className="app-heading"><span className="status-mark" aria-hidden="true">⚙</span><div><h2>Your account</h2><p>{station ? `Signed in as ${station.identity.username}` : 'Account settings require a signed-in station session.'}</p></div></div>
-    <fieldset><legend>Change password</legend>
+    <div className="app-heading"><span className="status-mark" aria-hidden="true">⚙</span><div><h2>{t("Your account")}</h2><p>{station ? t('Signed in as {username}',{username:station.identity.username}) : t("Account settings require a signed-in station session.")}</p></div></div>
+    {station && <section className="vision-language-settings" aria-labelledby="language-settings-heading">
+      <h2 id="language-settings-heading">{t('Appearance & language')}</h2>
+      <LanguageSelector/>
+      <p className="fine-print">{t('Changes apply immediately and are saved in this browser.')}</p>
+    </section>}
+    <fieldset><legend>{t("Change password")}</legend>
       {station ? <form onSubmit={event => { event.preventDefault(); void submit(); }}>
-        <p>Choose a new password for your Vision account.</p>
+        <p>{t("Choose a new password for your Vision account.")}</p>
         <div className="password-fields">
-          <label htmlFor="settings-current-password">Current password</label><input id="settings-current-password" name="currentPassword" type="password" autoComplete="current-password" maxLength={1024} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} disabled={station.accountBusy} required/>
-          <label htmlFor="settings-new-password">New password</label><input id="settings-new-password" name="newPassword" type="password" autoComplete="new-password" maxLength={1024} value={newPassword} onChange={event => setNewPassword(event.target.value)} disabled={station.accountBusy} required aria-describedby="password-guidance"/>
-          <label htmlFor="settings-confirm-password">Confirm new password</label><input id="settings-confirm-password" name="confirmation" type="password" autoComplete="new-password" maxLength={1024} value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={station.accountBusy} required/>
+          <label htmlFor="settings-current-password">{t("Current password")}</label><input id="settings-current-password" name="currentPassword" type="password" autoComplete="current-password" maxLength={1024} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} disabled={station.accountBusy} required/>
+          <label htmlFor="settings-new-password">{t("New password")}</label><input id="settings-new-password" name="newPassword" type="password" autoComplete="new-password" maxLength={1024} value={newPassword} onChange={event => setNewPassword(event.target.value)} disabled={station.accountBusy} required aria-describedby="password-guidance"/>
+          <label htmlFor="settings-confirm-password">{t("Confirm new password")}</label><input id="settings-confirm-password" name="confirmation" type="password" autoComplete="new-password" maxLength={1024} value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={station.accountBusy} required/>
         </div>
-        <p id="password-guidance" className="fine-print">Use at least 12 characters. Changing your password signs out all sessions for this account.</p>
-        <p role="status" className="password-message">{message}</p>
-        <div className="app-actions"><button type="submit" disabled={station.accountBusy || !currentPassword || !newPassword || !confirmation}>{station.accountBusy ? 'Changing password…' : 'Change password'}</button><button type="button" disabled={station.accountBusy} onClick={() => { clear(); setMessage(''); }}>Clear fields</button></div>
-      </form> : <><p>Open the station WebGUI and sign in to change your own password.</p><button disabled>Change password</button></>}
+        <p id="password-guidance" className="fine-print">{t("Use at least 12 characters. Changing your password signs out all sessions for this account.")}</p>
+        <p role="status" className="password-message">{t(message)}</p>
+        <div className="app-actions"><button type="submit" disabled={station.accountBusy || !currentPassword || !newPassword || !confirmation}>{station.accountBusy ? t("Changing password…") : t("Change password")}</button><button type="button" disabled={station.accountBusy} onClick={() => { clear(); setMessage(''); }}>{t("Clear fields")}</button></div>
+      </form> : <><p>{t("Open the station WebGUI and sign in to change your own password.")}</p><button disabled>{t("Change password")}</button></>}
     </fieldset>
   </div>;
 }

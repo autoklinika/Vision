@@ -1,3 +1,6 @@
+import { useTranslation } from '../i18n/LanguageProvider';
+import { Button, Input, Select } from '@fluentui/react-components';
+import { ArrowUploadRegular, ImageRegular } from '@fluentui/react-icons';
 import {useRef,useState} from 'react';
 import type {DraftReport,DraftAssetPreview} from './draftContract';
 import {referenceIdentifier,maxEditorImageBytes} from './draftContract';
@@ -21,6 +24,7 @@ async function fileBase64(file:File){
   return btoa(binary);
 }
 export function EditorAssets({report,document,disabled,readable,onAttach,onBusy,onConflict}:Props){
+  const {t}=useTranslation();
   const [file,setFile]=useState<File|null>(null);
   const [assetId,setAssetId]=useState('');
   const [kind,setKind]=useState('photo');
@@ -69,23 +73,23 @@ export function EditorAssets({report,document,disabled,readable,onAttach,onBusy,
       else {setMessage(failures[result.status]);if(result.status==='DRAFT_CONFLICT')onConflict();}
     }finally{running.current=false;onBusy(false);}
   }
-  return <fieldset className="editor-asset-box"><legend>Managed reference images</legend>
-    <p className="fine-print">Import JPEG/PNG up to 2 MiB and 8 megapixels. Core validates the image and stores it privately by SHA-256. No image is marked verified automatically.</p>
+  return <fieldset className="editor-asset-box"><legend>{t("Managed reference images")}</legend>
+    <p className="fine-print">{t("Import JPEG/PNG up to 2 MiB and 8 megapixels. Core validates the image and stores it privately by SHA-256. No image is marked verified automatically.")}</p>
     <div className="draft-fields">
-      <label htmlFor="asset-file">Image file</label><input id="asset-file" ref={fileInput} type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={disabled} onChange={e=>{setFile(e.target.files?.[0]??null);setMessage('');}}/>
-      <label htmlFor="asset-id">Imported asset ID</label><input id="asset-id" value={assetId} maxLength={128} disabled={disabled} onChange={e=>setAssetId(e.target.value)}/>
-      <label htmlFor="asset-kind">Image kind</label><select id="asset-kind" value={kind} disabled={disabled} onChange={e=>setKind(e.target.value)}><option value="photo">Photo</option><option value="image">Image</option></select>
-      <label htmlFor="asset-state">Image physical state</label><select id="asset-state" value={stateId} disabled={disabled} onChange={e=>setStateId(e.target.value)}><option value="">Select state…</option>{states.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>
-      <label htmlFor="asset-source">Image source</label><select id="asset-source" value={sourceId} disabled={disabled} onChange={e=>setSourceId(e.target.value)}><option value="">Select source…</option>{sources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>
+      <label htmlFor="asset-file">{t("Image file")}</label><input id="asset-file" ref={fileInput} type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={disabled} onChange={e=>{setFile(e.target.files?.[0]??null);setMessage('');}}/>
+      <label htmlFor="asset-id">{t("Imported asset ID")}</label><Input id="asset-id" value={assetId} maxLength={128} disabled={disabled} onChange={e=>setAssetId(e.target.value)}/>
+      <label htmlFor="asset-kind">{t("Image kind")}</label><Select id="asset-kind" value={kind} disabled={disabled} onChange={e=>setKind(e.target.value)}><option value="photo">{t("Photo")}</option><option value="image">{t("Image")}</option></Select>
+      <label htmlFor="asset-state">{t("Image physical state")}</label><Select id="asset-state" value={stateId} disabled={disabled} onChange={e=>setStateId(e.target.value)}><option value="">{t("Select state…")}</option>{states.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</Select>
+      <label htmlFor="asset-source">{t("Image source")}</label><Select id="asset-source" value={sourceId} disabled={disabled} onChange={e=>setSourceId(e.target.value)}><option value="">{t("Select source…")}</option>{sources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</Select>
     </div>
-    {duplicate&&<p className="editor-warning">Asset ID already used in the working draft or its manifest.</p>}
-    <button disabled={disabled||!file||!referenceIdentifier(assetId)||duplicate||!states.some(x=>x.value===stateId)||!sources.some(x=>x.value===sourceId)} onClick={()=>{void doImport();}}>Import reference image</button>
-    <p className="fine-print">An imported file is stored before the draft is saved; closing without saving can leave an unattached private asset. No automatic deletion.</p>
+    {duplicate&&<p className="editor-warning">{t("Asset ID already used in the working draft or its manifest.")}</p>}
+    <Button icon={<ArrowUploadRegular/>} disabled={disabled||!file||!referenceIdentifier(assetId)||duplicate||!states.some(x=>x.value===stateId)||!sources.some(x=>x.value===sourceId)} onClick={()=>{void doImport();}}>{t("Import reference image")}</Button>
+    <p className="fine-print">{t("An imported file is stored before the draft is saved; closing without saving can leave an unattached private asset. No automatic deletion.")}</p>
     <div className="draft-fields">
-      <label htmlFor="asset-preview">Saved image preview</label><select id="asset-preview" value={previewId} disabled={!readable||running.current} onChange={e=>{setPreviewId(e.target.value);setPreview(null);}}><option value="">Select saved image…</option>{saved.map((x,i)=><option key={i} value={String(x.asset_id)}>{String(x.asset_id)}</option>)}</select>
+      <label htmlFor="asset-preview">{t("Saved image preview")}</label><Select id="asset-preview" value={previewId} disabled={!readable||running.current} onChange={e=>{setPreviewId(e.target.value);setPreview(null);}}><option value="">{t("Select saved image…")}</option>{saved.map((x,i)=><option key={i} value={String(x.asset_id)}>{String(x.asset_id)}</option>)}</Select>
     </div>
-    <button disabled={!readable||running.current||!previewId||!saved.some(x=>x.asset_id===previewId)} onClick={()=>{void showPreview();}}>Preview saved image</button>
-    {preview&&<div className="editor-asset-preview"><img src={'data:'+preview.mime+';base64,'+preview.data} alt={'Stored reference image '+preview.assetId}/><p className="fine-print">{preview.mime} · {preview.bytes} bytes · SHA-256 {preview.sha256}</p><button onClick={()=>setPreview(null)}>Close preview</button></div>}
-    {message&&<p role="status">{message}</p>}
+    <Button icon={<ImageRegular/>} disabled={!readable||running.current||!previewId||!saved.some(x=>x.asset_id===previewId)} onClick={()=>{void showPreview();}}>{t("Preview saved image")}</Button>
+    {preview&&<div className="editor-asset-preview"><img src={'data:'+preview.mime+';base64,'+preview.data} alt={t('Stored reference image {id}',{id:preview.assetId})}/><p className="fine-print">{preview.mime} · {preview.bytes} {t("bytes · SHA-256")} {preview.sha256}</p><Button onClick={()=>setPreview(null)}>{t("Close preview")}</Button></div>}
+    {message&&<p role="status">{t(message)}</p>}
   </fieldset>;
 }

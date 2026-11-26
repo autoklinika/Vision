@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { copyFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 // Explicit lab-only same-origin proxy. No arbitrary URL/host configuration.
 const apiPort = process.env.VISION_API_LAB_PORT;
@@ -27,7 +27,7 @@ export default defineConfig({
     apply: 'build',
   }, {
     name: 'public-notices-only',
-    closeBundle() { copyFileSync('public/THIRD_PARTY_NOTICES.txt', 'dist/THIRD_PARTY_NOTICES.txt'); },
+    closeBundle() { execFileSync(process.execPath, ['scripts/collect-notices.mjs'], { stdio: 'inherit' }); },
     apply: 'build',
   }],
   server: { host: '127.0.0.1', cors: false, proxy, fs: {

@@ -14,6 +14,7 @@ const web = {
 };
 export default defineConfig({
   testDir: './tests/browser',
+  expect: {timeout: 10000},
   use: {baseURL: 'http://127.0.0.1:4173', viewport: {width:1280,height:800}},
   webServer: integration ? [
     {

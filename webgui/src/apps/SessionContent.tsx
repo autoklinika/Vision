@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import type { SessionControls } from '../api/useSessionView';
 
 const messages = {
@@ -11,36 +12,37 @@ const messages = {
 } as const;
 
 export function SessionContent({section, controls}: {section: 'summary' | 'inspection' | 'events'; controls: SessionControls}) {
+  const {t}=useTranslation();
   const {view, refreshSession, nextEvents} = controls;
   const {session, events} = view;
   const summary = section === 'summary';
   const message = summary && view.status === 'DISABLED' ? 'Protected reports are disabled in this client mode.' :
     summary && view.status === 'NOT_REQUESTED' ? 'No report loaded. Refresh session reads the authorized Core report.' :
     controls.autoRefresh && view.status === 'AVAILABLE' ? 'Session information refreshes automatically from Vision.' : messages[view.status];
-  const refresh = <button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING' || view.status === 'NO_ACTIVE_SESSION' || view.refreshing}>Refresh session</button>;
-  return <section className={`session-report${summary ? ' session-summary' : ''}`} aria-label="Protected Core report">
-    <div className="session-heading"><h2>{summary ? 'Core / Runtime session' : section === 'inspection' ? 'Inspection session report' : 'Session event journal'}</h2>{summary && refresh}</div>
-    <p className="protected-read-status" role="status">{message}</p>
-    {!summary && <div className="app-actions">{refresh}{section === 'events' && <button onClick={nextEvents} disabled={!events || events.nextAfterSequence === null || view.status !== 'AVAILABLE' || view.refreshing}>Load more events</button>}</div>}
+  const refresh = <button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING' || view.status === 'NO_ACTIVE_SESSION' || view.refreshing}>{t("Refresh session")}</button>;
+  return <section className={`session-report${summary ? ' session-summary' : ''}`} aria-label={t("Protected Core report")}>
+    <div className="session-heading"><h2>{summary ? t("Core / Runtime session") : section === 'inspection' ? t("Inspection session report") : t("Session event journal")}</h2>{summary && refresh}</div>
+    <p className="protected-read-status" role="status">{t(message)}</p>
+    {!summary && <div className="app-actions">{refresh}{section === 'events' && <button onClick={nextEvents} disabled={!events || events.nextAfterSequence === null || view.status !== 'AVAILABLE' || view.refreshing}>{t("Load more events")}</button>}</div>}
     {session && <>
-      {session.source === 'SYNTHETIC_TEST' && <p className="synthetic-label"><strong>SYNTHETIC TEST · no station session</strong></p>}
+      {session.source === 'SYNTHETIC_TEST' && <p className="synthetic-label"><strong>{t("SYNTHETIC TEST · no station session")}</strong></p>}
       <div className="report sunken-panel"><dl>
-        <dt>Session</dt><dd>{session.sessionId}</dd>
-        <dt>Report source</dt><dd>{session.source}</dd>
-        <dt>Captured at (UTC)</dt><dd>{session.capturedAt}</dd>
-        <dt>Journal through</dt><dd>{session.journalSequence}</dd>
-        <dt>Core invalidation</dt><dd>{session.invalidated ? 'INVALIDATED' : 'Not reported'}</dd>
+        <dt>{t("Session")}</dt><dd>{session.sessionId}</dd>
+        <dt>{t("Report source")}</dt><dd>{session.source}</dd>
+        <dt>{t("Captured at (UTC)")}</dt><dd>{session.capturedAt}</dd>
+        <dt>{t("Journal through")}</dt><dd>{session.journalSequence}</dd>
+        <dt>{t("Core invalidation")}</dt><dd>{session.invalidated ? 'INVALIDATED' : t("Not reported")}</dd>
       </dl></div>
       {section === 'inspection' && <>
-        <div className="sunken-panel session-table"><table aria-label="Reported inspection stages"><thead><tr><th>Stage</th><th>Reported state</th><th>Historical success</th><th>Last transition</th><th>Last ACK</th></tr></thead><tbody>{session.stages.map(stage => <tr key={stage.id}><td>{stage.id}</td><td>{stage.state}</td><td>{stage.historicalSuccess ? 'Recorded' : 'Not recorded'}</td><td>{stage.lastTransitionSequence ?? '—'}</td><td>{stage.lastAckSequence ?? '—'}</td></tr>)}</tbody></table></div>
-        <p className="fine-print">Historical success remains a historical fact when Core blocks a stage. ACK confirms receipt; it does not complete a stage.</p>
+        <div className="sunken-panel session-table"><table aria-label={t("Reported inspection stages")}><thead><tr><th>{t("Stage")}</th><th>{t("Reported state")}</th><th>{t("Historical success")}</th><th>{t("Last transition")}</th><th>{t("Last ACK")}</th></tr></thead><tbody>{session.stages.map(stage => <tr key={stage.id}><td>{stage.id}</td><td>{stage.state}</td><td>{stage.historicalSuccess ? t("Recorded") : t("Not recorded")}</td><td>{stage.lastTransitionSequence ?? '—'}</td><td>{stage.lastAckSequence ?? '—'}</td></tr>)}</tbody></table></div>
+        <p className="fine-print">{t("Historical success remains a historical fact when Core blocks a stage. ACK confirms receipt; it does not complete a stage.")}</p>
       </>}
       {section === 'events' && events && <>
-        <p>Journal page after {events.afterSequence}, pinned through {events.throughSequence}. {events.nextAfterSequence === null ? 'End of this report.' : 'More events are available.'}</p>
-        <div className="sunken-panel session-table"><table aria-label="Reported session events"><thead><tr><th>Sequence</th><th>Time (UTC)</th><th>Stage</th><th>Event</th><th>Reported state</th></tr></thead><tbody>{events.events.map(event => <tr key={event.sequence}><td>{event.sequence}</td><td>{event.timestamp}</td><td>{event.stageId ?? 'Session'}</td><td>{event.kind}</td><td>{event.state ?? '—'}</td></tr>)}</tbody></table>{events.events.length === 0 && <p>No events in this report.</p>}</div>
-        <p className="fine-print">One bounded page is kept in this browser. Refresh session returns to the first page of a new report.</p>
+        <p>{t("Journal page after {after}, pinned through {through}.",{after:events.afterSequence,through:events.throughSequence})} {events.nextAfterSequence === null ? t("End of this report.") : t("More events are available.")}</p>
+        <div className="sunken-panel session-table"><table aria-label={t("Reported session events")}><thead><tr><th>{t("Sequence")}</th><th>{t("Time (UTC)")}</th><th>{t("Stage")}</th><th>{t("Event")}</th><th>{t("Reported state")}</th></tr></thead><tbody>{events.events.map(event => <tr key={event.sequence}><td>{event.sequence}</td><td>{event.timestamp}</td><td>{event.stageId ?? t("Session")}</td><td>{event.kind}</td><td>{event.state ?? '—'}</td></tr>)}</tbody></table>{events.events.length === 0 && <p>{t("No events in this report.")}</p>}</div>
+        <p className="fine-print">{t("One bounded page is kept in this browser. Refresh session returns to the first page of a new report.")}</p>
       </>}
     </>}
-    {session && <p className="fine-print">This is a saved read result, not a live readiness signal. Session control and decisions belong to Vision.</p>}
+    {session && <p className="fine-print">{t("This is a saved read result, not a live readiness signal. Session control and decisions belong to Vision.")}</p>}
   </section>;
 }

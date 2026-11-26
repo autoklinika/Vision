@@ -15,7 +15,7 @@
 
 .library-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .library-heading h2 { margin: 0; }
-.library-heading span { color: #444; font-size: 11px; }
+.library-heading > div:first-child > span { color: #444; font-size: 11px; }
 .library-tools { display: flex; gap: 6px; flex-wrap: wrap; }
 .library-purpose { margin: 8px 0; }
 .library-content .synthetic-label { margin: 8px 0; padding: 4px 8px; }

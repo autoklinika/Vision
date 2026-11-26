@@ -1,0 +1,58 @@
+/* Temporary boundary while the remaining legacy shell still imports 98.css. */
+.vision-fluent-scope {
+  background-color: transparent;
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.vision-fluent-scope .fui-Button {
+  box-shadow: none;
+  text-shadow: none;
+  -webkit-font-smoothing: antialiased;
+  min-width: 0;
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+}
+.vision-fluent-scope .fui-Button:not(:focus-visible) {
+  outline: none;
+}
+
+.vision-fluent-form {
+  display: block;
+}
+.vision-fluent-form fieldset {
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackground1);
+  padding: 12px;
+}
+.vision-fluent-form legend,
+.vision-fluent-form label {
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  -webkit-font-smoothing: antialiased;
+}
+.vision-fluent-form .draft-fields {
+  grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+  gap: 10px;
+}
+.vision-fluent-form .fui-Input {
+  width: 100%;
+  min-width: 0;
+}
+.vision-fluent-form .fui-Input input {
+  box-shadow: none;
+  text-shadow: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  -webkit-font-smoothing: antialiased;
+}
+@container (max-width: 440px) {
+  .vision-fluent-form .draft-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
