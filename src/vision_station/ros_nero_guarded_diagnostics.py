@@ -12,6 +12,7 @@ from .nero_clear import ClearEngine, Evidence, read_sdk_evidence
 from .nero import NODE
 from .ros_nero import sample_can
 from .nero_local_approval import Approval
+from .ros_nero_servo_bridge import CandidateReceiver
 
 
 def to_message(value, msg):
@@ -43,6 +44,8 @@ def node_class():
             self._approval=None
             if self._clear_commissioned:
                 self._approval=Approval(self.get_parameter("diagnostics_approval_directory").value)
+            self.declare_parameter("servo_candidate_monitor_enabled",False)
+            self._servo_candidate_receiver=None
             self._diagnostics_group=MutuallyExclusiveCallbackGroup()
             self._tx_lock=threading.RLock()
             self._stop_epoch=0
@@ -57,6 +60,11 @@ def node_class():
         def _publish_evidence(self):
             e=read_sdk_evidence(self.agx_arm)
             self._evidence_pub.publish(to_message(e.payload() if e else None,NeroEvidence()))
+
+        def _setup_subscribers(self):
+            super()._setup_subscribers()
+            if self.get_parameter("servo_candidate_monitor_enabled").value is True:
+                self._servo_candidate_receiver=CandidateReceiver(self)
 
         def _setup_services(self):
             super()._setup_services()
