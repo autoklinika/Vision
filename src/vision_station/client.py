@@ -9,6 +9,15 @@ from vision_api.library_reports import (validate_library_report, validate_librar
 from vision_api.reports import _timestamp, validate_session_report, validate_events_report
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
+from .luxonis import validate_luxonis_report
+from .nero import validate_nero_report
+from .nero_tcp import validate_report as validate_nero_tcp
+from .nero_manual import valid_intent as valid_manual_intent
+from .nero_manual_api import validate_status as validate_manual_status,validate_command as validate_manual_command
+from .nero_diagnostics import validate_report as validate_nero_diagnostics
+from .nero_history import validate_history as validate_nero_history, valid_query as valid_nero_history_query, validate_attempts
+from .nero_clear_coordinator import valid_intent, valid_actor, validate_envelope
+from .luxonis_ir import IRRejected, validate_request, validate_result
 from .draft_editor import DraftConflict, DraftNotFound, DraftRequestInvalid, validate_draft_report, validate_diagnostic_report, validate_asset_report, ASSET_WIRE_LIMIT, FIELDS
 from .protocol import (ERRORS, exchange_timeout, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT,
                        check_peer, checked_path, checked_socket, receive, send,
@@ -79,6 +88,8 @@ class RemoteStationOwner:
                     raise DraftNotFound()
                 if code == "BAD_REQUEST" and operation == "draft_editor":
                     raise DraftRequestInvalid()
+                if code == "IR_REJECTED":
+                    raise IRRejected()
                 if code == "INSPECTION_REJECTED":
                     raise InspectionRejected()
                 if code == "NO_ACTIVE_SESSION":
@@ -94,7 +105,7 @@ class RemoteStationOwner:
             if operation in ("library", "entry", "history") and report["libraryId"] != "vision-ecu-library":
                 raise ValueError("station library identity mismatch")
             return report
-        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected, DraftConflict, DraftNotFound, DraftRequestInvalid):
+        except (NoActiveSession, CursorRejected, ReportUnavailable, InspectionRejected, DraftConflict, DraftNotFound, DraftRequestInvalid, IRRejected):
             raise
         except Exception:
             raise ReportUnavailable() from None
@@ -123,6 +134,64 @@ class RemoteStationOwner:
             raise ReportUnavailable()
         return report
 
+    def luxonis_ir(self, **intent):
+        if not validate_request(intent):
+            raise ValueError("invalid IR command")
+        report=self._read("luxonis_ir",intent,validate_result)
+        if any(report[k]!=intent[k] for k in intent):
+            raise ReportUnavailable()
+        return report
+
+    def nero_report(self):
+        return self._read("nero",{},validate_nero_report)
+
+    def nero_tcp_report(self):
+        return self._read("nero_tcp",{},validate_nero_tcp)
+
+    def nero_manual_report(self):
+        return self._read("nero_manual",{},validate_manual_status)
+
+    def nero_manual_command(self, *, operator, **intent):
+        if not valid_actor(operator) or not valid_manual_intent(intent):raise ValueError("invalid manual intent")
+        r=self._read("nero_manual_command",{**intent,"operator":operator},validate_manual_command)
+        if r["instanceId"]!=intent["instanceId"] or any(r["result"][k]!=intent[k] for k in ("operationId","action","sequence")):
+            raise ReportUnavailable()
+        return r
+
+    def nero_diagnostics_report(self):
+        return self._read("nero_diagnostics",{},validate_nero_diagnostics)
+
+    def nero_history_report(self, source="ALL", status="ALL", before=0):
+        if not valid_nero_history_query(source,status,before):
+            raise ValueError("invalid NERO history query")
+        report = self._read("nero_history",{"source":source,"status":status,"before":before},validate_nero_history)
+        if (report["filterSource"],report["filterStatus"],report["before"]) != (source,status,before):
+            raise ReportUnavailable()
+        return report
+
+    def nero_clear_history_report(self, source="ALL", before=0):
+        if not valid_nero_history_query(source,"ALL",before):
+            raise ValueError("invalid NERO clear history query")
+        r=self._read("nero_clear_history",{"source":source,"before":before},validate_attempts)
+        if (r["filterSource"],r["before"])!=(source,before):
+            raise ReportUnavailable()
+        return r
+
+    def clear_nero(self, *, operator, **intent):
+        if not valid_intent(intent) or not valid_actor(operator):
+            raise ValueError("invalid NERO clear intent")
+        r=self._read("nero_clear",{**intent,"operator":operator},validate_envelope)
+        if (r["instanceId"]!=intent["instanceId"] or r["operation"]["operationId"]!=intent["operationId"]
+                or r["operation"]["scope"]!=intent["scope"]):
+            raise ReportUnavailable()
+        return r
+
+    def luxonis_report(self, *, preview=False):
+        report=self._read("luxonis_preview" if preview else "luxonis",{},validate_luxonis_report)
+        if not preview and any(frame is not None for frame in report["frames"].values()):
+            raise ReportUnavailable()
+        return report
+
     def inspection_report(self):
         return self._read("inspection", {}, validate_inspection_report)
 
@@ -141,9 +210,17 @@ class RemoteStationOwner:
             validator=validate_diagnostic_report if action in ("validate","validate_structure") else validate_draft_report
         report=self._read("draft_editor",{"action":action,"args":args},validator,
             response_limit=ASSET_WIRE_LIMIT if action=="asset_preview" else RESPONSE_LIMIT)
+        if action=="open_generation" and report.get("snapshotId")!=args["snapshotId"]:
+            raise ReportUnavailable()
+        if action in ("create_basic","save_basic","clone_basic") and "declaration" not in report:
+            raise ReportUnavailable()
+        if action=="publish_review" and report.get("lifecycle")!="RELEASED":
+            raise ReportUnavailable()
+        if action!="open_generation" and "snapshotId" in report:
+            raise ReportUnavailable()
         if action=="asset_preview" and report["assetId"]!=args["assetId"]:
             raise ReportUnavailable()
-        expected = args["newKey"] if action == "clone" else args["key"]
+        expected = args["newKey"] if action in ("clone","clone_basic") else args["key"]
         if report["instanceId"] != args["instanceId"] or report["key"] != expected:
             raise ReportUnavailable()
         return report

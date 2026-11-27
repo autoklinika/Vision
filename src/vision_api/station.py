@@ -21,6 +21,10 @@ from .server import EVENTS_PATH, LIBRARY_ENTRY, LIBRARY_HISTORY, LIBRARY_PAGE
 from .station_owner import NoActiveSession
 from .status import boot_status
 from vision_station.inspection import InspectionRejected, ID, HEX32
+from vision_station.luxonis_ir import IRRejected, validate_request
+from vision_station.nero_manual import valid_intent as valid_manual_intent
+from vision_station.nero_manual_api import locked as manual_locked
+from vision_station.nero_clear_coordinator import valid_intent
 from vision_station.draft_editor import DraftConflict, DraftNotFound, FIELDS, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 
 # Two 1024-byte passwords can each expand sixfold with JSON escaping.
@@ -112,10 +116,13 @@ def _origins(values):
 class StationApplication:
     """Authentication is enforced before accessing any protected owner. Session commands also require operator permission."""
 
-    def __init__(self, *, identity, owner, dist_root, origins):
+    def __init__(self, *, identity, owner, dist_root, origins, manual_local=False):
         self.identity = identity
         self.owner = owner
         self.origins = _origins(origins)
+        if manual_local and (len(self.origins)!=1 or not all(v.startswith("http://127.0.0.1:") for v in self.origins.values())):
+            raise ValueError("manual command listener is local-only")
+        self.manual_local=bool(manual_local)
         self.static = _load_static(dist_root)
 
     @staticmethod
@@ -199,6 +206,8 @@ class StationApplication:
             return self._error(start_response, 409, "DRAFT_CONFLICT", head=head)
         except DraftNotFound:
             return self._error(start_response, 404, "DRAFT_NOT_FOUND", head=head)
+        except IRRejected:
+            return self._error(start_response, 409, "IR_REJECTED", head=head)
         except InspectionRejected:
             return self._error(start_response, 409, "INSPECTION_REJECTED", head=head)
         except NoActiveSession:
@@ -265,6 +274,36 @@ class StationApplication:
                 self.identity.logout(token)
             return self._json(start_response, 200, {"schema": "vision.api.logout.v1", "loggedOut": True},
                               extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
+        if method == "POST" and target == "/api/v1/devices/nero/manual/command":
+            if not self.manual_local or environ.get("REMOTE_ADDR")!="127.0.0.1":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            if environ.get("HTTP_ORIGIN")!=origin or environ.get("HTTP_X_VISION_CLIENT")!="webgui":
+                return self._error(start_response,403,"ORIGIN_REJECTED")
+            identity=self._authorize(environ,touch=False)
+            if identity["role"]!="operator":return self._error(start_response,403,"OPERATOR_REQUIRED")
+            value=self._body(environ,{"instanceId","operationId","action","sequence","sentAt","declaration","axis","direction"},1024)
+            if not valid_manual_intent(value):raise ValueError("invalid manual intent")
+            return self._json(start_response,200,self.owner.nero_manual_command(**value,operator=identity["username"]))
+        if method == "POST" and target == "/api/v1/devices/nero/clear":
+            if environ.get("HTTP_ORIGIN") != origin or environ.get("HTTP_X_VISION_CLIENT") != "webgui":
+                return self._error(start_response,403,"ORIGIN_REJECTED")
+            identity=self._authorize(environ,touch=False)
+            if identity["role"]!="operator":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            value=self._body(environ,{"instanceId","operationId","scope"},1024)
+            if not valid_intent(value):
+                raise ValueError("invalid NERO clear intent")
+            return self._json(start_response,200,self.owner.clear_nero(**value,operator=identity["username"]))
+        if method == "POST" and target == "/api/v1/devices/luxonis/ir":
+            if environ.get("HTTP_ORIGIN") != origin or environ.get("HTTP_X_VISION_CLIENT") != "webgui":
+                return self._error(start_response,403,"ORIGIN_REJECTED")
+            identity=self._authorize(environ,touch=False)
+            if identity["role"]!="operator":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            value=self._body(environ,{"instanceId","channel","enabled"},1024)
+            if not validate_request(value):
+                raise ValueError("invalid IR command")
+            return self._json(start_response,200,self.owner.luxonis_ir(**value))
         if method == "POST" and target in {"/api/v1/library/editor/" + action for action in FIELDS}:
             if (environ.get("HTTP_ORIGIN") != origin
                     or environ.get("HTTP_X_VISION_CLIENT") != "webgui"):
@@ -306,6 +345,40 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
+        if target == "/api/v1/devices/nero/manual":
+            identity=self._authorize(environ,touch=False)
+            if not self.manual_local or environ.get("REMOTE_ADDR")!="127.0.0.1" or identity["role"]!="operator":
+                return self._json(start_response,200,manual_locked(self.owner.station_report()["instanceId"]))
+            return self._json(start_response,200,self.owner.nero_manual_report())
+        if target == "/api/v1/devices/nero/control":
+            self._authorize(environ,touch=False)
+            return self._json(start_response,200,self.owner.nero_tcp_report())
+        if target == "/api/v1/devices/nero/diagnostics":
+            self._authorize(environ,touch=False)
+            return self._json(start_response,200,self.owner.nero_diagnostics_report())
+        if path == "/api/v1/devices/nero/clear-history":
+            self._authorize(environ,touch=False)
+            match=re.fullmatch(r"source=(ALL|ARM|J[1-7])&before=([0-9]{1,16})",query)
+            if match is None or int(match[2])>2**53-1:
+                return self._error(start_response,400,"BAD_REQUEST")
+            return self._json(start_response,200,self.owner.nero_clear_history_report(match[1],int(match[2])))
+        if path == "/api/v1/devices/nero/history":
+            self._authorize(environ,touch=False)
+            match = re.fullmatch(r"source=(ALL|ARM|J[1-7])&status=(ALL|ACTIVE|RESOLVED)&before=([0-9]{1,16})",query)
+            if match is None or int(match[3]) > 2**53-1:
+                return self._error(start_response,400,"BAD_REQUEST")
+            return self._json(start_response,200,self.owner.nero_history_report(match[1],match[2],int(match[3])))
+        if target == "/api/v1/devices/nero":
+            self._authorize(environ,touch=False)
+            return self._json(start_response,200,self.owner.nero_report())
+        if target in ("/api/v1/devices/luxonis","/api/v1/devices/luxonis/preview"):
+            identity=self._authorize(environ,touch=False)
+            preview=target.endswith("/preview")
+            if preview and identity["role"]!="operator":
+                return self._error(start_response,403,"OPERATOR_REQUIRED")
+            # The proxy cannot access ROS or the observer directory itself.
+            # This is a closed Core projection, not a generic parameter endpoint.
+            return self._json(start_response,200,self.owner.luxonis_report(preview=preview))
         protected = (target in ("/api/v1/station", "/api/v1/session", "/api/v1/library", "/api/v1/inspection")
                      or EVENTS_PATH.fullmatch(target) or LIBRARY_PAGE.fullmatch(target)
                      or LIBRARY_ENTRY.fullmatch(target) or LIBRARY_HISTORY.fullmatch(target))
@@ -357,8 +430,10 @@ def main():
     parser.add_argument("--accounts", required=True)
     parser.add_argument("--core-socket", required=True)
     parser.add_argument("--dist", required=True)
+    parser.add_argument("--nero-manual-local", action="store_true", help="Dedicated authenticated loopback maintenance UI; never use behind a proxy.")
     parser.add_argument("--https-origin", action="append", default=[])
     args = parser.parse_args()
+    if args.nero_manual_local and args.https_origin:parser.error("manual listener cannot have HTTPS proxy origins")
     if not 1 <= args.port <= 65535 or any(not x.startswith("https://") for x in args.https_origin):
         parser.error("invalid station endpoint")
     # The API owns browser identity and presentation only. The independently
@@ -368,7 +443,7 @@ def main():
         identity = IdentityStore(args.accounts, forbidden_roots=(args.dist,))
         owner = RemoteStationOwner(args.core_socket)
         application = StationApplication(identity=identity, owner=owner, dist_root=args.dist,
-                                         origins=[f"http://127.0.0.1:{args.port}", *args.https_origin])
+                                         origins=[f"http://127.0.0.1:{args.port}", *args.https_origin],manual_local=args.nero_manual_local)
     except Exception:
         parser.exit(1, "Station configuration rejected; check private paths and station build.\n")
     print("VISION_STATION_WEBGUI_STARTED core_transport=LOCAL_SOCKET", flush=True)

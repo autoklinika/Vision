@@ -1,3 +1,13 @@
+import {isManualReport,isManualResult} from './neroManualContract';
+import type {ManualReport,ManualResult,ManualIntent} from './neroManualContract';
+import {isTcpReport} from './neroTcpContract';
+import type {TcpReport} from './neroTcpContract';
+import {isDiagnosticsReport,isHistoryReport,isAttemptReport,isClearEnvelope} from './neroDiagnosticsContract';
+import type {DiagnosticsReport,HistoryReport,AttemptReport,ClearEnvelope,SourceFilter,HistoryFilter,ClearScope} from './neroDiagnosticsContract';
+import {isNeroReport} from './neroContract';
+import type {NeroReport} from './neroContract';
+import {isLuxonisReport,isIRResult} from './luxonisContract';
+import type {LuxonisReport,IRResult,IRChannel} from './luxonisContract';
 import { isIdentityReport, isLogoutReport, isPasswordChangeReport, isStationReport, isInspectionReport, record, usernameValid } from './contract';
 import {isDraftReport, isDraftValidation, isDraftAssetReport, isDraftAssetPreview} from './draftContract';
 import type {DraftAction, DraftReport, DraftValidation, DraftAssetReport, DraftAssetPreview} from './draftContract';
@@ -5,7 +15,7 @@ import type { IdentityReport, LogoutReport, PasswordChangeReport, StationReport,
 
 export type StationResult<T> = Readonly<{status: 'AVAILABLE'; report: T}> | Readonly<{status: 'ACCESS_DENIED' | 'RATE_LIMITED' | 'UNAVAILABLE'; report: null}>;
 type PasswordError = 'CURRENT_PASSWORD_INVALID' | 'PASSWORD_REJECTED';
-type InspectionError = 'OPERATOR_REQUIRED' | 'INSPECTION_REJECTED';
+type InspectionError = 'OPERATOR_REQUIRED' | 'INSPECTION_REJECTED' | 'IR_REJECTED';
 type DraftError = 'OPERATOR_REQUIRED' | 'DRAFT_CONFLICT' | 'DRAFT_NOT_FOUND' | 'BAD_REQUEST';
 export type DraftResult<T> = StationResult<T> | Readonly<{status: DraftError; report: null}>;
 export type InspectionCommandResult = StationResult<StationReport> | Readonly<{status: InspectionError; report: null}>;
@@ -76,6 +86,53 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
     {400: 'PASSWORD_REJECTED', 403: 'CURRENT_PASSWORD_INVALID'} as const);
 }
 
+export function readNero():Promise<StationResult<NeroReport>>{
+  return request<NeroReport,never>('/api/v1/devices/nero',isNeroReport,undefined,undefined,16384);
+}
+
+export function readNeroManual():Promise<StationResult<ManualReport>>{
+ return request<ManualReport,never>('/api/v1/devices/nero/manual',isManualReport,undefined,undefined,4096,1200);
+}
+export async function sendNeroManual(intent:ManualIntent):Promise<StationResult<ManualResult>>{
+ const r=await request<ManualResult,never>('/api/v1/devices/nero/manual/command',isManualResult,JSON.stringify(intent),undefined,4096,1200);
+ if(r.status==='AVAILABLE'&&(r.report.instanceId!==intent.instanceId||r.report.result.operationId!==intent.operationId||
+   r.report.result.action!==intent.action||r.report.result.sequence!==intent.sequence))return unavailable;
+ return r;
+}
+export function readNeroTcp():Promise<StationResult<TcpReport>>{
+  return request<TcpReport,never>('/api/v1/devices/nero/control',isTcpReport,undefined,undefined,16384);
+}
+export function readNeroDiagnostics():Promise<StationResult<DiagnosticsReport>>{
+  return request<DiagnosticsReport,never>('/api/v1/devices/nero/diagnostics',isDiagnosticsReport,undefined,undefined,131072);
+}
+export async function readNeroHistory(source:SourceFilter,status:HistoryFilter,before:number):Promise<StationResult<HistoryReport>>{
+  const result=await request<HistoryReport,never>('/api/v1/devices/nero/history?source='+source+'&status='+status+'&before='+before,isHistoryReport,undefined,undefined,131072);
+  if(result.status==='AVAILABLE'&&(result.report.filterSource!==source||result.report.filterStatus!==status||result.report.before!==before))return unavailable;
+  return result;
+}
+export async function readNeroClearHistory(source:SourceFilter,before:number):Promise<StationResult<AttemptReport>>{
+  const result=await request<AttemptReport,never>('/api/v1/devices/nero/clear-history?source='+source+'&before='+before,isAttemptReport,undefined,undefined,131072);
+  if(result.status==='AVAILABLE'&&(result.report.filterSource!==source||result.report.before!==before))return unavailable;
+  return result;
+}
+export async function clearNero(instanceId:string,operationId:string,scope:ClearScope):Promise<StationResult<ClearEnvelope>>{
+  const result=await request<ClearEnvelope,never>('/api/v1/devices/nero/clear',isClearEnvelope,JSON.stringify({instanceId,operationId,scope}),undefined,16384,15000);
+  if(result.status==='AVAILABLE'&&(result.report.instanceId!==instanceId||result.report.operation.operationId!==operationId||result.report.operation.scope!==scope))return unavailable;
+  return result;
+}
+
+export async function readLuxonis(preview:boolean):Promise<StationResult<LuxonisReport>>{
+  const result=await request<LuxonisReport,never>('/api/v1/devices/luxonis'+(preview?'/preview':''),isLuxonisReport,undefined,undefined,131072);
+  if(result.status==='AVAILABLE'&&!preview&&Object.values(result.report.frames).some(f=>f!==null))return unavailable;
+  return result;
+}
+export async function setLuxonisIR(instanceId:string,channel:IRChannel,enabled:boolean){
+  const result=await request('/api/v1/devices/luxonis/ir',isIRResult,JSON.stringify({instanceId,channel,enabled}),
+      {403:'OPERATOR_REQUIRED',409:'IR_REJECTED'} as const,4096,15000);
+  if(result.status==='AVAILABLE'&&(result.report.instanceId!==instanceId||result.report.channel!==channel||result.report.enabled!==enabled))return unavailable;
+  return result satisfies StationResult<IRResult>|Readonly<{status:'OPERATOR_REQUIRED'|'IR_REJECTED';report:null}>;
+}
+
 export function readInspection(): Promise<StationResult<InspectionReport>> {
   return request<InspectionReport, never>('/api/v1/inspection', isInspectionReport, undefined, undefined, 16384);
 }
@@ -99,9 +156,13 @@ async function editorRequest<T extends DraftReport | DraftValidation | DraftAsse
   const assetWire=3*1024*1024;
   if (new TextEncoder().encode(body).length > (action==='asset_import'?assetWire:131072)) return {status:'BAD_REQUEST',report:null};
   const result = await request('/api/v1/library/editor/'+action,validate,body,draftErrors,action==='asset_preview'?assetWire:131072,editorTimeoutMs);
+  if(result.status==='AVAILABLE'&&action==='open_generation'&&(!('snapshotId' in result.report)||result.report.snapshotId!==args.snapshotId))return unavailable;
+  if(result.status==='AVAILABLE'&&action!=='open_generation'&&'snapshotId' in result.report)return unavailable;
+  if(result.status==='AVAILABLE'&&['create_basic','save_basic','clone_basic'].includes(action)&&!('declaration' in result.report))return unavailable;
+  if(result.status==='AVAILABLE'&&action==='publish_review'&&(!('lifecycle' in result.report)||result.report.lifecycle!=='RELEASED'))return unavailable;
   if(result.status==='AVAILABLE'&&action==='asset_preview'&&(!('assetId' in result.report)||result.report.assetId!==args.assetId))return unavailable;
   if (result.status === 'AVAILABLE' && (result.report.instanceId !== args.instanceId ||
-      result.report.key !== (action === 'clone' ? args.newKey : args.key))) return unavailable;
+      result.report.key !== ((action === 'clone'||action==='clone_basic') ? args.newKey : args.key))) return unavailable;
   return result;
 }
 export function editDraft(action: Exclude<DraftAction,'validate'|'validate_structure'|'asset_import'|'asset_preview'>, args: Record<string,string>, document?: string): Promise<DraftResult<DraftReport>> {

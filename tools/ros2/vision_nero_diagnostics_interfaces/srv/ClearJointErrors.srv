@@ -1,0 +1,14 @@
+# 1..7 or 255 for all axes; no generic commands.
+string operation_id
+uint8 scope
+float64 not_after
+---
+string operation_id
+uint8 scope
+string result
+string reason
+bool command_invoked
+float64 sent_after
+string[7] axis_results
+vision_nero_diagnostics_interfaces/NeroEvidence before
+vision_nero_diagnostics_interfaces/NeroEvidence after

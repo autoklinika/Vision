@@ -91,3 +91,9 @@
 .draft-editor {container-type:inline-size}
 @container (max-width: 660px){.editor-section-layout{grid-template-columns:minmax(0,1fr)}.editor-section-list{display:none}}
 @container (max-width: 440px){.editor-field,.draft-editor .draft-fields{grid-template-columns:minmax(0,1fr);gap:3px}.editor-section-form fieldset{padding:5px}.editor-field>label,.editor-field>span{padding-top:0}.editor-vector-fields{gap:3px}.editor-list-row{flex-wrap:wrap}.editor-list-row>.editor-field{min-width:100%}}
+
+/* NERO diagnostic workspace */
+.nero-clear-panel { margin-top: 16px; }
+.nero-clear-confirm { margin-top: 12px; overflow-wrap: anywhere; }
+.nero-operation-result { margin: 10px 0; }
+.nero-axis-results { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; }

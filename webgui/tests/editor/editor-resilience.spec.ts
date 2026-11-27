@@ -15,6 +15,7 @@ async function newEditor(page:Page,key:string,create=true,virtualClock=true){
   await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name:'ECU Library',exact:true}).click();
   const library=page.locator('[data-module="ecu"]');
   await library.getByRole('button',{name:'New profile',exact:true}).click();
+  await library.getByRole('button',{name:'Advanced editor',exact:true}).click();
   const editor=library.getByRole('region',{name:'ECU reference editor'});
   await editor.getByLabel('ECU family',{exact:true}).fill('resilience-family');
   await editor.getByLabel('Variant ID',{exact:true}).fill('synthetic-'+key);
@@ -42,6 +43,15 @@ test('unsaved editor survives transient station/auth failures, Core outage and s
   const {editor}=await newEditor(page,'resilience-profile',false,false);
   page.once('dialog',dialog=>dialog.dismiss());
   await page.getByRole('button',{name:'Close ECU Library',exact:true}).click();
+  await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('resilience-family');
+  // Closing a dirty, inactive tab must preserve both the working copy and
+  // the currently selected module if the operator cancels the confirmation.
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).hover();
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('button',{name:'Close ECU Library',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'System Status',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'ECU Library',exact:true}).click();
   await expect(editor.getByLabel('ECU family',{exact:true})).toHaveValue('resilience-family');
   page.once('dialog',dialog=>dialog.dismiss());
   await editor.getByRole('button',{name:'Close editor',exact:true}).click();
@@ -153,7 +163,7 @@ for(const change of ['role','user'] as const){
     })}));
     await page.clock.fastForward(15100);
     await expect(page.locator('.vision-workspace')).toBeVisible();
-    await expect(page.locator('.desktop .mode-banner')).toContainText(change==='role'?'Read only':'synthetic-other-owner');
+    await expect(page.locator('.vision-workspace-status')).toContainText(change==='role'?'Read only':'synthetic-other-owner');
     await expect(editor).toHaveCount(0);
     await expect(page.locator('[data-editor-dirty]')).toHaveCount(0);
   });
@@ -181,7 +191,7 @@ test('Core reconnect discards previous READY evidence until a fresh inspection r
   });
   await page.getByRole('tab',{name:'System Status',exact:true}).click();
   const status=page.locator('[data-module="status"]');
-  const readyCells=status.getByRole('cell',{name:'READY',exact:true});
+  const readyCells=status.locator('[data-reported-state="READY"]');
   const start=status.getByRole('button',{name:'Start inspection session',exact:true});
   await page.clock.fastForward(5100);
   await expect(readyCells).toHaveCount(4);

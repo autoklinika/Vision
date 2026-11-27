@@ -96,8 +96,8 @@ class ECULibraryService:
         return {'key': profile_id, 'profile': thaw(p.data), 'etag': etag}
 
     def get_draft(self, profile_id):
-        p, etag = self.store.get(profile_id)
-        return {'key': profile_id, 'profile': thaw(p.data), 'etag': etag}
+        p, etag, lifecycle, release_digest, declaration = self.store.get_state(profile_id)
+        return {'key': profile_id, 'profile': thaw(p.data), 'etag': etag, **({'lifecycle':lifecycle} if lifecycle!='ACTIVE' else {}), **({'releaseDigest':release_digest} if release_digest else {}), **({'declaration':declaration} if declaration is not None else {})}
 
     def update_draft(self, profile_id, document, expected_etag):
         p = _document(document)
@@ -107,7 +107,9 @@ class ECULibraryService:
     def clone_draft(self, profile_id, new_profile_id, new_revision):
         identifier(new_profile_id); identifier(new_revision)
         with self.store.transaction():
-            old = self.get_draft(profile_id)['profile']; m = old['metadata']
+            source = self.get_draft(profile_id)
+            if 'declaration' in source: raise ValueError('use simplified revision clone')
+            old = source['profile']; m = old['metadata']
             if m['status'] != 'DRAFT' or m['template_only'] or m['content_sha256'] or m['approval_scopes'] or old['provenance_release']['release_approval'] or old['provenance_release']['released_snapshot_sha256']:
                 raise ValueError('source must be an unsigned draft')
             if new_revision == m['profile_revision']: raise ValueError('new revision required')

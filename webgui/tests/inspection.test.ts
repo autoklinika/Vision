@@ -33,6 +33,27 @@ it('validates only exact reports and explicit reader or operator identity',()=>{
   ]) expect(isInspectionReport(invalid)).toBe(false);
 });
 
+it('accepts the explicit hardware metadata extension, never interprets USB as readiness',()=>{
+  const hardware = ['USB_DETECTED','USB_CAN_DETECTED','NOT_APPLICABLE','USB_NOT_DETECTED'];
+  const extended = {...report,devices:report.devices.map((d,i)=>({...d,hardwareConnection:hardware[i]}))};
+  expect(isInspectionReport(extended)).toBe(true);
+  expect(isInspectionReport(report)).toBe(true);
+  expect(isInspectionReport({...extended,devices:extended.devices.map((d,i)=>i===1?{...d,hardwareConnection:'USB_CAN_NOT_DETECTED'}:d)})).toBe(true);
+  expect(isInspectionReport({...extended,startAllowed:true,blockers:[]})).toBe(false);
+  for(const [index,value] of [[0,'READY'],[0,'USB_CAN_DETECTED'],[1,'USB_DETECTED'],[2,'USB_DETECTED'],[3,'NOT_APPLICABLE'],[0,null]] as const){
+    expect(isInspectionReport({...extended,devices:extended.devices.map((d,i)=>i===index?{...d,hardwareConnection:value}:d)})).toBe(false);
+  }
+  expect(isInspectionReport({...extended,devices:extended.devices.map(d=>({...d,extra:true}))})).toBe(false);
+});
+
+it('validates diagnostic readiness reasons without treating them as trusted receipts',()=>{
+  const devices=report.devices.map((d,i)=>i===1?{...d,availability:'ACTIVE',readiness:'NOT_READY',readinessReason:'ARM_BRAKE_NOT_RELEASED'}:d);
+  expect(isInspectionReport({...report,devices})).toBe(true);
+  expect(isInspectionReport({...report,devices:devices.map((d,i)=>i===1?{...d,readiness:'READY'}:d)})).toBe(false);
+  expect(isInspectionReport({...report,devices:devices.map((d,i)=>i===0?{...d,readiness:'NOT_READY',readinessReason:'ARM_FAULT'}:d)})).toBe(false);
+  expect(isInspectionReport({...report,devices:devices.map((d,i)=>i===1?{...d,readinessReason:'unknown arbitrary string'}:d)})).toBe(false);
+});
+
 it('reads readiness and sends only the explicit selection and stale intent token', async()=>{
   secure();
   const network=vi.fn().mockResolvedValueOnce(response(report,'/api/v1/inspection'))

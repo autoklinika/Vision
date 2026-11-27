@@ -15,6 +15,7 @@ import unicodedata
 
 from .service import ECULibraryService
 from .storage import DraftReadUnavailable, SavedRevision
+from .basic_profile import STATES
 
 LibraryReadUnavailable = DraftReadUnavailable
 MAX_CATALOG_RECORDS = 256
@@ -85,6 +86,11 @@ class ProfileSummary:
     etag: str
     readiness: str = 'NOT_READY'
     reason_code: str = 'UNSIGNED_DRAFT'
+    lifecycle: str = 'ACTIVE'
+    search_terms: str = ''
+    search_complete: bool = True
+    release_digest: str | None = None
+    simplified: bool = False
 
 
 @dataclass(frozen=True)
@@ -158,13 +164,34 @@ def _catalog_detail(record):
                          False, record.envelope is not None)
 
 
+def identity_search_terms(document):
+    identity = document['identity']
+    values = ([identity['manufacturer']] if identity['manufacturer'] else []) + list(identity['manufacturer_part_numbers']) + list(identity['oem_part_numbers'])
+    # The existing 50-row / 128 KiB report budget is retained. Legacy
+    # records with overlong identity fields remain readable; incomplete
+    # indexing is explicit, never silently claimed to cover every term.
+    terms = []
+    complete = True
+    for value in values:
+        if any(unicodedata.category(c).startswith('C') for c in value):
+            complete = False
+            continue
+        next_value = ' '.join(terms + [value])
+        if len(json.dumps(next_value,ensure_ascii=True)) > 1024:
+            complete = False
+            continue
+        terms.append(value)
+    return ' '.join(terms), complete
+
+
 def _profile_detail(snapshot):
     document = snapshot.profile.data
     metadata = document['metadata']
+    terms, complete = identity_search_terms(document)
     summary = ProfileSummary(*(_identifier(metadata[k]) for k in
         ('profile_id', 'family_id', 'variant_id', 'profile_revision')),
         _display_name(metadata['display_name']),
-        metadata['status'], snapshot.etag)
+        metadata['status'], snapshot.etag, lifecycle=snapshot.lifecycle, search_terms=terms, search_complete=complete, release_digest=snapshot.release_digest, simplified=snapshot.declaration is not None)
     states = document['physical_states']
     workflows = document['inspection_workflows']['recipes']
     if len(states) > MAX_STATE_ROWS or len(workflows) > MAX_WORKFLOW_ROWS:
@@ -173,6 +200,9 @@ def _profile_detail(snapshot):
         _identifier(row['state_id']),
         _display_name(row['display_name']), row['verified'])
         for row in states)
+    if snapshot.declaration is not None:
+        state_rows=tuple(PhysicalStateSummary(s["stateId"],STATES[s["stateId"]],False)
+                         for s in snapshot.declaration["states"])
     recipe_rows = []
     for row in workflows:
         if row['approval_scope'] not in _SCOPES:

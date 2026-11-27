@@ -1,6 +1,6 @@
 # Dokumentacja Vision — indeks
 
-**Punkt wejścia aktualny 25.11.2026.** Dokumenty z wcześniejszych dat zachowują własny status i zakres; nie są aktualną telemetrią. [README projektu](../README.md) zawiera bieżący przegląd.
+**Punkt wejścia aktualny 26.11.2026 — gałąź DEV, Draft PR #81.** Dokumenty z wcześniejszych dat zachowują własny status i zakres; nie są aktualną telemetrią. [README projektu](../README.md) zawiera bieżący przegląd.
 
 ## Decyzje i obowiązujące kontrakty
 
@@ -22,7 +22,9 @@
 - Runtime: [Station Session Orchestration candidate](implementation/VISION_RUNTIME_002_STATION_SESSION.md), [S01–S04](implementation/VISION_RUNTIME_V1_S01_S04.md), [ROS 2 Luxonis adapter](implementation/VISION_RUNTIME_ROS2_LUXONIS_ADAPTER_V1.md).
 - Planner: [S05–S06](implementation/VISION_INSPECTION_PLANNER_V1_S05_S06.md).
 - [Thermal Inspection V1](implementation/VISION_THERMAL_INSPECTION_V1.md).
-- WebGUI: [specyfikacja V1](ux/VISION_WEBGUI_V1_SPECIFICATION.md), [biblioteka i edytor ECU](ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md), [kod i instrukcja](../webgui/README.md). GUI-01/02, API-01–03 i stanowiskowy Core/GUI są w main; edytor i obsługa urządzeń pozostają odrębnymi pakietami.
+- WebGUI: [specyfikacja historyczna V1](ux/VISION_WEBGUI_V1_SPECIFICATION.md), [biblioteka i edytor ECU](ux/ECU_LIBRARY_SELECTION_EDITOR_V1.md), [kod i instrukcja](../webgui/README.md). Aktualny kierunek Fluent 2 jest w main (#79–80); poniższe rozszerzenia znajdują się w DEV #81.
+- DEV ECU: [cykl życia i przegląd](implementation/VISION_ECU_LIBRARY_LIFECYCLE_V1.md), [uproszczona deklaracja V2](implementation/VISION_ECU_DECLARATION_V2.md).
+- DEV urządzenia: [diagnostyka gotowości](implementation/VISION_DEVICE_READINESS_V1.md), [Luxonis V1 i podgląd](implementation/VISION_DEVICES_LUXONIS_V1.md), [autostart](implementation/VISION_LUXONIS_AUTOSTART_V1.md), [sterowanie IR](implementation/VISION_LUXONIS_IR_V1.md), [NERO V1 — odczyt telemetrii](implementation/VISION_DEVICES_NERO_V1.md).
 - API: [Foundation](implementation/VISION_API_FOUNDATION_V1.md), [Core reports](implementation/VISION_API_CORE_REPORTS_V1.md), [ECU Library read](implementation/VISION_API_ECU_LIBRARY_READ_V1.md), [Station WebGUI](implementation/VISION_STATION_WEBGUI_V1.md), [deployment](operations/VISION_WEBGUI_DEPLOYMENT.md), [kontrakt API](../contracts/vision-api/v1/README.md).
 
 ## Odbiory i kalibracja
@@ -38,7 +40,7 @@
 
 - [Mapa kodu](../src/README.md), [testy](../tests/README.md).
 - [Repository Hygiene V1](process/REPOSITORY_HYGIENE_V1.md), [Development](process/DEVELOPMENT.md).
-- [Aktualny rejestr repozytorium 25.11](operations/REPOSITORY_REGISTER_2026-11-25.md); [snapshot 24.11](operations/REPOSITORY_REGISTER_2026-11-24.md) — historyczny.
+- [Aktualny rejestr repozytorium 26.11](operations/REPOSITORY_REGISTER_2026-11-26.md); wcześniejsze snapshoty [25.11](operations/REPOSITORY_REGISTER_2026-11-25.md) i [24.11](operations/REPOSITORY_REGISTER_2026-11-24.md) pozostają historyczne.
 - [Przegląd PR z 23.11](operations/OPEN_PR_PORTFOLIO_2026-11-23.md) jest historycznym punktem odniesienia, nie bieżącą listą.
 
 ## Materiały historyczne

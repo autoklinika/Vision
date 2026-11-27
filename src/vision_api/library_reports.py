@@ -25,6 +25,7 @@ SECTION_NAMES = (
 SCOPES = ("browse_and_select", "verify_identity", "localize", "photo_inspection",
           "thermal_relative", "thermal_radiometric")
 COMMON = {"schema", "scope", "source", "libraryId", "viewId", "capturedAt"}
+LIFECYCLES = ("ACTIVE","ARCHIVED","REVIEW_READY","RELEASED")
 ENTRY_FIELDS = {"entryId", "kind", "profileId", "family", "variant", "revision",
                 "displayName", "status", "readiness", "reasonCode", "etag"}
 
@@ -64,13 +65,29 @@ def _common(value, schema, fields):
 
 
 def _entry(value):
-    if (not _object(value, ENTRY_FIELDS) or not _hex(value["entryId"], 32)
+    if (type(value) is not dict or not ENTRY_FIELDS <= set(value) <= ENTRY_FIELDS | {"lifecycle","searchTerms","searchComplete","releaseDigest","simplified"}
+            or not _hex(value["entryId"], 32)
             or not all(_id(value[k]) for k in ("profileId", "family", "variant", "revision"))
             or not _text(value["displayName"], 160) or value["readiness"] != "NOT_READY"):
         return False
     if value["kind"] == "CATALOG_RECORD":
+        if set(value) != ENTRY_FIELDS:
+            return False
         return (value["status"] in ("DRAFT", "READY_FOR_REVIEW", "APPROVED")
                 and value["reasonCode"] == "CATALOG_ONLY" and value["etag"] is None)
+    if (value.get("lifecycle","ACTIVE") not in LIFECYCLES
+            or ("searchTerms" in value) != ("searchComplete" in value)
+            or (value.get("lifecycle")=="RELEASED") != ("releaseDigest" in value)
+            or ("releaseDigest" in value and not _hex(value["releaseDigest"],64))):
+        return False
+    if "simplified" in value and (value["simplified"] is not True or value.get("lifecycle","ACTIVE") not in ("ACTIVE","ARCHIVED")):
+        return False
+    if "searchTerms" in value:
+        terms = value["searchTerms"]
+        if (not isinstance(terms,str) or len(json.dumps(terms,ensure_ascii=True))>1024
+                or any(unicodedata.category(c).startswith("C") for c in terms)
+                or type(value["searchComplete"]) is not bool):
+            return False
     return (value["kind"] == "REFERENCE_DRAFT" and value["status"] == "DRAFT"
             and value["reasonCode"] == "UNSIGNED_DRAFT" and _etag(value["etag"]))
 
@@ -140,7 +157,10 @@ def validate_library_history_report(value):
             or not _page(value, value["items"], MAX_HISTORY, empty=False)):
         return False
     rows = value["items"]
-    if not all(_object(r, {"snapshotId", "etag", "revision"}) and _hex(r["snapshotId"], 32)
+    if not all(type(r) is dict and {"snapshotId","etag","revision"} <= set(r) <= {"snapshotId","etag","revision","lifecycle","releaseDigest"}
+               and ((r.get("lifecycle")=="RELEASED")==("releaseDigest" in r))
+               and ("releaseDigest" not in r or _hex(r["releaseDigest"],64))
+               and r.get("lifecycle","ACTIVE") in LIFECYCLES and _hex(r["snapshotId"], 32)
                and _etag(r["etag"]) and r["revision"] == value["revision"] for r in rows):
         return False
     return (len({r["snapshotId"] for r in rows}) == len(rows)
@@ -155,12 +175,19 @@ def _entry_id(kind, summary):
 
 
 def _summary(kind, summary):
-    return {"entryId": _entry_id(kind, summary), "kind": kind,
+    result = {"entryId": _entry_id(kind, summary), "kind": kind,
             "profileId": summary.profile_id, "family": summary.family,
             "variant": summary.variant, "revision": summary.revision,
             "displayName": summary.display_name, "status": summary.status,
             "readiness": summary.readiness, "reasonCode": summary.reason_code,
             "etag": summary.etag if kind == "REFERENCE_DRAFT" else None}
+    if kind == "REFERENCE_DRAFT":
+        if summary.lifecycle != "ACTIVE": result["lifecycle"] = summary.lifecycle
+        if summary.release_digest: result["releaseDigest"] = summary.release_digest
+        if summary.simplified: result["simplified"] = True
+        if summary.search_terms or not summary.search_complete:
+            result.update(searchTerms=summary.search_terms,searchComplete=summary.search_complete)
+    return result
 
 
 def _slice(items, after):
@@ -265,7 +292,7 @@ class LibraryReportProvider:
             paging, page = _slice(detail.history, after)
             result = {**self._base(snapshot, "vision.api.library-history.v1"), **paging,
                       "entryId": entry_id, "profileId": entry["profileId"], "revision": entry["revision"], "etag": entry["etag"],
-                      "items": [{"snapshotId": h.snapshot_id, "etag": h.etag, "revision": h.revision} for h in page]}
+                      "items": [{"snapshotId": h.snapshot_id, "etag": h.etag, "revision": h.revision, **({"lifecycle":h.lifecycle} if h.lifecycle!="ACTIVE" else {}), **({"releaseDigest":h.release_digest} if h.release_digest else {})} for h in page]}
             return self._checked(result, validate_library_history_report)
         except CursorRejected:
             raise

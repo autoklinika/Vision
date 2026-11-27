@@ -1,3 +1,4 @@
+import {jointCheckFixture} from '../fixtures/neroJointCheck';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -6,6 +7,10 @@ import { resolve } from 'node:path';
 import { identityFixture, stationFixture } from '../fixtures/station';
 import { libraryFixture, libraryDetailFixture, libraryHistoryFixture, draftEntry } from '../fixtures/library';
 import { sessionFixture, eventsFixture } from '../fixtures/session';
+import {luxonisFixture} from '../fixtures/luxonis';
+import {neroFixture} from '../fixtures/nero';
+import {diagnosticsFixture,neroHistoryFixture,neroAttemptFixture,rejectedOperation} from '../fixtures/neroDiagnostics';
+import type {SourceFilter,HistoryFilter,ClearScope} from '../../src/station/neroDiagnosticsContract';
 
 const contentType = 'application/json; charset=utf-8';
 async function login(page: Page, username: string, password: string) {
@@ -24,13 +29,13 @@ async function fillPasswordChange(page: Page, current: string, next: string, con
 async function mockStation(page: Page) {
   const state = {authenticated: false, offline: false, coreConnected: true, active: false, revoked: false, logoutOffline: false,
     holdSession: null as null | (() => Promise<void>), libraryCount: 2, libraryView: 'c'.repeat(64), reads: [] as string[], writes: [] as string[], holdDetail: null as null | (() => Promise<void>),
-    holdPassword: null as null | (() => Promise<void>), passwordResult: 'success' as 'success' | 'wrong' | 'rejected' | 'limited' | 'unconfirmed'};
+    role: 'reader' as 'reader'|'operator', holdPassword: null as null | (() => Promise<void>), passwordResult: 'success' as 'success' | 'wrong' | 'rejected' | 'limited' | 'unconfirmed'};
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname;
     if (route.request().method() === 'POST') state.writes.push(path); else state.reads.push(path + url.search);
     if (state.offline || path.endsWith('/logout') && state.logoutOffline) return route.abort('failed');
     const reply = (value: unknown, status = 200) => route.fulfill({status, contentType, body: JSON.stringify(value)});
-    if (path === '/api/v1/auth/login') { state.authenticated = true; state.revoked = false; return reply(identityFixture()); }
+    if (path === '/api/v1/auth/login') { state.authenticated = true; state.revoked = false; return reply({...identityFixture(),role:state.role}); }
     if (path === '/api/v1/auth/logout') { state.authenticated = false; return reply({schema: 'vision.api.logout.v1', loggedOut: true}); }
     if (!state.authenticated || state.revoked) return reply({schema: 'vision.api.error.v1', code: 'ACCESS_DENIED'}, 401);
     if (path === '/api/v1/auth/password') {
@@ -42,7 +47,7 @@ async function mockStation(page: Page) {
       state.authenticated = false;
       return reply({schema: 'vision.api.password-change.v1', changed: true});
     }
-    if (path === '/api/v1/auth/session') return reply(identityFixture());
+    if (path === '/api/v1/auth/session') return reply({...identityFixture(),role:state.role});
     if (path === '/api/v1/station') return reply(stationFixture(state.coreConnected && state.active, state.coreConnected));
     const session = {...sessionFixture(), source: 'STATION', sessionId: 'station-session'} as const;
     if (!state.coreConnected && (path === '/api/v1/session' || path === '/api/v1/events')) return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
@@ -54,8 +59,15 @@ async function mockStation(page: Page) {
     if (path.startsWith('/api/v1/library')) {
       if (!state.coreConnected) return reply({schema: 'vision.api.error.v1', code: 'REPORT_UNAVAILABLE'}, 503);
       if (state.holdDetail && path.endsWith(draftEntry.entryId)) { await state.holdDetail(); return reply({schema: 'vision.api.error.v1', code: 'ACCESS_DENIED'}, 401); }
-      const data = path.endsWith('/history') ? libraryHistoryFixture(undefined, Number(url.searchParams.get('after'))) :
+      let data = path.endsWith('/history') ? libraryHistoryFixture(undefined, Number(url.searchParams.get('after'))) :
         path.includes('/entries/') ? libraryDetailFixture(path.endsWith(draftEntry.entryId) ? 'draft' : 'catalog') : libraryFixture(state.libraryCount, Number(url.searchParams.get('after')));
+      if(path.includes('/entries/')&&!path.endsWith('/history')){
+        const match=path.split('/').at(-1);
+        for(let after=0;after<state.libraryCount;after+=50){
+          const entry=libraryFixture(state.libraryCount,after).entries.find(item=>item.entryId===match);
+          if(entry){data={...libraryDetailFixture(entry.kind==='REFERENCE_DRAFT'?'draft':'catalog'),entry};break;}
+        }
+      }
       return reply({...data, source: 'STATION', libraryId: 'vision-ecu-library', viewId: state.libraryView});
     }
     return reply({schema: 'vision.api.error.v1', code: 'NOT_FOUND'}, 404);
@@ -91,7 +103,10 @@ test('connected idle Core creates no session and its outage clears library data 
   const state = await mockStation(page);
   await page.goto('/'); await login(page, 'operator', 'mock-password');
   const status = page.locator('[data-module="status"]');
-  await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(status).toContainText('No active inspection session');
+  await expect(status.locator('.station-status-message')).toHaveCount(0);
+  await expect(status.locator('.station-status-footer')).toHaveCount(0);
+  await expect(status.getByText('Station information refreshes automatically. Closing this desktop leaves Vision running.',{exact:true})).toHaveCount(0);
   await expect(status).toContainText('Unknown');
   await expect(status.getByRole('button', {name: 'Refresh session'})).toBeDisabled();
   expect(state.reads.some(path => path === '/api/v1/session' || path.startsWith('/api/v1/events'))).toBe(false);
@@ -113,7 +128,7 @@ test('connected idle Core creates no session and its outage clears library data 
   await expect(library.getByRole('region', {name: 'Library entry details'})).toHaveCount(0);
   state.coreConnected = true;
   await page.clock.fastForward(5100);
-  await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(status).toContainText('No active inspection session');
   await expect(library.getByRole('table', {name: 'ECU library entries'}).locator('tbody tr')).toHaveCount(2);
   await expect(library.getByRole('region', {name: 'Library entry details'})).toHaveCount(0);
   expect(state.reads.some(path => path === '/api/v1/session' || path.startsWith('/api/v1/events'))).toBe(false);
@@ -153,7 +168,7 @@ test('station polling clears offline and revoked data, reconnects and follows ac
   await expect(page.getByRole('table', {name: 'Reported inspection stages'}).locator('tbody tr')).toHaveCount(11);
   state.active = false;
   await page.clock.fastForward(5100);
-  await expect(page.locator('[data-module="status"]')).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(page.locator('[data-module="status"]')).toContainText('No active inspection session');
   await expect(page.getByRole('table', {name: 'Reported inspection stages'})).toHaveCount(0);
   await expect(page.locator('[data-module="inspection"]')).toContainText('No active inspection session');
   state.revoked = true;
@@ -231,7 +246,7 @@ test('late denial from a previous login cannot sign out a new login', async ({pa
   await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
   await page.getByRole('dialog', {name: 'Navigation', exact: true}).getByRole('button', {name: 'System Status', exact: true}).click();
   await page.locator('[data-module="status"]').getByRole('button', {name: 'Refresh station'}).click();
-  await expect(page.locator('.mode-banner')).toContainText('CONNECTED · VENTUNO');
+  await expect(page.locator('.vision-workspace-status')).toContainText('Core connected');
 });
 
 test('unconfirmed logout hides protected data and retries without restoring the desktop', async ({page}) => {
@@ -370,7 +385,7 @@ test('TEST actual station: inspection blockers and password rotation preserve Co
   await expect(section.getByRole('table').locator('tbody tr')).toHaveCount(4);
   await expect(section.getByRole('button', {name: 'Start inspection session'})).toHaveCount(0);
   const status = page.locator('[data-module="status"]');
-  await expect(status).toContainText('Vision Core is connected. No inspection session is active.');
+  await expect(status).toContainText('No active inspection session');
   const core = await (await page.request.get('/api/v1/station')).json();
   expect(core).toMatchObject({coreConnection: 'CONNECTED', state: 'NO_ACTIVE_SESSION', sessionId: null, sessionViewId: null, coreReadiness: 'UNKNOWN'});
   expect((await context.cookies()).some(cookie => cookie.name === 'vision_session' && cookie.httpOnly && cookie.sameSite === 'Strict')).toBe(true);
@@ -515,4 +530,488 @@ test('interface language changes live and persists without restarting authentica
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(settings.getByLabel('Interface language',{exact:true})).toHaveValue('en');
   expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('Fluent system status presents only reported hardware/availability/readiness, updates in place and navigates without operations',async({page})=>{
+  const state=await mockStation(page);
+  await page.clock.install();
+  const fixture=stationFixture(false,true);
+  const observedAt='2026-11-25T12:00:00Z';
+  let devices=[
+    {device:'luxonis',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'UNKNOWN',observedAt},
+    {device:'nero',hardwareConnection:'USB_CAN_DETECTED',availability:'ACTIVE',readiness:'NOT_READY',observedAt,readinessReason:'ARM_BRAKE_NOT_RELEASED'},
+    {device:'moveit',hardwareConnection:'NOT_APPLICABLE',availability:'INACTIVE',readiness:'UNKNOWN',observedAt},
+    {device:'sony',hardwareConnection:'USB_DETECTED',availability:'ACTIVE',readiness:'READY',observedAt},
+  ];
+  let pending=false;
+  await page.route('**/api/v1/inspection',route=>pending?route.fulfill({status:503,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'REPORT_UNAVAILABLE'})}):route.fulfill({contentType,body:JSON.stringify({
+    schema:'vision.api.inspection.v1',source:'STATION',instanceId:fixture.instanceId,capturedAt:observedAt,sessionId:null,
+    intentToken:'a'.repeat(32),devices,selections:[],blockers:['NO_APPROVED_SELECTION','DEVICES_NOT_VERIFIED'],startAllowed:false,closeAllowed:false,
+  })}));
+  await page.goto('/');await login(page,'operator','mock-password');
+  const status=page.locator('[data-module="status"]');
+  const table=status.getByRole('table',{name:'Devices and services'});
+  await expect(status.getByRole('toolbar',{name:'Station actions'})).toBeVisible();
+  await expect(table).toHaveClass(/fui-Table/);
+  await expect(table.locator('tbody tr')).toHaveCount(4);
+  await expect(table.getByRole('columnheader',{name:'Hardware connection'})).toBeVisible();
+  await expect(table.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('USB detected');
+  await expect(table.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_DETECTED"]')).toHaveText('USB-CAN detected');
+  await expect(table.locator('[data-device="moveit"] [data-hardware-connection="NOT_APPLICABLE"]')).toHaveText('Not applicable');
+  await expect(table.locator('[data-device="luxonis"]')).toContainText('Active');
+  await expect(table.locator('[data-device="luxonis"]')).toContainText('Unknown');
+  await expect(table.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Not ready');
+  await expect(table.locator('[data-device="nero"] [data-readiness-reason="ARM_BRAKE_NOT_RELEASED"]')).toHaveText('Joint brakes not released');
+  await expect(table.locator('[data-device="sony"] [data-reported-state="READY"]')).toHaveText('Ready');
+  await expect(status).toContainText('Session start blocked');
+  await expect(status).toContainText('No approved ECU inspection recipe is available.');
+  await expect(status.getByRole('button',{name:'Start inspection session'})).toHaveCount(0);
+  const original=await table.elementHandle();
+  devices=devices.map(d=>d.device==='sony'?{...d,readiness:'NOT_READY',hardwareConnection:'USB_NOT_DETECTED'}:d.device==='nero'?{...d,hardwareConnection:'USB_CAN_NOT_DETECTED'}:d);
+  await page.clock.fastForward(5100);
+  await expect(table.locator('[data-device="sony"] [data-reported-state="NOT_READY"]')).toBeVisible();
+  await expect(table.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('USB not detected');
+  await expect(table.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_NOT_DETECTED"]')).toHaveText('USB-CAN not detected');
+  expect(await table.evaluate((element,previous)=>element===previous,original)).toBe(true);
+  await original?.dispose();
+  pending=true;
+  await page.clock.fastForward(5100);
+  await expect(table).toHaveCount(0);
+  await expect(status).toContainText('Inspection readiness report unavailable. No session command is enabled.');
+  pending=false;
+  await page.clock.fastForward(5100);
+  await expect(table.locator('tbody tr')).toHaveCount(4);
+
+  // Existing workspace routing, not a session mutation.
+  await status.getByRole('button',{name:'Open inspection manager'}).click();
+  await expect(page.getByRole('tab',{name:'Inspection Manager',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('[data-module="inspection"]')).toBeVisible();
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await expect(table).toBeVisible();
+
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Settings',exact:true}).click();
+  await page.getByLabel('Interface language',{exact:true}).selectOption('pl');
+  await page.getByRole('tab',{name:'Stan systemu',exact:true}).click();
+  const translated=status.getByRole('table',{name:'Urządzenia i usługi'});
+  await expect(translated.getByRole('columnheader',{name:'Połączenie sprzętowe'})).toBeVisible();
+  await expect(translated.locator('[data-device="luxonis"] [data-hardware-connection="USB_DETECTED"]')).toHaveText('Wykryto USB');
+  await expect(translated.locator('[data-device="sony"] [data-hardware-connection="USB_NOT_DETECTED"]')).toHaveText('Nie wykryto USB');
+  await expect(translated.locator('[data-device="nero"] [data-reported-state="NOT_READY"]')).toHaveText('Niegotowe');
+  await expect(translated.locator('[data-device="nero"] [data-readiness-reason="ARM_BRAKE_NOT_RELEASED"]')).toHaveText('Hamulce przegubów niezwolnione');
+  await expect(translated.locator('[data-device="nero"] [data-hardware-connection="USB_CAN_NOT_DETECTED"]')).toHaveText('Nie wykryto USB–CAN');
+  await expect(status).toContainText('Rozpoczęcie sesji zablokowane');
+  await expect(status.getByRole('button',{name:'Przejdź do menedżera inspekcji'})).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  expect(await status.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  const area=translated.locator('..');
+  expect(await area.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('compact header keeps tabs beside the logo, closes the requested tab and supports keyboard and narrow screens', async ({page}) => {
+  const state=await mockStation(page);
+  await page.goto('/');
+  await login(page,'operator','mock-password');
+  const header=page.locator('.vision-topbar');
+  const strip=header.getByRole('tablist',{name:'Open modules'});
+  const drawer=page.getByRole('dialog',{name:'Navigation',exact:true});
+  const open=async(name:string)=>{
+    await header.getByRole('button',{name:'Open navigation',exact:true}).click();
+    await drawer.getByRole('button',{name,exact:true}).click();
+    await expect(drawer).toHaveCount(0);
+  };
+  await expect(strip).toBeVisible();
+  await expect(header).not.toContainText('Core connected');
+  await expect(page.locator('.vision-workspace-status')).toContainText('Core connected');
+  expect(await page.locator('.vision-workspace').evaluate(el=>getComputedStyle(el).gridTemplateRows.split(' ').length)).toBe(3);
+  await open('ECU Library');
+  await open('Settings');
+  const status=strip.getByRole('tab',{name:'System Status',exact:true});
+  const library=strip.getByRole('tab',{name:'ECU Library',exact:true});
+  const settings=strip.getByRole('tab',{name:'Settings',exact:true});
+  const libraryClose=strip.getByRole('button',{name:'Close ECU Library',exact:true});
+  await expect(settings).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('[data-module="settings"]')).toBeVisible();
+  await page.mouse.move(10,200);
+  await expect(libraryClose).toHaveCSS('opacity','0');
+  await library.hover();
+  await expect(libraryClose).toHaveCSS('opacity','1');
+  await settings.click();
+  await library.hover();
+  await expect(strip.getByRole('button',{name:'Close Settings',exact:true})).toHaveCSS('opacity','0');
+  await expect(libraryClose).toHaveCSS('opacity','1');
+  await libraryClose.click();
+  await expect(library).toHaveCount(0);
+  await expect(settings).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('[data-module="settings"]')).toBeVisible();
+
+  // An inactive tab can be reached by arrows, selected and closed via Delete.
+  await settings.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(status).toBeFocused();
+  await expect(strip.getByRole('button',{name:'Close System Status',exact:true})).toHaveCSS('opacity','1');
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveAttribute('aria-selected','true');
+  await expect(status).toBeFocused();
+  await expect(page.locator('[data-module="status"]')).toBeVisible();
+  await page.keyboard.press('Delete');
+  await expect(status).toHaveCount(0);
+  await expect(settings).toBeFocused();
+  await expect(settings).toHaveAttribute('aria-selected','true');
+
+  await open('System Status');
+  await open('ECU Library');
+  await page.setViewportSize({width:390,height:844});
+  await open('Event Viewer');
+  await expect(strip.getByRole('tab',{name:'Event Viewer',exact:true})).toHaveAttribute('aria-selected','true');
+  expect(await strip.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const selected=strip.getByRole('tab',{name:'Event Viewer',exact:true});
+  await expect.poll(()=>selected.evaluate(el=>{const a=el.getBoundingClientRect(),b=el.closest('.vision-workspace-tabs')!.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1;})).toBe(true);
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('library searches all authorized pages, filters record type and browses the exact matching entry',async({page})=>{
+  const state=await mockStation(page);
+  state.libraryCount=101;
+  await page.goto('/');
+  await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'ECU Library',exact:true}).click();
+  const library=page.locator('[data-module="ecu"]');
+  const table=library.getByRole('table',{name:'ECU library entries'});
+  const query=library.getByRole('textbox',{name:'Search ECU library',exact:true});
+  await expect(table.locator('tbody tr')).toHaveCount(50);
+  await query.fill('CATALOG_100');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  await expect(library).toContainText('Search results: 1 of 101');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await table.getByRole('button',{name:'Browse Catalog 100 v1',exact:true}).click();
+  await expect(library.getByRole('region',{name:'Library entry details'})).toContainText('Catalog 100');
+  expect(state.reads.some(path=>path.includes('after=100'))).toBe(true);
+  await query.fill('');
+  await library.getByRole('combobox',{name:'Record type',exact:true}).selectOption('REFERENCE_DRAFT');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  await expect(library).toContainText('Search results: 1 of 101');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await expect(table.getByRole('button',{name:'Browse API-03 synthetic reference r1',exact:true})).toBeVisible();
+  await library.getByRole('button',{name:'Clear search',exact:true}).click();
+  await expect(table.locator('tbody tr')).toHaveCount(50);
+  await expect(library).not.toContainText('Search results:');
+  await query.fill('missing-profile');
+  await library.getByRole('button',{name:'Search library',exact:true}).click();
+  await expect(library).toContainText('No matching ECU entries.');
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('Devices Luxonis distinguishes saved settings and current frames, and stops polling preview when hidden',async({page})=>{
+  const state=await mockStation(page);state.role='operator';
+  let active=false,fail=false,previewReads=0,statusReads=0;
+  await page.route('**/api/v1/devices/luxonis**',route=>{
+    const preview=new URL(route.request().url()).pathname.endsWith('/preview');
+    if(preview)previewReads++;else statusReads++;
+    if(fail)return route.fulfill({status:503,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'REPORT_UNAVAILABLE'})});
+    return route.fulfill({contentType,body:JSON.stringify(luxonisFixture(active,preview))});
+  });
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  const drawer=page.getByRole('dialog',{name:'Navigation',exact:true});
+  const devices=drawer.getByRole('region',{name:'Devices',exact:true});
+  await expect(devices.getByRole('button')).toHaveText(['Luxonis','NERO','Sony']);
+  const workspace=drawer.getByRole('region',{name:'Workspace',exact:true});
+  await expect(workspace.getByRole('button')).toHaveText(['System Status','ECU Library','Inspection Manager','Images']);
+  await devices.getByRole('button',{name:'Luxonis',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'Luxonis',exact:true})).toHaveAttribute('aria-selected','true');
+  const panel=page.locator('[data-module="luxonis"]');
+  await expect(panel).toContainText('Luxonis OAK-D Pro AF');
+  await expect(panel).toContainText('USB detected');
+  await expect(panel).toContainText('The camera node is not running');
+  const select=panel.getByRole('combobox',{name:'Settings source',exact:true});
+  await expect(select).toHaveValue('rgbd_lab');
+  await select.selectOption('stereo800_lab');
+  await expect(panel.getByRole('table',{name:'Stereo depth'})).toContainText('1280');
+  await expect(panel).toContainText('Saved diagnostic configuration');
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
+  expect(previewReads).toBe(0);expect(statusReads).toBeGreaterThan(0);
+  await panel.getByRole('button',{name:'Enable preview',exact:true}).click();
+  active=true;
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(2);
+  await expect.poll(()=>panel.locator('.luxonis-image-viewport img').first().evaluate((el:HTMLImageElement)=>el.naturalWidth)).toBe(32);
+  await expect(panel.getByRole('region',{name:'RGB preview'})).toContainText('1920 × 1080');
+  await select.selectOption('live');
+  await expect(panel.getByRole('table',{name:'RGB camera'})).toContainText('15');
+  await expect(panel).toContainText('/oak · ROS 186');
+  fail=true;
+  await expect(panel).toContainText('Device report unavailable.');
+  await expect(panel.getByText('Delayed frame',{exact:true}).first()).toBeVisible();
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0,{timeout:6000});
+  fail=false;
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(2);
+  await page.getByRole('tab',{name:'System Status',exact:true}).click();
+  await expect(panel).toBeHidden();
+  await page.waitForTimeout(1200);
+  const stopped=previewReads;await page.waitForTimeout(1100);
+  expect(previewReads).toBe(stopped);
+  await page.getByRole('tab',{name:'Luxonis',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Enable preview',exact:true})).toBeEnabled();
+  await expect(panel.locator('.luxonis-image-viewport img')).toHaveCount(0);
+  await page.setViewportSize({width:390,height:844});
+  expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  expect(errors).toEqual([]);
+  expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('Luxonis IR switches use independent verified readback and fixed command scope',async({page})=>{
+  const state=await mockStation(page);state.role='operator';
+  let dot=0,flood=0,reject=false;
+  const commands:unknown[]=[];
+  await page.route('**/api/v1/devices/luxonis**',async route=>{
+    const now=Date.now()/1000;
+    if(route.request().method()==='POST'){
+      const body=route.request().postDataJSON();commands.push(body);
+      expect(Object.keys(body).sort()).toEqual(['channel','enabled','instanceId']);
+      if(reject)return route.fulfill({status:409,contentType,body:JSON.stringify({schema:'vision.api.error.v1',code:'IR_REJECTED'})});
+      if(body.channel==='dot')dot=body.enabled ? 0.6 : 0;
+      else if(body.channel==='flood')flood=body.enabled ? 0.6 : 0;
+      else throw new Error('Unexpected IR command');
+      return route.fulfill({contentType,body:JSON.stringify({schema:'vision.api.luxonis-ir.v1',source:'STATION',...body,dot,flood,capturedAt:now})});
+    }
+    const r=luxonisFixture(true,false,now);
+    return route.fulfill({contentType,body:JSON.stringify({...r,settings:{...r.settings,'driver.i_enable_ir':true,
+      'driver.r_laser_dot_intensity':dot,'driver.r_floodlight_intensity':flood},irControlAvailable:true})});
+  });
+  await page.goto('/');await login(page,'operator','mock-password');
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'Luxonis',exact:true}).click();
+  const panel=page.locator('[data-module="luxonis"]');
+  const laser=panel.getByRole('switch',{name:'IR dot projector',exact:true});
+  const light=panel.getByRole('switch',{name:'IR flood illuminator',exact:true});
+  await expect(laser).toBeEnabled();await expect(laser).not.toBeChecked();await expect(light).not.toBeChecked();
+  await laser.click();await expect(laser).toBeChecked();await expect(light).not.toBeChecked();
+  await expect(panel).toContainText('IR change confirmed by driver.');
+  await expect(laser).toBeEnabled();
+  await light.click();await expect(light).toBeChecked();await expect(laser).toBeChecked();
+  await expect(light).toBeEnabled();
+  reject=true;await laser.click();
+  await expect(panel).toContainText('IR change rejected by Core.');
+  await expect(laser).toBeChecked();
+  expect(commands).toHaveLength(3);
+  expect(commands).toEqual([
+    {instanceId:'f'.repeat(32),channel:'dot',enabled:true},
+    {instanceId:'f'.repeat(32),channel:'flood',enabled:true},
+    {instanceId:'f'.repeat(32),channel:'dot',enabled:false}
+  ]);
+});
+
+test('NERO live read-only telemetry clears expired feedback and never writes controls',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ let active=true,stale=false,reads=0;
+ await page.route('**/api/v1/devices/nero',route=>{
+   expect(route.request().method()).toBe('GET');reads++;
+   const r=neroFixture(active);
+   return route.fulfill({contentType,body:JSON.stringify(stale?{...r,joints:null,motors:null}:r)});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await expect(panel).toContainText('Live feedback');
+ await expect(panel).toContainText('All drives disabled');
+ await expect(panel).toContainText('Joint brakes not released');
+ await expect(panel.getByRole('table',{name:'Joint telemetry',exact:true}).getByRole('row')).toHaveCount(8);
+ await expect(panel.getByRole('row').filter({hasText:'J7'})).toContainText('60.00');
+ await expect(panel).toContainText('ERROR-ACTIVE');
+ await expect(panel.getByRole('tab',{name:'Control',exact:true})).toBeVisible();
+ stale=true;await expect(panel).toContainText('Drive status unknown');
+ await expect(panel.getByRole('row').filter({hasText:'J7'})).not.toContainText('60.00');
+ stale=false;active=false;await expect(panel).toContainText('Robot feedback is incomplete or stale.');
+ active=true;await expect(panel).toContainText('Live feedback');
+ await page.setViewportSize({width:390,height:844});
+ expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ await page.getByRole('tab',{name:'System Status',exact:true}).click();
+ await expect(panel).toBeHidden();
+ await page.waitForTimeout(1000);const stopped=reads;await page.waitForTimeout(1000);
+ expect(reads).toBe(stopped);expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('NERO diagnostics shows source codes, filtered history and explicit clear confirmation',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ let commissioned=false,partial=false,commands:unknown[]=[];
+ await page.route('**/api/v1/devices/nero',route=>route.fulfill({contentType,body:JSON.stringify(neroFixture())}));
+ await page.route('**/api/v1/devices/nero/diagnostics',route=>{
+   const d=diagnosticsFixture(commissioned);
+   if(partial)d.coverage=d.coverage.filter(c=>!(c.source==='J2'&&c.family==='DRIVE_STATUS')&&!(c.source==='J5'&&c.family==='ARM_MASK'));
+   return route.fulfill({contentType,body:JSON.stringify(d)});
+ });
+ await page.route('**/api/v1/devices/nero/history?*',route=>{
+   const p=new URL(route.request().url()).searchParams;
+   return route.fulfill({contentType,body:JSON.stringify(neroHistoryFixture(p.get('source') as SourceFilter,p.get('status') as HistoryFilter,Number(p.get('before'))))});
+ });
+ await page.route('**/api/v1/devices/nero/clear-history?*',route=>{
+   const p=new URL(route.request().url()).searchParams;
+   return route.fulfill({contentType,body:JSON.stringify(neroAttemptFixture(p.get('source') as SourceFilter,Number(p.get('before'))))});
+ });
+ await page.route('**/api/v1/devices/nero/clear',route=>{
+   const body=route.request().postDataJSON() as {operationId:string;scope:ClearScope};
+   commands.push(body);
+   return route.fulfill({contentType,body:JSON.stringify({schema:'vision.api.nero-clear.v1',source:'STATION',instanceId:'f'.repeat(32),operation:rejectedOperation(body.operationId,body.scope)})});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Diagnostics',exact:true}).click();
+ const table=panel.getByRole('table',{name:'Current diagnostic codes'});
+ await expect(table).toContainText('0x20');
+ await expect(table).toContainText('DRIVE_STATUS');
+ const normal=table.getByRole('row').filter({has:page.getByRole('cell',{name:'J1',exact:true})});
+ await expect(normal.getByRole('cell',{name:'0x00',exact:true})).toBeVisible();
+ await expect(normal.getByText('Normal',{exact:true})).toBeVisible();
+ partial=true;
+ const missing=table.getByRole('row').filter({has:page.getByRole('cell',{name:'J2',exact:true})}).filter({hasText:'DRIVE_STATUS'});
+ await expect(missing.getByRole('cell',{name:'—',exact:true})).toBeVisible();
+ await expect(missing.getByText('Unknown',{exact:true})).toBeVisible();
+ await expect(table.getByRole('row').filter({has:page.getByRole('cell',{name:'J2',exact:true})}).getByText('Normal',{exact:true})).toHaveCount(0);
+ await expect(table.getByRole('row').filter({has:page.getByRole('cell',{name:'J5',exact:true})}).filter({hasText:'ARM_MASK'})).toContainText('Unknown');
+ await expect(table).toContainText('0x20');
+ partial=false;
+ await expect(table.getByRole('row').filter({has:page.getByRole('cell',{name:'J2',exact:true})}).getByText('Normal',{exact:true})).toBeVisible();
+ await expect(panel.getByRole('button',{name:'Prepare clear'})).toBeDisabled();
+ commissioned=true;
+ await expect(panel.getByRole('button',{name:'Prepare clear'})).toBeEnabled();
+ await panel.getByLabel('Clear scope').selectOption('5');
+ await panel.getByRole('button',{name:'Prepare clear'}).click();
+ expect(commands).toHaveLength(0);
+ await expect(panel).toContainText('local VENTUNO console');
+ await panel.getByRole('button',{name:'Execute confirmed clear'}).click();
+ await expect(panel).toContainText('NO_LOCAL_CONFIRMATION');
+ expect(commands).toHaveLength(1);
+ await panel.getByRole('tab',{name:'Fault history',exact:true}).click();
+ const history=panel.getByRole('table',{name:'Fault episodes'});
+ await expect(history).toContainText('Driver error');
+ await panel.getByLabel('Source',{exact:true}).selectOption('J1');
+ await expect(panel).toContainText('No matching fault episodes.');
+ await panel.getByLabel('Source',{exact:true}).selectOption('J5');
+ await expect(history).toContainText('Driver error');
+ await panel.getByLabel('Status',{exact:true}).selectOption('RESOLVED');
+ await expect(panel).toContainText('No matching fault episodes.');
+ await page.setViewportSize({width:390,height:844});
+ expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ expect(commands).toHaveLength(1);
+});
+
+
+test('NERO TCP control uses live drive readback and local-only speed and keyboard declaration',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ await page.route('**/api/v1/devices/nero',r=>r.fulfill({contentType,body:JSON.stringify(neroFixture())}));
+ let requests=0;
+ await page.route('**/api/v1/devices/nero/control',r=>{
+   expect(r.request().method()).toBe('GET');requests++;
+   return r.fulfill({contentType,body:JSON.stringify({
+     schema:'vision.api.nero-tcp.v1',source:'STATION',instanceId:'f'.repeat(32),capturedAt:Date.now()/1000,
+     driveEnabled:[false,false,false,false,false,false,false],jointCheck:jointCheckFixture(Date.now()/1000-.1,true),mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
+     capabilities:{enable:false,jog:false,hold:false},speedLimits:{linearMin:1,linearMax:100,angularMin:1,angularMax:30},
+     defaults:{linearMmS:10,angularDegS:5},frames:['BASE','TOOL'],actualTcp:null
+   })});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Control',exact:true}).click();
+ const control=panel.getByRole('region',{name:'TCP control'});
+ await expect(control).toContainText('0/7 Enabled');
+ const limits=control.getByRole('region',{name:'Joint limit preflight'});
+ await expect(limits.locator('[data-joint="joint4"]')).toContainText('OUTSIDE_LIMITS');
+ await expect(limits.locator('[data-joint="joint4"]')).toContainText('126.322°');
+ await expect(limits).toContainText('Drive enable blocked');
+ await expect(control.getByRole('button',{name:'Enable drives',exact:true})).toBeDisabled();
+ await expect(control.getByRole('button',{name:'STOP / HOLD',exact:true})).toBeDisabled();
+ await expect(control.getByRole('spinbutton',{name:'Linear speed value'})).toHaveValue('10');
+ await expect(control.getByRole('spinbutton',{name:'Angular speed value'})).toHaveValue('5');
+ await control.getByRole('button',{name:'Normal speed',exact:true}).click();
+ await expect(control.getByRole('spinbutton',{name:'Linear speed value'})).toHaveValue('25');
+ await expect(control.getByRole('spinbutton',{name:'Angular speed value'})).toHaveValue('10');
+ await control.getByLabel('Reference frame').selectOption('TOOL');
+ await control.getByRole('button',{name:'Test keyboard',exact:true}).click();
+ const area=control.getByRole('group',{name:'Keyboard test area'});
+ await area.focus();
+ await page.keyboard.down('ArrowUp');
+ await expect(area.getByRole('status')).toContainText('X +');
+ await expect(area.getByRole('status')).toContainText('TOOL · 25 mm/s');
+ await page.keyboard.up('ArrowUp');
+ await expect(area.getByRole('status')).toContainText('No input');
+ await page.keyboard.down('e');
+ await expect(area.getByRole('status')).toContainText('ROLL +');
+ await expect(area.getByRole('status')).toContainText('10 °/s');
+ await page.keyboard.press('Escape');
+ await expect(area.getByRole('status')).toContainText('No input');
+ await page.keyboard.up('e');
+ await control.getByRole('button',{name:'End keyboard test',exact:true}).click();
+ await expect(area.getByRole('button',{name:'X +',exact:true})).toBeDisabled();
+ await page.setViewportSize({width:390,height:844});
+ await expect.poll(()=>panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ expect(requests).toBeGreaterThan(0);
+ expect(state.writes).toEqual(['/api/v1/auth/login']);
+});
+
+test('NERO manual operator workflow confirms enable, sends bounded key intent and releases',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ await page.route('**/api/v1/devices/nero',r=>r.fulfill({contentType,body:JSON.stringify(neroFixture())}));
+ await page.route('**/api/v1/devices/nero/control',r=>r.fulfill({contentType,body:JSON.stringify({
+   schema:'vision.api.nero-tcp.v1',source:'STATION',instanceId:'f'.repeat(32),capturedAt:Date.now()/1000,
+   driveEnabled:Array(7).fill(false),jointCheck:jointCheckFixture(Date.now()/1000-.1),mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
+   capabilities:{enable:false,jog:false,hold:false},speedLimits:{linearMin:1,linearMax:100,angularMin:1,angularMax:30},
+   defaults:{linearMmS:10,angularDegS:5},frames:['BASE','TOOL'],actualTcp:null
+ })}));
+ let phase='IDLE';
+ const commands:any[]=[];
+ await page.route('**/api/v1/devices/nero/manual',r=>r.fulfill({contentType,body:JSON.stringify({
+   schema:'vision.api.nero-manual.v1',source:'STATION',instanceId:'f'.repeat(32),
+   status:{state:phase,reason:'TEST_FIXTURE',driveEnabled:Array(7).fill(phase!=='IDLE'),
+     pipelineReady:true,enableAvailable:phase==='IDLE',jogAvailable:['READY','JOGGING'].includes(phase),
+     holdAvailable:['READY','JOGGING'].includes(phase),linearMax:25,angularMax:10}
+ })}));
+ await page.route('**/api/v1/devices/nero/manual/command',r=>{
+   const body=r.request().postDataJSON();commands.push(body);
+   if(body.action==='ENABLE')phase='READY';
+   else if(body.action==='JOG')phase='JOGGING';
+   else if(body.action==='RELEASE')phase='READY';
+   else if(body.action==='HOLD')phase='HOLD';
+   else if(body.action==='CLOSE')phase='IDLE';
+   return r.fulfill({contentType,body:JSON.stringify({
+     schema:'vision.api.nero-manual-command.v1',source:'STATION',instanceId:body.instanceId,
+     result:{operationId:body.operationId,action:body.action,sequence:body.sequence,accepted:true,reason:'TEST_FIXTURE',state:phase}
+   })});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Control',exact:true}).click();
+ const control=panel.getByRole('region',{name:'TCP control'});
+ await control.getByRole('button',{name:'Enable drives',exact:true}).click();
+ expect(commands).toHaveLength(0);
+ await control.getByRole('button',{name:'Confirm drive enable',exact:true}).click();
+ await expect.poll(()=>commands.filter(x=>x.action==='ENABLE').length).toBe(1);
+ await control.getByRole('button',{name:'Normal speed',exact:true}).click();
+ await control.getByLabel('Reference frame').selectOption('TOOL');
+ await control.getByRole('button',{name:'Start manual keyboard',exact:true}).click();
+ const area=control.getByRole('group',{name:'Keyboard test area'});await area.focus();
+ await page.keyboard.down('ArrowUp');
+ await expect.poll(()=>commands.filter(x=>x.action==='JOG').length).toBeGreaterThan(1);
+ const first=commands.find(x=>x.action==='JOG');
+ expect(first.declaration).toEqual({frame:'TOOL',linearMmS:25,angularDegS:10});
+ expect(first.axis).toBe('X');expect(first.direction).toBe(1);
+ await page.keyboard.up('ArrowUp');
+ await expect.poll(()=>commands.filter(x=>x.action==='RELEASE').length).toBe(1);
+ const count=commands.filter(x=>x.action==='JOG').length;
+ await page.waitForTimeout(250);
+ expect(commands.filter(x=>x.action==='JOG').length).toBe(count);
+ await control.getByRole('button',{name:'STOP / HOLD',exact:true}).click();
+ await expect.poll(()=>commands.filter(x=>x.action==='HOLD').length).toBe(1);
+ expect(commands.filter(x=>x.action==='ENABLE').length).toBe(1);
 });

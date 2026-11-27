@@ -10,6 +10,10 @@ import time
 from vision_api.access import Credentials, CursorRejected, ReportUnavailable
 from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
+from .nero_history import valid_query as valid_nero_history_query
+from .nero_clear_coordinator import valid_intent, valid_actor
+from .nero_manual import valid_intent as valid_manual_intent
+from .luxonis_ir import IRRejected, validate_request
 from .draft_editor import DraftConflict, DraftNotFound, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
                        check_peer, checked_path, checked_socket, exchange_timeout, receive, send)
@@ -29,6 +33,31 @@ def dispatch(host, request):
         raise ValueError("legacy request too large")
     if operation == "station" and not query:
         return host.station_report()
+    if operation == "nero" and not query:
+        return host.nero_report()
+    if operation == "nero_tcp" and not query:
+        return host.nero_tcp_report()
+    if operation == "nero_manual" and not query:
+        return host.nero_manual_report()
+    if operation == "nero_manual_command" and "operator" in query:
+        intent={k:v for k,v in query.items() if k!="operator"}
+        if valid_manual_intent(intent) and valid_actor(query["operator"]):
+            return host.nero_manual_command(**query)
+    if operation == "nero_diagnostics" and not query:
+        return host.nero_diagnostics_report()
+    if operation == "nero_history" and set(query) == {"source","status","before"} and valid_nero_history_query(**query):
+        return host.nero_history_report(**query)
+    if operation == "nero_clear_history" and set(query) == {"source","before"} and valid_nero_history_query(query["source"],"ALL",query["before"]):
+        return host.nero_clear_history_report(**query)
+    if operation == "nero_clear" and set(query) == {"instanceId","operationId","scope","operator"}:
+        if valid_actor(query["operator"]) and valid_intent({k:v for k,v in query.items() if k!="operator"}):
+            return host.clear_nero(**query)
+    if operation == "luxonis" and not query:
+        return host.luxonis_report()
+    if operation == "luxonis_ir" and validate_request(query):
+        return host.luxonis_ir(**query)
+    if operation == "luxonis_preview" and not query:
+        return host.luxonis_report(preview=True)
     if operation == "inspection" and not query:
         return host.inspection_report()
     if operation == "inspection_start" and set(query) == {"selection_id", "instance_id", "intent_token", "operator"}:
@@ -66,6 +95,8 @@ class _Handler(socketserver.BaseRequestHandler):
             response = {"schema": PROTOCOL, "error": "DRAFT_CONFLICT"}
         except DraftNotFound:
             response = {"schema": PROTOCOL, "error": "DRAFT_NOT_FOUND"}
+        except IRRejected:
+            response = {"schema": PROTOCOL, "error": "IR_REJECTED"}
         except InspectionRejected:
             response = {"schema": PROTOCOL, "error": "INSPECTION_REJECTED"}
         except NoActiveSession:
@@ -154,6 +185,8 @@ class CoreServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
         super().server_close()
         if self.host is not None and hasattr(self.host, "shutdown_inspection") and self._inode is not None:
             self.host.shutdown_inspection()
+        if self.host is not None and hasattr(self.host, "close_nero_history"):
+            self.host.close_nero_history()
         if self._inode is not None:
             try:
                 info = self._path.lstat()

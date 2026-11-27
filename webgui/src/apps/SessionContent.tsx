@@ -1,4 +1,6 @@
 import { useTranslation } from '../i18n/LanguageProvider';
+import { Button } from '@fluentui/react-components';
+import { ArrowClockwiseRegular } from '@fluentui/react-icons';
 import type { SessionControls } from '../api/useSessionView';
 
 const messages = {
@@ -11,7 +13,7 @@ const messages = {
   NO_ACTIVE_SESSION: 'No active inspection session is connected.',
 } as const;
 
-export function SessionContent({section, controls}: {section: 'summary' | 'inspection' | 'events'; controls: SessionControls}) {
+export function SessionContent({section, controls, fluent = false}: {section: 'summary' | 'inspection' | 'events'; controls: SessionControls; fluent?: boolean}) {
   const {t}=useTranslation();
   const {view, refreshSession, nextEvents} = controls;
   const {session, events} = view;
@@ -19,7 +21,8 @@ export function SessionContent({section, controls}: {section: 'summary' | 'inspe
   const message = summary && view.status === 'DISABLED' ? 'Protected reports are disabled in this client mode.' :
     summary && view.status === 'NOT_REQUESTED' ? 'No report loaded. Refresh session reads the authorized Core report.' :
     controls.autoRefresh && view.status === 'AVAILABLE' ? 'Session information refreshes automatically from Vision.' : messages[view.status];
-  const refresh = <button onClick={refreshSession} disabled={view.status === 'DISABLED' || view.status === 'LOADING' || view.status === 'NO_ACTIVE_SESSION' || view.refreshing}>{t("Refresh session")}</button>;
+  const refreshDisabled = view.status === 'DISABLED' || view.status === 'LOADING' || view.status === 'NO_ACTIVE_SESSION' || view.refreshing;
+  const refresh = fluent?<Button icon={<ArrowClockwiseRegular/>} onClick={refreshSession} disabled={refreshDisabled}>{t("Refresh session")}</Button>:<button onClick={refreshSession} disabled={refreshDisabled}>{t("Refresh session")}</button>;
   return <section className={`session-report${summary ? ' session-summary' : ''}`} aria-label={t("Protected Core report")}>
     <div className="session-heading"><h2>{summary ? t("Core / Runtime session") : section === 'inspection' ? t("Inspection session report") : t("Session event journal")}</h2>{summary && refresh}</div>
     <p className="protected-read-status" role="status">{t(message)}</p>

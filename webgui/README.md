@@ -1,8 +1,12 @@
 # Vision WebGUI — stanowisko i izolowany klient
 
-## Aktualny zakres stanowiskowy (25.11.2026)
+## Aktualny zakres stanowiskowy (26.11.2026)
 
-Pulpit Windows 98 działa na VENTUNO Q w trybie Kiosk i przez prywatny HTTPS. Wydanie stanowiskowe ma rzeczywiste logowanie, sesje backendowe, zmianę hasła i automatyczną synchronizację. API odczytuje niezależny Core przez prywatny Unix socket; GUI nie tworzy Workflow ani drugiej biblioteki. W stanie idle: CONNECTED, NO_ACTIVE_SESSION, UNKNOWN. System Status, ECU Library (odczyt), Inspection Manager i Event Viewer są połączone; okna Luxonis, NERO, Sony i Images nadal są placeholderami. Nie ma komend sprzętowych ani edycji/zatwierdzania profilu ECU.
+Fluent 2 zastąpił stanowiskowy pulpit Windows 98 w #79, a #80 poprawił odnawianie sesji. Kiosk na VENTUNO Q i prywatny HTTPS pozostają dostępne. API odczytuje niezależny Core przez prywatny Unix socket; GUI nie tworzy Workflow ani drugiej biblioteki. Wydanie produkcyjne GUI pozostaje na #80, a Core ma niezależnie przypięte wydanie.
+
+W **DEV #81** rozszerzono System Status i bibliotekę ECU (wyszukiwanie, cykl życia i czterosekcyjna deklaracja V2) oraz wdrożono osobną zakładkę Luxonis. Odczyt parametrów i podgląd RGB/Depth są diagnostyczne; jedyną nową komendą urządzenia jest ograniczone sterowanie IR przy spełnionych bramkach Core. Operator zaakceptował zakres Luxonis V1 na tym etapie. NERO V1 udostępnia rzeczywisty odczyt telemetrii i diagnostyki; przełącznik napędów i sterowanie klawiaturą pozostają planowane. Sony nie ma jeszcze modułu sterowania. DEV nie jest zatwierdzonym wydaniem produkcyjnym.
+
+Dokumentacja: [bieżący rejestr](../docs/operations/REPOSITORY_REGISTER_2026-11-26.md), [ECU V2](../docs/implementation/VISION_ECU_DECLARATION_V2.md), [Luxonis V1](../docs/implementation/VISION_DEVICES_LUXONIS_V1.md), [IR](../docs/implementation/VISION_LUXONIS_IR_V1.md).
 
 - [Kontrakt stanowiskowy](../docs/implementation/VISION_STATION_WEBGUI_V1.md) i [runbook wdrożenia](../docs/operations/VISION_WEBGUI_DEPLOYMENT.md) są nadrzędne wobec historycznych opisów poniżej.
 - [#65 Core IPC](https://github.com/autoklinika/Vision/pull/65), [#68 Settings](https://github.com/autoklinika/Vision/pull/68), [#70 Firefox](https://github.com/autoklinika/Vision/pull/70) zawierają zakres testów i ograniczenia.

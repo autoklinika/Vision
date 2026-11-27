@@ -19,13 +19,21 @@ from vision_core.ports import Request
 from vision_modules.ecu_profiles import Declaration
 from vision_modules.ecu_reference import compile_profile
 from vision_runtime import VisionRuntimeCoordinator
+from .hardware_presence import usb_hardware_connections, valid_hardware_connection
+from .readiness import device_observation, read_snapshot, valid_reason
 
 DEVICES = ("luxonis", "nero", "moveit", "sony")
-UNITS = {
-    "luxonis": "vision-luxonis-etc3-guidance-186.service",
-    "nero": "vision-nero-factory-driver-trial.service",
-    "moveit": "vision-nero-factory-moveit-trial.service",
-}
+# Explicit, installed ROS 2 service bindings for the current station.
+# The guarded NERO service only proves service liveness (no motion permission).
+# The two alternative plan-only scenes include Luxonis and MoveIt. An active
+# scene service is NOT evidence that either individual ROS node or device works.
+# Do not infer Sony acquisition availability from USB presence or a legacy app.
+STANDALONE_CAMERA_UNIT = "vision-luxonis.service"
+UNITS = MappingProxyType({
+    "luxonis": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service", STANDALONE_CAMERA_UNIT),
+    "nero": ("vision-nero-guarded-lab.service",),
+    "moveit": ("vision-nero-oak-scene-lab.service", "vision-nero-oak800-scene-lab.service"),
+})
 MAX_AGE = 5.0
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", re.ASCII)
 USER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", re.ASCII)
@@ -76,34 +84,75 @@ class DeviceStatus:
     availability: str
     readiness: str
     observed_at: float
+    hardware_connection: str = "UNKNOWN"
+    readiness_reason: str | None = None
 
     def __post_init__(self):
         if (self.device not in DEVICES or self.availability not in ("ACTIVE", "INACTIVE", "UNKNOWN")
                 or self.readiness not in ("READY", "NOT_READY", "UNKNOWN")
+                or not valid_hardware_connection(self.device, self.hardware_connection)
+                or (self.readiness_reason is not None and not valid_reason(self.device,self.readiness_reason,self.readiness))
                 or type(self.observed_at) not in (float, int) or not math.isfinite(self.observed_at)
                 or self.observed_at < 0 or (self.readiness == "READY" and self.availability != "ACTIVE")):
             raise ValueError("invalid device status")
 
 
-def systemd_diagnostics():
-    """Read fixed service liveness only; never assert physical readiness.
+def systemd_diagnostics(readiness_report=None):
+    """Read only the liveness of explicitly bound ROS 2 services.
 
-    The Sony transport has no accepted live readiness source in this release.
-    No ROS discovery, subprocess shell, or device command is used here.
+    Missing/unloaded units and unrecognized/transitional states are UNKNOWN,
+    not INACTIVE. A loaded active alternative establishes service liveness;
+    INACTIVE requires every bound alternative to be known stopped or failed.
+    USB and service liveness never establish operational readiness alone.
+    The optional local ROS observer adds diagnostic evidence, never trusted
+    Runtime composition or inspection/motion authorization.
     """
+    names = tuple(dict.fromkeys(unit for units in UNITS.values() for unit in units))
+    values = {}
     try:
-        result = subprocess.run(["systemctl", "--user", "show", "--property=Id,ActiveState",
-                                 *UNITS.values()], capture_output=True, text=True, timeout=0.65, check=False)
-        values = {}
+        result = subprocess.run(
+            ["systemctl", "--user", "show", "--property=Id,LoadState,ActiveState", *names],
+            capture_output=True, text=True, timeout=0.65, check=False)
+        duplicates = set()
         for block in result.stdout.split("\n\n"):
             fields = dict(line.split("=", 1) for line in block.splitlines() if "=" in line)
-            values[fields.get("Id")] = fields.get("ActiveState")
+            name = fields.get("Id")
+            if name not in names:
+                continue
+            if name in values:
+                duplicates.add(name)
+            values[name] = (
+                fields.get("ActiveState") if fields.get("LoadState") == "loaded" else None
+            )
+        for name in duplicates:
+            values[name] = None
     except (OSError, subprocess.SubprocessError, ValueError):
         values = {}
+
+    def availability(device):
+        states = tuple(values.get(name) for name in UNITS.get(device, ()))
+        if "active" in states:
+            return "ACTIVE"
+        if states and all(state in ("inactive", "failed") for state in states):
+            return "INACTIVE"
+        return "UNKNOWN"
+
+    hardware = usb_hardware_connections()
     now = time.time()
-    return tuple(DeviceStatus(device, "ACTIVE" if values.get(UNITS.get(device)) == "active"
-                              else "INACTIVE" if values.get(UNITS.get(device)) in ("inactive", "failed")
-                              else "UNKNOWN", "UNKNOWN", now) for device in DEVICES)
+    observations = read_snapshot(readiness_report, now)
+    active_scenes = tuple(source for source, unit in zip(("oak","oak800"), UNITS["moveit"])
+                          if values.get(unit) == "active")
+    # The standalone camera runs in domain 186, not the scene observer's
+    # domain 181. Never borrow evidence from an unrelated legacy scene.
+    camera_sources = active_scenes + (("standalone186",) if values.get(STANDALONE_CAMERA_UNIT) == "active" else ())
+    devices = []
+    for device in DEVICES:
+        available = availability(device)
+        connection = hardware.get(device, "UNKNOWN")
+        observation = device_observation(device, available, connection, observations, camera_sources if device == "luxonis" else active_scenes, now)
+        devices.append(DeviceStatus(device, available, observation.state, observation.observed_at,
+                                    connection, observation.reason))
+    return tuple(devices)
 
 
 @dataclass(frozen=True)
@@ -137,14 +186,15 @@ class RuntimeComposition:
     def __init__(self, *, selections, profiles, calibrations, requirements, capabilities,
                  release_store, reference_release_store, reference_library, asset_store,
                  trust_verifier, readiness_provider, readiness_receipt_provider, sensor_frame, scene_frame,
-                 known_transforms, max_age, max_skew, clock=time.time):
+                 known_transforms, max_age, max_skew, clock=time.time, managed_releases=False):
         selections = tuple(selections)
-        if (not 1 <= len(selections) <= 16 or any(not isinstance(s, Selection) for s in selections)
+        if (type(managed_releases) is not bool or not (0 if managed_releases else 1) <= len(selections) <= 16 or any(not isinstance(s, Selection) for s in selections)
                 or len({s.selection_id for s in selections}) != len(selections)
                 or not callable(readiness_provider) or not callable(readiness_receipt_provider)
                 or not callable(trust_verifier) or not callable(clock)):
             raise ValueError("explicit trusted composition required")
         self.selections = MappingProxyType({s.selection_id: s for s in selections})
+        self.managed_releases = managed_releases
         self.profiles = MappingProxyType(dict(profiles))
         self.calibrations = MappingProxyType(dict(calibrations))
         self.requirements = MappingProxyType({k: frozenset(v) for k,v in requirements.items()})
@@ -156,6 +206,32 @@ class RuntimeComposition:
         self.sensor_frame, self.scene_frame = sensor_frame, scene_frame
         self.known_transforms = frozenset(known_transforms)
         self.max_age, self.max_skew, self.clock = max_age, max_skew, clock
+
+    @classmethod
+    def from_released_references(cls, library, **configuration):
+        """Explicit owner configuration; only fully compiled releases appear."""
+        from .reference_review import approved_selections
+        if "selections" in configuration:
+            raise ValueError("choose explicit selections or approved release discovery")
+        choices=approved_selections(library,reference_library=configuration["reference_library"],
+            reference_store=configuration["reference_release_store"],
+            release_store=configuration["release_store"],asset_store=configuration["asset_store"],
+            calibrations=configuration["calibrations"],capabilities=configuration["capabilities"])
+        return cls(selections=choices,managed_releases=True,**configuration)
+
+    def refresh_released_selections(self, library):
+        if not self.managed_releases:
+            return
+        from .reference_review import approved_selections
+        try:
+            choices=approved_selections(library,reference_library=self.reference_library,
+                reference_store=self.reference_release_store,release_store=self.release_store,
+                asset_store=self.asset_store,calibrations=self.calibrations,capabilities=self.capabilities)
+        except Exception:
+            # The release is retained, but an unavailable/over-limit selection
+            # view cannot authorize an inspection.
+            choices=()
+        self.selections=MappingProxyType({s.selection_id:s for s in choices})
 
     def resolve(self, library, selection_id):
         choice = self.selections[selection_id]
@@ -275,7 +351,7 @@ class InspectionOwner:
             blockers.append("COMPOSITION_UNCONFIGURED")
         if not choices:
             blockers.append("NO_APPROVED_SELECTION")
-        if any(d.readiness != "READY" for d in devices):
+        if any(d.readiness != "READY" or d.readiness_reason is not None for d in devices):
             blockers.append("DEVICES_NOT_VERIFIED")
         if station["state"] == "SESSION_ACTIVE":
             blockers.append("SESSION_ACTIVE")
@@ -292,7 +368,9 @@ class InspectionOwner:
                 "capturedAt":_timestamp(time.time()), "sessionId":station["sessionId"],
                 "intentToken":self.intent_token,
                 "devices":[{"device":d.device, "availability":d.availability, "readiness":d.readiness,
-                            "observedAt":_timestamp(d.observed_at)} for d in devices],
+                            "observedAt":_timestamp(d.observed_at),
+                            "hardwareConnection":d.hardware_connection,
+                            **({"readinessReason":d.readiness_reason} if d.readiness_reason is not None else {})} for d in devices],
                 "selections":[s.report() for s in choices], "blockers":blockers,
                 "startAllowed":not blockers, "closeAllowed":closable}
 
@@ -310,7 +388,7 @@ class InspectionOwner:
             resolved = self.composition.resolve(self.host.library, selection_id)
         except Exception:
             raise InspectionRejected() from None
-        if any(d.readiness != "READY" for d in self._devices()):
+        if any(d.readiness != "READY" or d.readiness_reason is not None for d in self._devices()):
             raise InspectionRejected()
         session_id = "inspection-" + uuid4().hex
         root = _private_dir(self.root)
@@ -398,7 +476,13 @@ def validate_inspection_report(value):
     if value["closeAllowed"] and value["sessionId"] is None:
         return False
     for device,row in zip(DEVICES,value["devices"]):
-        if (type(row) is not dict or set(row) != {"device","availability","readiness","observedAt"}
+        # Accept only the exact legacy shape or the documented optional
+        # hardware observation extension; old Core releases remain readable.
+        base_keys = {"device","availability","readiness","observedAt"}
+        if (type(row) is not dict or not base_keys <= set(row) <= base_keys | {"hardwareConnection","readinessReason"}
+                or not valid_hardware_connection(device, row.get("hardwareConnection", "UNKNOWN"))
+                or ("readinessReason" in row and (not isinstance(row["readinessReason"],str)
+                    or not valid_reason(device,row["readinessReason"],row["readiness"])))
                 or row["device"] != device or row["availability"] not in ("ACTIVE","INACTIVE","UNKNOWN")
                 or row["readiness"] not in ("READY","NOT_READY","UNKNOWN") or not _utc(row["observedAt"])
                 or (row["readiness"] == "READY" and row["availability"] != "ACTIVE")):
@@ -410,4 +494,4 @@ def validate_inspection_report(value):
             return False
         ids.append(row["selectionId"])
     return len(ids) == len(set(ids)) and (not value["startAllowed"] or
-                (bool(ids) and value["sessionId"] is None and all(x["readiness"]=="READY" for x in value["devices"])))
+                (bool(ids) and value["sessionId"] is None and all(x["readiness"]=="READY" and "readinessReason" not in x for x in value["devices"])))

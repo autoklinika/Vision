@@ -24,7 +24,7 @@ const statuses:Record<string,string>={
   RATE_LIMITED:'Request rate limited. Try again later.',
   UNAVAILABLE:'Outcome not confirmed. Do not repeat automatically. Refresh the library and reopen the draft.',
 };
-type Intent='open'|'create'|'create_empty'|'save'|'clone'|'validate'|'validate_structure';
+type Intent='open'|'archive'|'restore'|'submit_review'|'withdraw_review'|'create'|'create_empty'|'save'|'clone'|'validate'|'validate_structure';
 type EditorEntry=LibraryEntry|'new';
 type ValidationTarget={stateId:string;recipeId:string;scope:string};
 
@@ -55,12 +55,15 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
   const [uncertain,setUncertain]=useState(false);
   const [uncertainKey,setUncertainKey]=useState('');
   const [dirty,setDirty]=useState(false);
+  const [reviewFile,setReviewFile]=useState<File|null>(null);
   const [changedSections,setChangedSections]=useState<LibrarySectionName[]>([]);
   const running=useRef(false);
   const instanceId=station.report.instanceId;
   const editable=station.report.coreConnection==='CONNECTED'&&station.identity.role==='operator'&&!station.accountBusy;
   const idle=station.report.state==='NO_ACTIVE_SESSION';
-  const writable=editable&&idle&&!busy&&!uncertain;
+  const lifecycle=report?.lifecycle??'ACTIVE';
+  const canManage=editable&&idle&&!busy&&!uncertain;
+  const writable=canManage&&lifecycle==='ACTIVE';
   const confirmDiscard=()=>!dirty||window.confirm(t('Discard unsaved draft changes?'));
 
   useEffect(()=>{
@@ -73,7 +76,7 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
   function load(next:DraftReport) {
     const hydrated=hydrateDocument(next.document);
     setReport(next);setDocument(hydrated);setDirty(false);setChangedSections([]);setDiagnostic(null);
-    setUncertain(false);setUncertainKey('');
+    setUncertain(false);setUncertainKey('');setReviewFile(null);
     // The document never chooses a workflow or physical state automatically.
     setTarget({stateId:'',recipeId:'',scope:''});
   }
@@ -86,7 +89,10 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
   }
   async function execute(action:Intent) {
     if(running.current||!editable)return;
-    if(['create','create_empty','save','clone'].includes(action)&&!writable)return;
+    if(['create','create_empty','save'].includes(action)&&!writable)return;
+    if(action==='clone'&&!canManage)return;
+    const management=['archive','restore','submit_review','withdraw_review'].includes(action);
+    if(management&&(!report||!canManage||dirty||!window.confirm(t('Change the saved profile lifecycle? The document and its history will be retained.'))))return;
     if(action==='open'&&!confirmDiscard())return;
     if(action==='clone'&&dirty){setMessage('Save or discard unsaved changes before cloning a revision.');return;}
     let serialized:string|undefined;
@@ -117,13 +123,16 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
       else if(action==='create'&&fromCatalog)result=await editDraft('create',{instanceId,family:entry.family,variant:entry.variant,catalogRevision:entry.revision,key:newKey,revision,displayName});
       else if(action==='create_empty'&&entry==='new')result=await editDraft('create_empty',{instanceId,family,variant,key:newKey,revision,displayName});
       else if(action==='save'&&report&&serialized!==undefined)result=await editDraft('save',{instanceId,key:report.key,etag:report.etag},serialized);
+      else if((action==='archive'||action==='restore'||action==='submit_review'||action==='withdraw_review')&&report)
+        result=await editDraft(action,{instanceId,key:report.key,etag:report.etag});
       else if(action==='clone'&&report)result=await editDraft('clone',{instanceId,key:report.key,etag:report.etag,newKey,newRevision:revision});
       else return;
       if(result.status==='AVAILABLE'){
+        if(result.report.declaration){setMessage("This profile uses the simplified editor. Reopen it from the library.");return;}
         try{load(result.report);}
         catch{setMessage('Stored document has an unsupported form structure. Reopen it with a compatible editor.');setUncertain(true);setUncertainKey(result.report.key);return;}
         if(action==='open')setMessage('Draft loaded from Core.');
-        else{setMessage(action==='clone'?'New draft revision created.':'Draft saved in Core.');refreshLibrary();}
+        else{setMessage(management?'Profile lifecycle updated.':action==='clone'?'New draft revision created.':'Draft saved in Core.');refreshLibrary();}
         if(action==='create'||action==='create_empty'||action==='clone'){setNewKey('');setRevision('');}
       }else{
         setMessage(statuses[result.status]);
@@ -140,6 +149,41 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
       }
     }finally{running.current=false;setBusy(false);}
   }
+  function exportReview(){
+    if(!report||report.lifecycle!=='REVIEW_READY'||dirty||busy||!editable)return;
+    const data=JSON.stringify({schema:'vision.reference-review-request.v1',key:report.key,submittedEtag:report.etag,document:report.document},null,2);
+    const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+    const anchor=window.document.createElement('a');
+    anchor.href=url;anchor.download=report.key+'-review-request.json';
+    window.document.body.appendChild(anchor);anchor.click();anchor.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  async function importReview(){
+    if(!report||report.lifecycle!=='REVIEW_READY'||!report.reviewAvailable||!reviewFile||!canManage||dirty||running.current)return;
+    if(reviewFile.size>131072){setMessage('Invalid or oversized reviewed package.');return;}
+    if(!window.confirm(t('Publish independently reviewed release? Core verifies the exact submitted generation and proof.')))return;
+    running.current=true;setBusy(true);setMessage('');setDiagnostic(null);
+    try{
+      let data:unknown;
+      try{data=JSON.parse(await reviewFile.text());}catch{setMessage('Invalid or oversized reviewed package.');return;}
+      const pkg=row(data);
+      if(Object.keys(pkg).sort().join(',')!=='document,key,proof,schema,submittedEtag'||
+        pkg.schema!=='vision.reference-reviewed.v1'||pkg.key!==report.key||pkg.submittedEtag!==report.etag||
+        typeof pkg.proof!=='string'||pkg.proof.length>5464||typeof pkg.document!=='object'||pkg.document===null){
+        setMessage('Invalid or oversized reviewed package.');return;
+      }
+      const result=await editDraft('publish_review',{instanceId,key:report.key,etag:report.etag,reviewProof:pkg.proof},JSON.stringify(pkg.document));
+      if(result.status==='AVAILABLE'){
+        load(result.report);setMessage('Independently reviewed reference published.');refreshLibrary();
+      }else{
+        setMessage(statuses[result.status]);
+        if(['UNAVAILABLE','DRAFT_CONFLICT','DRAFT_NOT_FOUND'].includes(result.status)){
+          setUncertain(true);setUncertainKey(report.key);refreshLibrary();
+        }
+      }
+    }catch{setMessage('Invalid or oversized reviewed package.');}
+    finally{running.current=false;setBusy(false);}
+  }
   const states=document?referenceOptions(document,'state'):[];
   const workflows=document?array(row(document.inspection_workflows).recipes).map(row):[];
   const recipes=workflows.filter(w=>w.state_id===target.stateId&&typeof w.recipe_id==='string'&&w.recipe_id!==''&&typeof w.approval_scope==='string');
@@ -148,7 +192,7 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
   return <section className="draft-editor sunken-panel" aria-label={t("ECU reference editor")} data-editor-dirty={dirty?'true':'false'} data-editor-busy={busy?'true':'false'}>
     <div className="editor-heading"><div><h3>{t("ECU reference editor")}</h3><span>{t("Universal V1 profile forms")}</span></div>
       <Button disabled={busy} onClick={()=>{if(confirmDiscard())onClose();}}>{t("Close editor")}</Button></div>
-    <MessageBar intent="warning"><MessageBarBody><MessageBarTitle>{t("DRAFT / NOT_READY")}</MessageBarTitle>{t("Reference definitions only. Approval and release are separate.")}</MessageBarBody></MessageBar>
+    <MessageBar intent="warning"><MessageBarBody><MessageBarTitle>{lifecycle==='ACTIVE'?t("DRAFT / NOT_READY"):t(lifecycle==='ARCHIVED'?'Archived profile':lifecycle==='REVIEW_READY'?'Submitted for review':'Released reference record')}</MessageBarTitle>{t("Reference definitions only. Approval and release are separate.")}</MessageBarBody></MessageBar>
     {station.report.coreConnection!=='CONNECTED'?<p>{t("Core connection is unavailable. Your unsaved form remains in this tab; editing resumes after reconnection.")}</p>:!idle&&<p>{t("Core has an active session. Editing is read-only until the session closes.")}</p>}
     {!report&&(newProfile?<FluentProvider theme={webLightTheme} className="vision-fluent-scope vision-fluent-form"><fieldset>
       <legend>{fromCatalog?t('Create from catalog — {family} / {variant} / {revision}',{family:entry.family,variant:entry.variant,revision:entry.revision}):t('Create a new unsigned reference profile')}</legend>
@@ -165,12 +209,28 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
     </fieldset></FluentProvider>:<p><Button disabled={!editable||busy} onClick={()=>{void execute('open');}}>{t("Load draft {id}",{id:entry.profileId})}</Button></p>)}
     {report&&document&&<>
       <div className="editor-summary"><strong>{String(row(document.metadata).display_name||report.key)}</strong><span>{report.key} · {t("revision")} {String(row(document.metadata).profile_revision)} · ETag {report.etag.slice(1,13)}…</span><span role="status"><Badge appearance="tint" color={dirty?'warning':'informative'}>{dirty?t('Unsaved changes ({count} sections)',{count:changedSections.length}):t('Saved generation')}</Badge></span></div>
+      {lifecycle!=='ACTIVE'&&<p className="fine-print">{t("This saved draft is locked. A submitted draft is not an approved release.")}</p>}
       <p className="fine-print">{t("Save complete rows in any order. Sections can remain empty until their measurements are available. An unfinished required field must be completed or its row removed before saving.")}</p>
       <FluentProvider theme={webLightTheme} className="vision-fluent-scope editor-toolbar">
         <Button appearance="primary" icon={<SaveRegular/>} disabled={!writable||!dirty} onClick={()=>{void execute('save');}}>{t("Save draft generation")}</Button>
         <Button icon={<CheckmarkCircleRegular/>} disabled={!editable||busy} onClick={()=>{void execute('validate_structure');}}>{t("Check structure")}</Button>
         <Button icon={<ArrowClockwiseRegular/>} disabled={!editable||busy} onClick={()=>{void execute('open');}}>{uncertainKey&&uncertainKey!==report.key?t("Check requested revision"):t("Reload latest")}</Button>
+        {lifecycle==='ACTIVE'&&<>
+          <Button disabled={!canManage||dirty} onClick={()=>{void execute('archive');}}>{t("Archive profile")}</Button>
+          <Button disabled={!canManage||dirty||workflows.length===0} onClick={()=>{void execute('submit_review');}}>{t("Submit for review")}</Button>
+        </>}
+        {lifecycle==='ARCHIVED'&&<Button disabled={!canManage} onClick={()=>{void execute('restore');}}>{t("Restore profile")}</Button>}
+        {lifecycle==='REVIEW_READY'&&<Button disabled={!canManage} onClick={()=>{void execute('withdraw_review');}}>{t("Withdraw from review")}</Button>}
       </FluentProvider>
+      {lifecycle==='REVIEW_READY'&&<section className="editor-review-panel" aria-label={t("Independent review")}>
+        <h3>{t("Independent review")}</h3>
+        <Button disabled={!editable||busy} onClick={exportReview}>{t("Export review request")}</Button>
+        {report.reviewAvailable?<div className="library-review-controls"><label htmlFor="review-package">{t("Reviewed release package")}</label>
+          <input id="review-package" type="file" accept=".json,application/json" disabled={!canManage} onChange={event=>setReviewFile(event.target.files?.[0]??null)}/>
+          <Button appearance="primary" disabled={!canManage||!reviewFile} onClick={()=>{void importReview();}}>{t("Publish reviewed release")}</Button>
+        </div>:<p className="fine-print">{t("Independent review authority is not configured on this Core. Export is available; publication is disabled.")}</p>}
+      </section>}
+      {lifecycle==='RELEASED'&&report.releaseDigest&&<p className="library-detail-key">{t("Release digest")}: <code>{report.releaseDigest}</code></p>}
       {message&&<p role="status" className="editor-feedback">{displayMessage(message)}</p>}
       <div className="editor-section-nav"><label htmlFor="draft-section">{t("Section")}</label>
         <Select id="draft-section" value={section} onChange={e=>setSection(e.target.value as LibrarySectionName)} disabled={busy}>
@@ -216,9 +276,9 @@ export function DraftEditorContent({entry,station,onClose,refreshLibrary}:{
         <Button disabled={!editable||busy||!target.stateId||!target.recipeId||!target.scope} onClick={()=>{void execute('validate');}}>{t("Validate document")}</Button>
       </details>
       <details className="editor-diagnostics"><summary>{t("Clone saved draft to a new revision")}</summary><div className="draft-fields">
-        <label htmlFor="draft-clone-key">{t("New profile ID")}</label><Input id="draft-clone-key" value={newKey} maxLength={64} onChange={e=>setNewKey(e.target.value)} disabled={!writable}/>
-        <label htmlFor="draft-clone-revision">{t("New revision")}</label><Input id="draft-clone-revision" value={revision} maxLength={64} onChange={e=>setRevision(e.target.value)} disabled={!writable}/>
-      </div><Button disabled={!writable||dirty||!identifier(newKey)||!identifier(revision)} onClick={()=>{void execute('clone');}}>{t("Clone saved revision")}</Button></details>
+        <label htmlFor="draft-clone-key">{t("New profile ID")}</label><Input id="draft-clone-key" value={newKey} maxLength={64} onChange={e=>setNewKey(e.target.value)} disabled={!canManage}/>
+        <label htmlFor="draft-clone-revision">{t("New revision")}</label><Input id="draft-clone-revision" value={revision} maxLength={64} onChange={e=>setRevision(e.target.value)} disabled={!canManage}/>
+      </div><Button disabled={!canManage||dirty||!identifier(newKey)||!identifier(revision)} onClick={()=>{void execute('clone');}}>{t("Clone saved revision")}</Button></details>
     </>}
     {!report&&message&&<p role="status" className="editor-feedback">{displayMessage(message)}</p>}
   </section>;

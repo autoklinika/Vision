@@ -45,7 +45,24 @@ export function isStationReport(value: unknown): value is StationReport {
 }
 
 export type DeviceId = 'luxonis' | 'nero' | 'moveit' | 'sony';
-export type DeviceReport = Readonly<{device: DeviceId; availability: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN'; readiness: 'READY' | 'NOT_READY' | 'UNKNOWN'; observedAt: string}>;
+export type HardwareConnection = 'USB_DETECTED' | 'USB_NOT_DETECTED' | 'USB_CAN_DETECTED' | 'USB_CAN_NOT_DETECTED' | 'UNKNOWN' | 'NOT_APPLICABLE';
+export const readinessReasons = {
+  SERVICE_INACTIVE:'NOT_READY', SERVICE_UNKNOWN:'UNKNOWN', USB_MISSING:'NOT_READY', OBSERVER_UNAVAILABLE:'UNKNOWN',
+  AMBIGUOUS_SCENE:'NOT_READY', JOINT_FEEDBACK_UNVERIFIED:'UNKNOWN', ARM_STATUS_UNVERIFIED:'UNKNOWN',
+  ARM_BRAKE_NOT_RELEASED:'NOT_READY', ARM_FAULT:'NOT_READY', MOTOR_STATUS_UNVERIFIED:'UNKNOWN',
+  MOTORS_NOT_ENABLED:'NOT_READY', NERO_TELEMETRY_OK:'READY', RGBD_UNVERIFIED:'UNKNOWN',
+  RGBD_STREAMS_OK:'READY', SCENE_UNVERIFIED:'UNKNOWN', ROBOT_TF_UNVERIFIED:'UNKNOWN',
+  PLANNING_DATA_OK:'READY', SONY_UNVERIFIED:'UNKNOWN',
+} as const;
+export type ReadinessReason = keyof typeof readinessReasons;
+const commonReasons: readonly ReadinessReason[] = ['SERVICE_INACTIVE','SERVICE_UNKNOWN','USB_MISSING','OBSERVER_UNAVAILABLE'];
+const deviceReasons: Readonly<Record<DeviceId,readonly ReadinessReason[]>> = {
+  nero:['JOINT_FEEDBACK_UNVERIFIED','ARM_STATUS_UNVERIFIED','ARM_BRAKE_NOT_RELEASED','ARM_FAULT','MOTOR_STATUS_UNVERIFIED','MOTORS_NOT_ENABLED','NERO_TELEMETRY_OK'],
+  luxonis:['RGBD_UNVERIFIED','RGBD_STREAMS_OK','AMBIGUOUS_SCENE'],
+  moveit:['JOINT_FEEDBACK_UNVERIFIED','SCENE_UNVERIFIED','ROBOT_TF_UNVERIFIED','PLANNING_DATA_OK','AMBIGUOUS_SCENE'],
+  sony:['SONY_UNVERIFIED'],
+};
+export type DeviceReport = Readonly<{device: DeviceId; availability: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN'; readiness: 'READY' | 'NOT_READY' | 'UNKNOWN'; observedAt: string; hardwareConnection?: HardwareConnection; readinessReason?: ReadinessReason}>;
 export type InspectionSelection = Readonly<{selectionId: string; family: string; variant: string; revision: string; physicalState: string; recipe: string}>;
 const deviceIds = ['luxonis', 'nero', 'moveit', 'sony'] as const;
 const blockerIds = ['COMPOSITION_UNCONFIGURED', 'NO_APPROVED_SELECTION', 'DEVICES_NOT_VERIFIED', 'SESSION_ACTIVE', 'RECOVERY_REQUIRED'] as const;
@@ -59,7 +76,16 @@ function identifier(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value);
 }
 function isDevice(value: unknown, device: DeviceId): value is DeviceReport {
-  return record(value, ['device','availability','readiness','observedAt']) && value.device === device &&
+  const legacyKeys = ['device','availability','readiness','observedAt'];
+  return (record(value, legacyKeys) || record(value, [...legacyKeys,'hardwareConnection']) ||
+    record(value,[...legacyKeys,'readinessReason']) || record(value,[...legacyKeys,'hardwareConnection','readinessReason'])) && value.device === device &&
+    (!Object.hasOwn(value,'readinessReason') || (typeof value.readinessReason === 'string' &&
+      Object.hasOwn(readinessReasons,value.readinessReason) && readinessReasons[value.readinessReason as ReadinessReason]===value.readiness &&
+      (commonReasons.includes(value.readinessReason as ReadinessReason)||deviceReasons[device].includes(value.readinessReason as ReadinessReason)))) &&
+    (!Object.hasOwn(value,'hardwareConnection') || value.hardwareConnection === 'UNKNOWN' ||
+      ((device === 'luxonis' || device === 'sony') && (value.hardwareConnection === 'USB_DETECTED' || value.hardwareConnection === 'USB_NOT_DETECTED')) ||
+      (device === 'nero' && (value.hardwareConnection === 'USB_CAN_DETECTED' || value.hardwareConnection === 'USB_CAN_NOT_DETECTED')) ||
+      (device === 'moveit' && value.hardwareConnection === 'NOT_APPLICABLE')) &&
     ['ACTIVE','INACTIVE','UNKNOWN'].includes(String(value.availability)) && typeof value.availability === 'string' &&
     ['READY','NOT_READY','UNKNOWN'].includes(String(value.readiness)) && typeof value.readiness === 'string' &&
     (value.readiness !== 'READY' || value.availability === 'ACTIVE') && utc(value.observedAt);
@@ -79,5 +105,5 @@ export function isInspectionReport(value: unknown): value is InspectionReport {
       || !Array.isArray(value.blockers) || !value.blockers.every(b => typeof b === 'string' && (blockerIds as readonly string[]).includes(b))
       || new Set(value.blockers).size !== value.blockers.length
       || value.startAllowed !== (value.blockers.length === 0) || (value.closeAllowed && value.sessionId === null)) return false;
-  return !value.startAllowed || (value.sessionId === null && value.selections.length > 0 && value.devices.every(d => d.readiness === 'READY'));
+  return !value.startAllowed || (value.sessionId === null && value.selections.length > 0 && value.devices.every(d => d.readiness === 'READY' && !Object.hasOwn(d,'readinessReason')));
 }

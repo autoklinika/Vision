@@ -7,11 +7,17 @@ type LibraryIdentity = Readonly<{
   scope: 'LIBRARY_READ_ONLY'; source: 'STATION' | 'SYNTHETIC_TEST';
   libraryId: string; viewId: string; capturedAt: string;
 }>;
+export const draftLifecycles = ['ACTIVE','ARCHIVED','REVIEW_READY','RELEASED'] as const;
+export type DraftLifecycle = typeof draftLifecycles[number];
+export function isDraftLifecycle(value:unknown):value is DraftLifecycle {
+  return draftLifecycles.some(state=>state===value);
+}
 export type LibraryEntry = Readonly<{
   entryId: string; kind: 'CATALOG_RECORD' | 'REFERENCE_DRAFT'; profileId: string;
   family: string; variant: string; revision: string; displayName: string;
   status: 'DRAFT' | 'READY_FOR_REVIEW' | 'APPROVED'; readiness: 'NOT_READY';
   reasonCode: 'CATALOG_ONLY' | 'UNSIGNED_DRAFT'; etag: string | null;
+  lifecycle?:DraftLifecycle; searchTerms?:string; searchComplete?:boolean; releaseDigest?:string; simplified?:true;
 }>;
 export type LibraryReport = LibraryIdentity & Readonly<{
   schema: 'vision.api.library.v1'; after: number; totalCount: number;
@@ -32,7 +38,7 @@ export type LibraryDetail = LibraryIdentity & Readonly<{
   }> | null;
   profile: LibraryProfile | null;
 }>;
-export type LibraryHistoryItem = Readonly<{snapshotId: string; etag: string; revision: string}>;
+export type LibraryHistoryItem = Readonly<{snapshotId: string; etag: string; revision: string; lifecycle?:DraftLifecycle; releaseDigest?:string}>;
 export type LibraryHistory = LibraryIdentity & Readonly<{
   schema: 'vision.api.library-history.v1'; entryId: string; profileId: string;
   revision: string; etag: string; after: number; totalCount: number;
@@ -44,6 +50,10 @@ const entryKeys = ['entryId','kind','profileId','family','variant','revision','d
 function record(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) &&
     Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+}
+function extendedRecord(value:unknown,required:readonly string[],optional:readonly string[]):value is Record<string,unknown>{
+  if(typeof value!=='object'||value===null||Array.isArray(value))return false;
+  return required.every(k=>Object.hasOwn(value,k))&&Object.keys(value).every(k=>required.includes(k)||optional.includes(k));
 }
 function integer(value: unknown, max: number): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= max;
@@ -73,8 +83,15 @@ function page(after: unknown, total: unknown, next: unknown, count: number, maxi
   return count === end - after && next === (end < total ? end : null);
 }
 export function isLibraryEntry(value: unknown): value is LibraryEntry {
-  if (!record(value, entryKeys) || !hex(value.entryId, 32) || !identifier(value.profileId) ||
+  if (!extendedRecord(value,entryKeys,['lifecycle','searchTerms','searchComplete','releaseDigest','simplified']) || !hex(value.entryId, 32) || !identifier(value.profileId) ||
       !identifier(value.family) || !identifier(value.variant) || !identifier(value.revision) || !label(value.displayName, 160) || value.readiness !== 'NOT_READY') return false;
+  if(value.kind==='CATALOG_RECORD'&&!record(value,entryKeys))return false;
+  if(Object.hasOwn(value,'lifecycle')&&!isDraftLifecycle(value.lifecycle))return false;
+  if(Object.hasOwn(value,'simplified')&&(value.simplified!==true||!['ACTIVE','ARCHIVED'].includes(String(value.lifecycle??'ACTIVE'))))return false;
+  if((value.lifecycle==='RELEASED')!==Object.hasOwn(value,'releaseDigest')||
+    (Object.hasOwn(value,'releaseDigest')&&!hex(value.releaseDigest,64)))return false;
+  if(Object.hasOwn(value,'searchTerms')!==Object.hasOwn(value,'searchComplete'))return false;
+  if(Object.hasOwn(value,'searchTerms')&&(typeof value.searchTerms!=='string'||value.searchTerms.length>1024||/\p{C}/u.test(value.searchTerms)||typeof value.searchComplete!=='boolean'))return false;
   return value.kind === 'CATALOG_RECORD'
     ? typeof value.status === 'string' && ['DRAFT','READY_FOR_REVIEW','APPROVED'].includes(value.status) && value.reasonCode === 'CATALOG_ONLY' && value.etag === null
     : value.kind === 'REFERENCE_DRAFT' && value.status === 'DRAFT' && value.reasonCode === 'UNSIGNED_DRAFT' && etag(value.etag);
@@ -111,7 +128,7 @@ export function isLibraryHistory(value: unknown): value is LibraryHistory {
       value.schema !== 'vision.api.library-history.v1' || !identity(value) || !hex(value.entryId, 32) || !identifier(value.profileId) ||
       !identifier(value.revision) || !etag(value.etag) || !Array.isArray(value.items) || value.totalCount === 0 ||
       !page(value.after, value.totalCount, value.nextAfter, value.items.length, 4096) || !value.items.every(item =>
-        record(item, ['snapshotId','etag','revision']) && hex(item.snapshotId, 32) && etag(item.etag) && item.revision === value.revision)) return false;
+        extendedRecord(item,['snapshotId','etag','revision'],['lifecycle','releaseDigest']) && (!Object.hasOwn(item,'lifecycle')||isDraftLifecycle(item.lifecycle)) && ((item.lifecycle==='RELEASED')===Object.hasOwn(item,'releaseDigest')) && (!Object.hasOwn(item,'releaseDigest')||hex(item.releaseDigest,64)) && hex(item.snapshotId, 32) && etag(item.etag) && item.revision === value.revision)) return false;
   if (new Set(value.items.map(item => item.snapshotId)).size !== value.items.length || new Set(value.items.map(item => item.etag)).size !== value.items.length) return false;
   return value.nextAfter === null ? value.items.at(-1)?.etag === value.etag : value.items.every(item => item.etag !== value.etag);
 }
@@ -119,7 +136,7 @@ export function matchesLibrary(page: LibraryReport, prior: LibraryReport, after:
   return sameView(page, prior) && page.after === after && page.totalCount === prior.totalCount;
 }
 export function matchesLibraryDetail(detail: LibraryDetail, library: LibraryReport, entry: LibraryEntry): boolean {
-  return sameView(detail, library) && entryKeys.every(key => detail.entry[key as keyof LibraryEntry] === entry[key as keyof LibraryEntry]);
+  return sameView(detail, library) && [...entryKeys,'lifecycle','searchTerms','searchComplete','releaseDigest','simplified'].every(key => detail.entry[key as keyof LibraryEntry] === entry[key as keyof LibraryEntry]);
 }
 export function matchesLibraryHistory(history: LibraryHistory, detail: LibraryDetail, after: number): boolean {
   return sameView(history, detail) && detail.profile !== null && history.entryId === detail.entry.entryId && history.profileId === detail.entry.profileId &&

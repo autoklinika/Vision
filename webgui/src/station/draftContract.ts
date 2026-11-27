@@ -1,11 +1,14 @@
-import {librarySections} from '../api/libraryContract';
+import {librarySections,isDraftLifecycle} from '../api/libraryContract';
+import type {DraftLifecycle} from '../api/libraryContract';
 import {record} from './contract';
+import {isBasicDeclaration} from './basicContract';
+import type {BasicDeclaration} from './basicContract';
 
-export type DraftAction = 'open' | 'create' | 'create_empty' | 'save' | 'clone' | 'validate' | 'validate_structure' | 'asset_import' | 'asset_preview';
+export type DraftAction = 'create_basic' | 'save_basic' | 'clone_basic' | 'open' | 'open_generation' | 'archive' | 'restore' | 'submit_review' | 'withdraw_review' | 'publish_review' | 'create' | 'create_empty' | 'save' | 'clone' | 'validate' | 'validate_structure' | 'asset_import' | 'asset_preview';
 export type DraftDocument = Record<typeof librarySections[number], unknown>;
 export type DraftReport = Readonly<{
   schema: 'vision.api.ecu-draft.v1'; source: 'STATION'; instanceId: string;
-  key: string; etag: string; document: DraftDocument;
+  key: string; etag: string; document: DraftDocument; lifecycle?:DraftLifecycle; snapshotId?:string; releaseDigest?:string; reviewAvailable?:true; basicEligible?:true; declaration?:BasicDeclaration;
 }>;
 export type DraftValidation = Readonly<{
   schema: 'vision.api.ecu-draft-validation.v1'; source: 'STATION'; instanceId: string;
@@ -22,7 +25,17 @@ function hex32(value: unknown): value is string {
   return typeof value === 'string' && value.length === 32 && !/[^a-f0-9]/.test(value);
 }
 export function isDraftReport(value: unknown): value is DraftReport {
-  if (!record(value, ['schema','source','instanceId','key','etag','document']) ||
+  const required=['schema','source','instanceId','key','etag','document'];
+  if(typeof value!=='object'||value===null||Array.isArray(value))return false;
+  const keys=Object.keys(value);
+  if (!record(value, [...required,...keys.filter(k=>['lifecycle','snapshotId','releaseDigest','reviewAvailable','basicEligible','declaration'].includes(k))]) ||
+      (Object.hasOwn(value,'lifecycle')&&!isDraftLifecycle(value.lifecycle)) ||
+      (Object.hasOwn(value,'snapshotId')&&!hex32(value.snapshotId)) ||
+      ((value.lifecycle==='RELEASED')!==Object.hasOwn(value,'releaseDigest')) ||
+      (Object.hasOwn(value,'releaseDigest')&&(typeof value.releaseDigest!=='string'||!/^[a-f0-9]{64}$/.test(value.releaseDigest))) ||
+      (Object.hasOwn(value,'reviewAvailable')&&value.reviewAvailable!==true) ||
+      (Object.hasOwn(value,'basicEligible')&&(value.basicEligible!==true||Object.hasOwn(value,'declaration')||(value.lifecycle??'ACTIVE')!=='ACTIVE')) ||
+      (Object.hasOwn(value,'declaration')&&(!isBasicDeclaration(value.declaration)||Object.hasOwn(value,'reviewAvailable')||!['ACTIVE','ARCHIVED'].includes(String(value.lifecycle??'ACTIVE')))) ||
       value.schema !== 'vision.api.ecu-draft.v1' || value.source !== 'STATION' ||
       !hex32(value.instanceId) || !identifier(value.key) ||
       typeof value.etag !== 'string' || value.etag.length !== 66 || !/^"[a-f0-9]{64}"$/.test(value.etag) ||
@@ -34,6 +47,9 @@ export function isDraftReport(value: unknown): value is DraftReport {
     meta.kind === 'ecu_reference_profile' && meta.schema_version === '1' && meta.template_only === false && meta.profile_id === value.key &&
     identifier(meta.family_id) && identifier(meta.variant_id) && identifier(meta.profile_revision) &&
     typeof meta.display_name === 'string' && meta.status === 'DRAFT' && meta.content_sha256 === null &&
+    (!Object.hasOwn(value,'declaration')||(isBasicDeclaration(value.declaration)&&
+      value.declaration.familyLabel.trim().replace(/ +/g,'_')===meta.family_id&&
+      value.declaration.variantLabel.trim().replace(/ +/g,'_')===meta.variant_id)) &&
     Array.isArray(meta.approval_scopes) && meta.approval_scopes.length === 0 &&
     record(provenance,['measurement_sources','calibration_dependencies','asset_hashes','release_approval','released_snapshot_sha256','supersedes']) &&
     provenance.release_approval === null && provenance.released_snapshot_sha256 === null &&

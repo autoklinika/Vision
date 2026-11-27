@@ -4,10 +4,7 @@
 body { margin: 0; }
 [hidden] { display: none !important; }
 .vision-station-root { min-height: 100dvh; }
-.vision-workspace { display: grid; grid-template-rows: 48px auto minmax(0,1fr) auto; height: 100dvh; min-width: 0; overflow: hidden; background: var(--colorNeutralBackground2); }
-.vision-workspace-tabs { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; min-width: 0; gap: 8px; border-bottom: 1px solid var(--colorNeutralStroke2); background: var(--colorNeutralBackground1); }
-.vision-workspace-tabs .fui-TabList { overflow-x: auto; min-width: 0; flex: 1; white-space: nowrap; }
-.vision-workspace-tabs > button { flex: 0 0 auto; }
+.vision-workspace { display: grid; grid-template-rows: 48px minmax(0,1fr) auto; height: 100dvh; min-width: 0; overflow: hidden; background: var(--colorNeutralBackground2); }
 .vision-workspace-body { min-height: 0; min-width: 0; overflow: hidden; position: relative; }
 .vision-module { height: 100%; overflow: auto; min-width: 0; padding: 24px 28px; background: var(--colorNeutralBackground1); color: var(--colorNeutralForeground1); }
 .vision-module-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; border-bottom: 1px solid var(--colorNeutralStroke2); padding-bottom: 14px; margin-bottom: 20px; }
@@ -101,7 +98,7 @@ body { margin: 0; }
 .vision-station-root .station-login-heading h2 { font-size: 16px; }
 @container (max-width: 780px) { .vision-module .editor-section-layout { grid-template-columns: minmax(0,1fr); } .vision-module .editor-section-list { display: none; } }
 @container (max-width: 480px) { .vision-module .editor-field, .vision-module .draft-fields { grid-template-columns: minmax(0,1fr); gap: 4px; } .vision-module fieldset { padding: 8px; } }
-@media(max-width: 600px) { .vision-module { padding: 14px; } .vision-module-title h1 { font-size: 21px; } .vision-module-title { margin-bottom: 12px; } .vision-module dl { grid-template-columns: minmax(100px, 38%) minmax(0,1fr); } .vision-workspace-tabs { padding: 0 4px; } .vision-workspace-status { padding: 6px 10px; } .vision-module .draft-editor { padding: 8px; } .vision-module table { font-size: 12px; } .vision-module th,.vision-module td { padding: 7px; } }
+@media(max-width: 600px) { .vision-module { padding: 14px; } .vision-module-title h1 { font-size: 21px; } .vision-module-title { margin-bottom: 12px; } .vision-module dl { grid-template-columns: minmax(100px, 38%) minmax(0,1fr); } .vision-workspace-status { padding: 6px 10px; } .vision-module .draft-editor { padding: 8px; } .vision-module table { font-size: 12px; } .vision-module th,.vision-module td { padding: 7px; } }
 
 /* Native Fluent controls in the reference library and all schema-driven forms. */
 .vision-module .library-content { background: transparent; color: inherit; }
@@ -139,3 +136,182 @@ body { margin: 0; }
   .vision-station-root .station-startup .mode-banner { height:auto; min-height:48px; flex-wrap:wrap; padding:8px 12px; }
   .vision-station-root .station-startup .mode-banner .vision-language-selector { margin-left:0; }
 }
+
+/* System Status V1 — a report surface, never a parallel readiness engine. */
+.vision-system-status { display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; max-width: 1460px; min-width: 0; margin: 0 auto; }
+.vision-system-status > * { min-width: 0; }
+.vision-system-status .station-overview { border: 1px solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusMedium); padding: 12px 16px 10px; min-width: 0; }
+.vision-system-status .station-overview-heading, .vision-system-status .station-section-heading, .vision-system-status .station-session-title, .vision-system-status .station-readiness-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.vision-system-status .station-overview-title { display: flex; gap: 12px; align-items: center; }
+.vision-system-status .station-overview-icon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 6px; background: var(--colorBrandBackground2); color: var(--colorBrandForeground1); }
+.vision-system-status .station-overview-title h2, .vision-system-status .station-section-heading h2, .vision-system-status .station-session-title h2 { margin: 0 0 2px; }
+.vision-system-status .station-overview-title > div > span, .vision-system-status .station-section-heading > div > span, .vision-system-status .station-report-time { font-size: 12px; color: var(--colorNeutralForeground3); }
+.vision-system-status .station-status-toolbar { padding: 0; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.vision-system-status .station-status-toolbar button { white-space: normal; text-align: left; }
+.vision-system-status .station-overview-facts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px 18px; margin: 12px 0 8px; }
+.vision-system-status .station-overview-facts > div { min-width: 0; border-left: 1px solid var(--colorNeutralStroke2); padding-left: 14px; }
+.vision-system-status .station-overview-facts > div:first-child { border: 0; padding-left: 0; }
+.vision-system-status .station-overview-facts dt { font-size: 12px; margin-bottom: 6px; }
+.vision-system-status .station-overview-facts dd { font-size: 14px; }
+.vision-system-status .station-overview-facts small { display: block; color: var(--colorNeutralForeground3); margin-top: 3px; font-size: 12px; }
+.vision-system-status .station-overview-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--colorNeutralForeground3); border-top: 1px solid var(--colorNeutralStroke2); padding-top: 10px; }
+.vision-system-status time { font-variant-numeric: tabular-nums; }
+.vision-system-status .station-device-section { min-width: 0; }
+.vision-system-status .station-section-heading { margin-bottom: 10px; align-items: flex-end; }
+.vision-system-status .station-device-report-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.vision-system-status .station-device-table { min-width: 0; overflow-x: auto; border: 1px solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusMedium); }
+.vision-system-status .station-device-table .fui-Table { min-width: 740px; }
+.vision-system-status .station-device-table .fui-TableCell { vertical-align: middle; padding-top: 7px; padding-bottom: 7px; }
+.vision-system-status .station-device-table .fui-TableHeaderCell { font-weight: 600; }
+.vision-system-status .station-device-table time { font-size: 12px; color: var(--colorNeutralForeground2); white-space: nowrap; }
+.vision-system-status .station-device-name { font-weight: 600; }
+.vision-system-status .station-readiness-heading { margin-top: 16px; margin-bottom: 10px; }
+.vision-system-status .station-readiness-heading h3 { margin: 0; }
+.vision-system-status .station-blocker-list { margin: 6px 0 0; padding-left: 20px; line-height: 1.5; }
+.vision-system-status .station-inspection-actions { display: flex; gap: 12px 18px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
+.vision-system-status .station-inspection-selection { flex: 1 1 300px; max-width: 640px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.vision-system-status .station-inspection-selection .fui-Select { width: 100%; min-width: 0; }
+.vision-system-status .station-inspection-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.vision-system-status .station-session-area { border-top: 1px solid var(--colorNeutralStroke2); padding-top: 16px; }
+.vision-system-status .session-summary { border-top: 0; padding-top: 8px; margin-top: 0; }
+.vision-system-status .session-summary .session-heading h2 { font-size: 14px; color: var(--colorNeutralForeground2); margin: 0; }
+.vision-system-status .fui-Badge { min-height: 20px; font-size: 12px; white-space: normal; height: auto; padding: 2px 8px; }
+@media (max-width: 800px) {
+  .vision-system-status .station-overview-facts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .vision-system-status .station-overview-facts > div:nth-child(odd) { padding-left: 0; border: 0; }
+}
+@media (max-width: 420px) {
+  .vision-system-status { gap: 14px; }
+  .vision-system-status .station-overview { padding: 12px; }
+  .vision-system-status .station-inspection-selection { flex-basis: 100%; }
+  .vision-system-status .station-overview-heading { align-items: flex-start; }
+  .vision-system-status .station-overview-title { min-width: 0; }
+  .vision-system-status .station-overview-title h2 { overflow-wrap: anywhere; }
+}
+
+.vision-module .library-search { display:flex; align-items:flex-end; flex-wrap:wrap; gap:10px; margin:12px 0; }
+.vision-module .library-search label { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.vision-module .library-search .library-search-field { flex:1 1 260px; max-width:560px; }
+.vision-module .library-search .fui-Input { width:100%; }
+.vision-module .library-search-result { color:var(--colorNeutralForeground3); font-size:13px; }
+
+.vision-module .saved-profile-inspector { display:grid; gap:10px; min-width:0; }
+.vision-module .library-review-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
+.vision-module .library-review-controls .fui-Select,.vision-module .library-review-controls .fui-Input { flex:1 1 180px; min-width:0; max-width:380px; }
+.vision-module .saved-profile-preview { min-width:0; overflow-wrap:anywhere; }
+.vision-module .saved-profile-preview .fui-TableCell { vertical-align:top; overflow-wrap:anywhere; max-width:320px; white-space:pre-wrap; }
+.vision-module .saved-profile-preview .fui-TableCell small { display:block; color:var(--colorNeutralForeground3); }
+
+/* V2 ECU declaration: everyday form, not the advanced V1 execution schema. */
+.vision-module .basic-profile-editor { padding: 0; }
+.vision-module .basic-editor-actions,.vision-module .basic-editor-footer { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.vision-module .basic-profile-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:14px 0; }
+.vision-module .basic-card { border:1px solid var(--colorNeutralStroke2); border-radius:var(--borderRadiusMedium); padding:16px; display:flex; flex-direction:column; gap:12px; min-width:0; background:var(--colorNeutralBackground1); align-items:stretch; }
+.vision-module .basic-card h3 { font-size:15px; font-weight:600; margin:0 0 4px; display:flex; align-items:center; gap:9px; padding-bottom:10px; border-bottom:1px solid var(--colorNeutralStroke2); }
+.vision-module .basic-card h3 span { color:var(--colorNeutralForeground3); font-size:12px; font-variant-numeric:tabular-nums; }
+.vision-module .basic-card p { margin:0; }
+.vision-module .basic-field { display:flex; flex-direction:column; gap:5px; min-width:0; font-size:13px; }
+.vision-module .basic-field .fui-Input,.vision-module .basic-field .fui-Textarea,.vision-module .basic-field .fui-Select { width:100%; min-width:0; }
+.vision-module .basic-field [aria-invalid=true] { color:var(--colorPaletteRedForeground1); }
+.vision-module .basic-field:has([aria-invalid=true]) .fui-Input { border-color:var(--colorPaletteRedBorder1); }
+.vision-module .basic-state { min-width:0; margin:0; padding:10px; border:1px solid var(--colorNeutralStroke2); border-radius:4px; }
+.vision-module .basic-state legend { font-size:13px; font-weight:600; }
+.vision-module .basic-dimensions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:8px; }
+.vision-module .basic-inline { display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; }
+.vision-module .basic-inline .basic-field { flex:1 1 180px; }
+.vision-module .basic-geometry-diagram { color:var(--colorNeutralForeground3); width:100%; height:146px; max-width:320px; align-self:center; }
+.vision-module .basic-photo-inputs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.vision-module .basic-photo-list { display:grid; gap:6px; }
+.vision-module .basic-photo-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--colorNeutralStroke2); padding:6px 0; }
+.vision-module .basic-photo-row>div { flex:1 1 140px; min-width:0; }
+.vision-module .basic-photo-row small { display:block; color:var(--colorNeutralForeground3); }
+.vision-module .basic-checks { display:flex; flex-direction:column; gap:5px; }
+.vision-module .basic-editor-footer { border-top:1px solid var(--colorNeutralStroke2); padding-top:14px; margin-top:14px; }
+.vision-module .basic-editor-footer .fine-print { margin-left:auto; }
+@container (max-width:800px) { .vision-module .basic-profile-grid { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:600px) { .vision-module .basic-profile-grid,.vision-module .basic-photo-inputs { grid-template-columns:minmax(0,1fr); } .vision-module .basic-card { padding:12px; } .vision-module .basic-dimensions { grid-template-columns:minmax(0,1fr); } }
+
+/* Devices — Luxonis read-only diagnostic module. */
+.vision-devices { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; min-width:0; max-width:1460px; margin:0 auto; }
+.vision-devices > * { min-width:0; }
+.luxonis-device-header,.luxonis-section-heading,.luxonis-preview-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.luxonis-device-title { display:flex; align-items:center; gap:12px; }
+.luxonis-device-icon { display:grid; place-items:center; background:var(--colorNeutralBackground3); border-radius:6px; width:48px; height:48px; }
+.vision-devices h2,.vision-devices h3 { margin:0; }
+.vision-devices h2 { font-size:18px; }
+.vision-devices h3 { font-size:14px; }
+.vision-devices p { margin:4px 0 0; }
+.luxonis-device-title p,.luxonis-section-heading p { font-size:12px; color:var(--colorNeutralForeground3); }
+.luxonis-facts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; border:1px solid var(--colorNeutralStroke2); border-radius:6px; padding:14px; }
+.luxonis-facts>div { display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; padding-left:12px; border-left:1px solid var(--colorNeutralStroke2); }
+.luxonis-facts>div:first-child { padding-left:0; border:0; }
+.luxonis-facts>div>span:first-child,.luxonis-facts small { font-size:12px; color:var(--colorNeutralForeground3); }
+.luxonis-preview-grid,.luxonis-settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:12px 0; }
+.luxonis-preview-card,.luxonis-settings-card { border:1px solid var(--colorNeutralStroke2); border-radius:6px; padding:12px; min-width:0; }
+.luxonis-image-viewport { aspect-ratio:16/9; background:#25292d; margin:10px 0; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:4px; }
+.luxonis-image-viewport img { width:100%; height:100%; object-fit:contain; }
+.luxonis-empty-frame { color:#c9cdd1; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; padding:16px; text-align:center; font-size:13px; }
+.luxonis-frame-meta,.luxonis-depth-scale>div:nth-child(2) { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; font-size:12px; color:var(--colorNeutralForeground3); font-variant-numeric:tabular-nums; }
+.luxonis-depth-scale { margin-top:12px; }
+.luxonis-depth-gradient { height:6px; border-radius:2px; background:linear-gradient(to right,#30123b,#4667dd,#28b9d5,#73e44b,#f2e64c,#f99524,#b51a01); }
+.luxonis-depth-scale small { color:var(--colorNeutralForeground3); font-size:11px; }
+.luxonis-settings-source { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:12px; }
+.luxonis-settings-source .fui-Select { max-width:100%; min-width:0; }
+.luxonis-settings-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.luxonis-settings-card h3 { padding-bottom:8px; }
+.luxonis-settings-card .fui-TableCell { overflow-wrap:anywhere; vertical-align:middle; }
+.luxonis-settings-card small { display:block; font-size:10px; color:var(--colorNeutralForeground3); overflow-wrap:anywhere; }
+.vision-devices .fui-Badge { white-space:normal; height:auto; padding:3px 8px; }
+@media (max-width:1000px) { .luxonis-settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:680px) { .luxonis-facts { grid-template-columns:repeat(2,minmax(0,1fr)); } .luxonis-facts>div:nth-child(odd) { padding-left:0; border:0; } .luxonis-preview-grid,.luxonis-settings-grid { grid-template-columns:minmax(0,1fr); } .luxonis-settings-source { max-width:100%; } .luxonis-settings-source select { max-width:100%; } }
+
+/* Luxonis manual illumination: compact independent controls. */
+.luxonis-ir-card { border:1px solid var(--colorNeutralStroke2); border-radius:6px; padding:14px; }
+.luxonis-ir-controls { display:flex; flex-wrap:wrap; gap:12px 28px; margin:8px 0; }
+.luxonis-ir-controls>div { display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:min(260px,100%); padding:4px 10px; background:var(--colorNeutralBackground2); border-radius:4px; }
+.luxonis-ir-controls>div>span { font-variant-numeric:tabular-nums; font-size:12px; color:var(--colorNeutralForeground3); }
+
+/* NERO: independent diagnostic fields, bounded horizontal table on mobile. */
+.nero-table-scroll { overflow-x:auto; max-width:100%; margin:12px 0; border:1px solid var(--colorNeutralStroke2); border-radius:6px; }
+.nero-table-scroll .fui-Table { min-width:1000px; font-variant-numeric:tabular-nums; }
+.nero-table-scroll .fui-TableHeaderCell { font-size:12px; white-space:normal; }
+.nero-table-scroll .fui-TableCell { padding:8px 10px; }
+.nero-fault { color:var(--colorStatusDangerForeground1); font-size:12px; overflow-wrap:anywhere; }
+.nero-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.nero-details { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px 12px; margin:8px 0; font-size:13px; }
+.nero-details dt { color:var(--colorNeutralForeground3); min-width:0; overflow-wrap:anywhere; }
+.nero-details dd { margin:0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.nero-planned { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+@media(max-width:1000px){.nero-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:680px){.nero-detail-grid{grid-template-columns:minmax(0,1fr);}}
+
+/* Cartesian control workspace: declaration and isolated keyboard preview. */
+.nero-tcp-control { display: grid; gap: 12px; min-width: 0; }
+.nero-tcp-control .luxonis-settings-card { display: grid; gap: 12px; min-width: 0; }
+.nero-tcp-drive-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.nero-tcp-axis-status { display: flex; flex-wrap: wrap; gap: 8px; }
+.nero-tcp-speed-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,230px),1fr)); gap: 14px; }
+.nero-tcp-speed { display: grid; grid-template-columns: minmax(0,1fr) 76px; align-items: center; gap: 10px; }
+.nero-tcp-speed .fui-Slider { width: 100%; min-width: 0; }
+.nero-tcp-keyboard { display: grid; gap: 12px; outline-offset: 4px; border-radius: 6px; }
+.nero-tcp-keys { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: 8px 16px; }
+.nero-tcp-key-row { display: grid; grid-template-columns: 1fr 58px 1fr; align-items: center; gap: 8px; text-align: center; }
+.nero-tcp-key-row .fui-Button { min-width: 0; }
+.nero-tcp-intent,.nero-tcp-stop { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.nero-tcp-control,.nero-tcp-control .luxonis-settings-card,.nero-tcp-keyboard { grid-template-columns:minmax(0,1fr); }
+.nero-tcp-control .fui-Field,.nero-tcp-control .fui-Select,.nero-tcp-control .fui-Input { min-width:0; max-width:100%; }
+.nero-tcp-speed .fui-Input { width:100%; box-sizing:border-box; }
+.nero-tcp-speed .fui-Input input { min-width:0; width:100%; box-sizing:border-box; }
+.nero-tcp-control .fui-Select select { min-width:0; max-width:100%; }
+.nero-tcp-control .fui-MessageBar { min-width:0; }
+.nero-tcp-key-row { grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr); }
+.nero-device > .fui-TabList { flex-wrap:wrap; }
+@media(max-width:480px){
+ .nero-tcp-speed-grid,.nero-tcp-keys { grid-template-columns:minmax(0,1fr); }
+ .nero-tcp-control .luxonis-settings-card { padding:10px; }
+}
+
+/* Read-only NERO software joint envelope. */
+.nero-limit-scroll { overflow-x:auto; max-width:100%; }
+.nero-limit-table { border-collapse:collapse; width:100%; min-width:480px; font-size:12px; font-variant-numeric:tabular-nums; }
+.nero-limit-table th,.nero-limit-table td { padding:6px 8px; text-align:left; border-bottom:1px solid var(--colorNeutralStroke2); }

@@ -1,5 +1,6 @@
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeaderTitle, FluentProvider, OverlayDrawer, webLightTheme } from '@fluentui/react-components';
 import { NavigationRegular, DismissRegular, AppsRegular, LibraryRegular, ClipboardTaskList16Regular, CameraRegular, VideoRegular, ImageRegular, SettingsRegular, SignOutRegular, PulseRegular, WrenchRegular, DocumentRegular } from '@fluentui/react-icons';
 import { apps } from './model';
@@ -32,8 +33,8 @@ function StationLogo() {
   return logo ? <img className="vision-header-logo" src={logo} alt={t("Original Vision logo")} onError={() => setLogo(null)}/> : <span className="vision-product-name">VISION</span>;
 }
 
-export function StationNavigation({mode, description, active, onNavigate, onSignOut, accountBusy, available}: {
-  mode: string; description: string; active: AppId | null;
+export function StationNavigation({active, onNavigate, onSignOut, accountBusy, available, tabs}: {
+  active: AppId | null; tabs: ReactNode;
   onNavigate: (id: AppId) => void; onSignOut: () => void; accountBusy: boolean; available: boolean;
 }) {
   const {t}=useTranslation();
@@ -41,13 +42,11 @@ export function StationNavigation({mode, description, active, onNavigate, onSign
   const trigger = useRef<HTMLButtonElement>(null);
   const [previousAvailable, setPreviousAvailable] = useState(available);
   if (available !== previousAvailable) { setPreviousAvailable(available); setOpen(false); }
-  const activeApp = apps.find(app => app.id === active);
   return <FluentProvider theme={webLightTheme} className="vision-station-navigation">
     <header className="mode-banner vision-topbar">
-      <Button ref={trigger} appearance="subtle" icon={<NavigationRegular/>} aria-label={t("Open navigation")} aria-haspopup="dialog" aria-expanded={available && open} onClick={() => setOpen(true)}/>
-      <StationLogo/>
-      <span className="vision-current-module">{t(activeApp?.title ?? 'Workspace')}</span>
-      <div className="vision-topbar-status"><span>{mode}</span><span>{description}</span></div>
+      <Button id="vision-open-navigation" ref={trigger} appearance="subtle" icon={<NavigationRegular/>} aria-label={t("Open navigation")} aria-haspopup="dialog" aria-expanded={available && open} onClick={() => setOpen(true)}/>
+      <div className="vision-topbar-brand"><StationLogo/></div>
+      {tabs}
     </header>
     <OverlayDrawer className="vision-navigation-drawer" position="start" size="small" modalType="modal" open={available && open} onOpenChange={(_, data) => setOpen(available && data.open)} aria-labelledby="vision-navigation-title">
       <DrawerHeader>
