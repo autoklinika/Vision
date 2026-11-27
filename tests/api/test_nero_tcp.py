@@ -21,6 +21,28 @@ class TcpTests(unittest.TestCase):
         bad["capabilities"]["jog"]=True
         self.assertFalse(validate_report(bad))
 
+    def test_joint_preflight_outside_both_limits(self):
+        n=report()
+        for row in n["joints"]["rows"]:row["positionRad"]=0.
+        n["joints"]["rows"][3]["positionRad"]=math.radians(126.322)
+        v=project(n)
+        self.assertTrue(validate_report(v))
+        self.assertEqual(v["jointCheck"]["state"],"OUTSIDE_LIMITS")
+        self.assertEqual(v["jointCheck"]["rows"][3]["state"],"OUTSIDE_LIMITS")
+        self.assertEqual(v["jointCheck"]["rows"][3]["modelRad"][1],2.14)
+        self.assertEqual(v["jointCheck"]["rows"][3]["sdkRad"][1],2.146755)
+        self.assertEqual(sum(r["state"]=="OUTSIDE_LIMITS" for r in v["jointCheck"]["rows"]),1)
+        self.assertFalse(any(v["capabilities"].values()))
+        bad=copy.deepcopy(v);bad["jointCheck"]["rows"][3]["state"]="WITHIN_LIMITS"
+        self.assertFalse(validate_report(bad))
+        n["joints"]["rows"][3]["positionRad"]=2.143
+        self.assertEqual(project(n)["jointCheck"]["state"],"OUTSIDE_LIMITS")
+        n["joints"]["rows"][3]["positionRad"]=2.0
+        self.assertEqual(project(n)["jointCheck"]["state"],"WITHIN_LIMITS")
+        n["joints"]=None
+        self.assertEqual(project(n)["jointCheck"]["state"],"UNKNOWN")
+        self.assertFalse(any(project(n)["capabilities"].values()))
+
     def test_speed_conversion_and_frames(self):
         for frame,expected in (("BASE","base_link"),("TOOL","tcp_link")):
             d={"frame":frame,"linearMmS":25,"angularDegS":10}

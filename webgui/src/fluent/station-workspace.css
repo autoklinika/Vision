@@ -310,3 +310,8 @@ body { margin: 0; }
  .nero-tcp-speed-grid,.nero-tcp-keys { grid-template-columns:minmax(0,1fr); }
  .nero-tcp-control .luxonis-settings-card { padding:10px; }
 }
+
+/* Read-only NERO software joint envelope. */
+.nero-limit-scroll { overflow-x:auto; max-width:100%; }
+.nero-limit-table { border-collapse:collapse; width:100%; min-width:480px; font-size:12px; font-variant-numeric:tabular-nums; }
+.nero-limit-table th,.nero-limit-table td { padding:6px 8px; text-align:left; border-bottom:1px solid var(--colorNeutralStroke2); }

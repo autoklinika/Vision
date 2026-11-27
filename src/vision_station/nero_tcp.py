@@ -8,6 +8,7 @@ import math
 
 from .nero import fresh, validate_nero_report
 from .nero_clear import valid_id
+from .nero_joint_limits import project as joint_check, validate as validate_joint_check
 
 SCHEMA = "vision.api.nero-tcp.v1"
 FRAMES = {"BASE": "base_link", "TOOL": "tcp_link"}
@@ -47,7 +48,9 @@ def twist_intent(declaration, axis, direction):
 def project(telemetry):
     now = telemetry["capturedAt"]
     drives = [None] * 7
+    joints = None
     if validate_nero_report(telemetry) and telemetry["graph"] == "ACTIVE" and telemetry["observer"] == "ACTIVE":
+        joints = telemetry["joints"]
         packet = telemetry["motors"]
         if packet and fresh(packet["stamp"], now):
             for i, motor in enumerate(packet["rows"]):
@@ -55,7 +58,7 @@ def project(telemetry):
                 if motor["level"] != 3 and raw is not None and motor["enabled"] is bool(raw & 0x40):
                     drives[i] = motor["enabled"]
     return {"schema": SCHEMA, "source": "STATION", "instanceId": telemetry["instanceId"],
-            "capturedAt": now, "driveEnabled": drives,
+            "capturedAt": now, "driveEnabled": drives, "jointCheck": joint_check(joints, now),
             "mode": "LOCKED", "reason": "NOT_COMMISSIONED",
             "servoState": "NOT_CONNECTED",
             "capabilities": {"enable": False, "jog": False, "hold": False},
@@ -68,11 +71,12 @@ def project(telemetry):
 
 def validate_report(v):
     try:
-        return (type(v) is dict and set(v) == {"schema","source","instanceId","capturedAt","driveEnabled","mode","reason","servoState","capabilities","speedLimits","defaults","frames","actualTcp"}
+        return (type(v) is dict and set(v) == {"schema","source","instanceId","capturedAt","driveEnabled","mode","reason","servoState","capabilities","speedLimits","defaults","frames","actualTcp","jointCheck"}
                 and v["schema"] == SCHEMA and v["source"] == "STATION" and valid_id(v["instanceId"])
                 and fresh(v["capturedAt"], v["capturedAt"])
                 and type(v["driveEnabled"]) is list and len(v["driveEnabled"]) == 7
                 and all(x is None or type(x) is bool for x in v["driveEnabled"])
+                and validate_joint_check(v["jointCheck"],v["capturedAt"])
                 and v["mode"] == "LOCKED" and v["reason"] == "NOT_COMMISSIONED"
                 and v["servoState"] == "NOT_CONNECTED"
                 and type(v["capabilities"]) is dict

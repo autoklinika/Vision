@@ -6,6 +6,7 @@ import {keyboardMap} from './neroTcpContract';
 import type {TcpReport,TcpIntent,TcpFrame} from './neroTcpContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 import {useNeroManual} from './useNeroManual';
+import {NeroJointPreflight} from './NeroJointPreflight';
 
 const controls=[
  {axis:'X',label:'X',minus:'ArrowDown',plus:'ArrowUp',minusKey:'↓',plusKey:'↑'},
@@ -56,9 +57,10 @@ export function NeroControl({station,active}:{station:StationPresentation;active
  },[active,practice,physical]);
  const report=enabled&&sample?.report.instanceId===owner&&tick-sample.received<=2500?sample.report:null;
  const drives=report?.driveEnabled??Array<boolean|null>(7).fill(null);
+ const check=report?.jointCheck??null;
  const known=drives.every(x=>x!==null);
  const enabledCount=drives.filter(x=>x===true).length;
- const available=!!report&&station.identity.role==='operator';
+ const available=!!report&&check?.state==='WITHIN_LIMITS'&&station.identity.role==='operator';
  const trial=(practice||physical&&manual.hasSession&&!!manual.status?.jogAvailable)&&active;
  const current:TcpIntent|null=trial&&key?keyboardMap[key]??null:null;
  const start=(code:string)=>{
@@ -76,6 +78,7 @@ export function NeroControl({station,active}:{station:StationPresentation;active
    {!manual.status&&<MessageBar intent="warning"><MessageBarBody>{t('Physical control is not commissioned. The keyboard test does not send robot commands.')}</MessageBarBody></MessageBar>}
    {manual.status&&<p className="fine-print">{t('Local maintenance session')} · {t(manual.status.reason)}</p>}
    {manual.notice&&<MessageBar intent="warning"><MessageBarBody>{t(manual.notice)}</MessageBarBody></MessageBar>}
+   <NeroJointPreflight check={check}/>
    <section className="luxonis-settings-card">
      <h3>{t('Drives')}</h3>
      <div className="nero-tcp-drive-row">

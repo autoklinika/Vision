@@ -14,6 +14,7 @@ import time
 from .nero_manual import Feedback,ManualEngine,Profile,JOINTS
 from .nero_local_approval import Approval
 from .nero_manual_transport import ManualOwnerServer
+from .nero_joint_limits import MODEL
 
 def _copy(packet,convert):
     if packet is None:raise ValueError("missing feedback")
@@ -114,9 +115,9 @@ class ManualRuntime:
                 or owner._clear_commissioned or owner.fast_mode or not owner.physical_hold_enabled):
             raise ValueError("approved exclusive manual composition required")
         limits=owner.agx_arm.get_config()["joint_limits"]
-        if set(limits)!=set(JOINTS) or any(lo<limits[n][0] or hi>limits[n][1]
-                for n,(lo,hi) in zip(JOINTS,profile.joint_limits)):
-            raise ValueError("profile exceeds SDK limits")
+        if set(limits)!=set(JOINTS) or any(lo<max(limits[n][0],model[0]) or hi>min(limits[n][1],model[1])
+                for n,(lo,hi),model in zip(JOINTS,profile.joint_limits,MODEL)):
+            raise ValueError("profile exceeds SDK or official MoveIt model limits")
         self.relay=NativeRelay(relay_binary)
         self.server=None;self.timer=None
         try:

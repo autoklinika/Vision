@@ -1,3 +1,4 @@
+import {jointCheckFixture} from '../fixtures/neroJointCheck';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -911,7 +912,7 @@ test('NERO TCP control uses live drive readback and local-only speed and keyboar
    expect(r.request().method()).toBe('GET');requests++;
    return r.fulfill({contentType,body:JSON.stringify({
      schema:'vision.api.nero-tcp.v1',source:'STATION',instanceId:'f'.repeat(32),capturedAt:Date.now()/1000,
-     driveEnabled:[false,false,false,false,false,false,false],mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
+     driveEnabled:[false,false,false,false,false,false,false],jointCheck:jointCheckFixture(Date.now()/1000-.1,true),mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
      capabilities:{enable:false,jog:false,hold:false},speedLimits:{linearMin:1,linearMax:100,angularMin:1,angularMax:30},
      defaults:{linearMmS:10,angularDegS:5},frames:['BASE','TOOL'],actualTcp:null
    })});
@@ -923,6 +924,10 @@ test('NERO TCP control uses live drive readback and local-only speed and keyboar
  await panel.getByRole('tab',{name:'Control',exact:true}).click();
  const control=panel.getByRole('region',{name:'TCP control'});
  await expect(control).toContainText('0/7 Enabled');
+ const limits=control.getByRole('region',{name:'Joint limit preflight'});
+ await expect(limits.locator('[data-joint="joint4"]')).toContainText('OUTSIDE_LIMITS');
+ await expect(limits.locator('[data-joint="joint4"]')).toContainText('126.322°');
+ await expect(limits).toContainText('Drive enable blocked');
  await expect(control.getByRole('button',{name:'Enable drives',exact:true})).toBeDisabled();
  await expect(control.getByRole('button',{name:'STOP / HOLD',exact:true})).toBeDisabled();
  await expect(control.getByRole('spinbutton',{name:'Linear speed value'})).toHaveValue('10');
@@ -958,7 +963,7 @@ test('NERO manual operator workflow confirms enable, sends bounded key intent an
  await page.route('**/api/v1/devices/nero',r=>r.fulfill({contentType,body:JSON.stringify(neroFixture())}));
  await page.route('**/api/v1/devices/nero/control',r=>r.fulfill({contentType,body:JSON.stringify({
    schema:'vision.api.nero-tcp.v1',source:'STATION',instanceId:'f'.repeat(32),capturedAt:Date.now()/1000,
-   driveEnabled:Array(7).fill(false),mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
+   driveEnabled:Array(7).fill(false),jointCheck:jointCheckFixture(Date.now()/1000-.1),mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
    capabilities:{enable:false,jog:false,hold:false},speedLimits:{linearMin:1,linearMax:100,angularMin:1,angularMax:30},
    defaults:{linearMmS:10,angularDegS:5},frames:['BASE','TOOL'],actualTcp:null
  })}));
