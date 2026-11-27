@@ -1116,5 +1116,7 @@
   "OUTSIDE_LIMITS": "Poza zakresem",
   "Drive enable blocked: measured joint position exceeds a software reference limit.": "Blokada napędów: zmierzone położenie przegubu wykracza poza limit modelu.",
   "Actual position": "Położenie rzeczywiste",
-  "Reference: installed SDK V121 and official MoveIt model. In-range does not certify physical readiness. No limits are changed.": "Odniesienie: zainstalowany SDK V121 i fabryczny model MoveIt. Zgodność z zakresami nie potwierdza gotowości fizycznej. Limity nie zostały zmienione."
+  "Reference: installed SDK V121 and official MoveIt model. In-range does not certify physical readiness. No limits are changed.": "Odniesienie: zainstalowany SDK V121 i fabryczny model MoveIt. Zgodność z zakresami nie potwierdza gotowości fizycznej. Limity nie zostały zmienione.",
+  "Read from installed SDK and official model, not firmware configuration. In-range does not certify physical readiness.": "Odczyt z zainstalowanego SDK i fabrycznego modelu, nie z konfiguracji firmware. Zgodność z zakresami nie potwierdza gotowości fizycznej.",
+  "Joint limit sources unavailable. Drive enable remains locked.": "Źródła limitów niedostępne. Włączenie napędów pozostaje zablokowane."
 }

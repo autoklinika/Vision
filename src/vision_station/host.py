@@ -29,7 +29,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None, nero_manual_transport=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None, nero_manual_transport=None, nero_joint_limits=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -48,6 +48,9 @@ class CoreHost:
         self._draft_editor = DraftEditor(self)
         self._luxonis = LuxonisMonitor(luxonis_directory)
         self._nero = NeroMonitor(nero_directory)
+        self._nero_joint_limits=nero_joint_limits
+        if nero_joint_limits is not None and not callable(nero_joint_limits):
+            raise ValueError("explicit joint-limit provider required")
         self._luxonis_ir = luxonis_ir
         self._luxonis_ir_interlock = luxonis_ir_interlock
         self._inspection = InspectionOwner(self, composition=composition, session_root=session_root, diagnostics=diagnostics)
@@ -72,7 +75,11 @@ class CoreHost:
             sampler.close()
 
     def nero_tcp_report(self):
-        return project_nero_tcp(self.nero_report())
+        reference=None
+        if self._nero_joint_limits is not None:
+            try:reference=self._nero_joint_limits()
+            except Exception:pass  # unavailable model/SDK must never mean in-range
+        return project_nero_tcp(self.nero_report(),reference=reference)
 
     def nero_manual_report(self):
         instance=self.station_report()["instanceId"]

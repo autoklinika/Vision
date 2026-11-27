@@ -53,6 +53,18 @@ class Profile:
                 or any(len(r)!=2 or not all(finite(x) for x in r) or r[0]>=r[1] for r in self.joint_limits)):
             raise ValueError("invalid commissioned limits")
 
+    @classmethod
+    def from_robot_model(cls, *, sdk_config, model_urdf, linear_max, angular_max,
+                         joint_velocity_max, tracking_error_max):
+        """Derive position bounds from the actual SDK and loaded robot_description.
+
+        Speed/tracking caps still require approved station configuration.
+        No stored initial joint position or default hardware envelope.
+        """
+        from .nero_joint_limits import sdk_bounds,model_bounds,intersection
+        limits=intersection(sdk_bounds(sdk_config),model_bounds(model_urdf))
+        return cls(linear_max,angular_max,limits,tuple(joint_velocity_max),tracking_error_max)
+
     def contains(self,q):
         return vector7(q) and all(lo<=x<=hi for x,(lo,hi) in zip(q,self.joint_limits))
 

@@ -2,6 +2,7 @@ import {Badge,MessageBar,MessageBarBody} from '@fluentui/react-components';
 import type {JointCheck} from './neroJointLimitsContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 const angle=(x:number|null)=>x===null?'—':(x*180/Math.PI).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:3})+'°';
+const range=(v:[number,number]|null)=>v===null?'—':angle(v[0])+' … '+angle(v[1]);
 export function NeroJointPreflight({check}:{check:JointCheck|null}){
  const {t}=useTranslation();
  const state=check?.state??'UNKNOWN';
@@ -15,9 +16,9 @@ export function NeroJointPreflight({check}:{check:JointCheck|null}){
   {check&&<div className="nero-limit-scroll"><table className="nero-limit-table">
    <thead><tr><th>{t('Joint')}</th><th>{t('Actual position')}</th><th>SDK</th><th>MoveIt</th><th>{t('Status')}</th></tr></thead>
    <tbody>{check.rows.map(r=><tr key={r.joint} data-joint={r.joint}><th scope="row">J{r.joint.slice(5)}</th><td>{angle(r.positionRad)}</td>
-    <td>{angle(r.sdkRad[0])} … {angle(r.sdkRad[1])}</td><td>{angle(r.modelRad[0])} … {angle(r.modelRad[1])}</td>
+    <td>{range(r.sdkRad)}</td><td>{range(r.modelRad)}</td>
     <td><Badge appearance="tint" color={r.state==='OUTSIDE_LIMITS'?'danger':r.state==='WITHIN_LIMITS'?'success':'informative'}>{t(r.state)}</Badge></td></tr>)}</tbody>
   </table></div>}
-  <p className="fine-print">{t('Reference: installed SDK V121 and official MoveIt model. In-range does not certify physical readiness. No limits are changed.')}</p>
+  {check?.reference?<p className="fine-print">SDK {check.reference.sdkVersion} · {check.reference.firmwareProfile} · URDF SHA-256 {check.reference.modelSha256.slice(0,12)}<br/>{t('Read from installed SDK and official model, not firmware configuration. In-range does not certify physical readiness.')}</p>:<p className="fine-print">{t('Joint limit sources unavailable. Drive enable remains locked.')}</p>}
  </section>;
 }

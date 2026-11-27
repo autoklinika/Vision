@@ -9,6 +9,13 @@ it('accepts only the locked real-feedback contract and rejects claimed hardware 
  expect(isTcpReport(d)).toBe(true);
  expect(isTcpReport({...d,jointCheck:jointCheckFixture(100,true)})).toBe(true);
  expect(isTcpReport({...d,jointCheck:{...jointCheckFixture(100,true),state:'WITHIN_LIMITS'}})).toBe(false);
+ const missing={...jointCheckFixture(100),reference:null,state:'UNKNOWN',rows:jointCheckFixture(100).rows.map(r=>({...r,sdkRad:null,modelRad:null,state:'UNKNOWN'}))};
+ expect(isTcpReport({...d,jointCheck:missing})).toBe(true);
+ expect(isTcpReport({...d,jointCheck:{...missing,state:'WITHIN_LIMITS'}})).toBe(false);
+ const changed=jointCheckFixture(100);
+ changed.reference={sdkVersion:'2.0.0',firmwareProfile:'v130',modelSha256:'b'.repeat(64)};
+ changed.rows[3]={...changed.rows[3],sdkRad:[-1.5,2.5],modelRad:[-1.5,2.4]};
+ expect(isTcpReport({...d,jointCheck:changed})).toBe(true);
  expect(isTcpReport({...d,capabilities:{enable:true,jog:false,hold:false}})).toBe(false);
  expect(isTcpReport({...d,driveEnabled:Array(6).fill(false)})).toBe(false);
  expect(isTcpReport({...d,actualTcp:{linear:0,angular:0}})).toBe(false);

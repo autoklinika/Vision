@@ -45,7 +45,7 @@ def twist_intent(declaration, axis, direction):
     return {"frameId": FRAMES[declaration["frame"]], "linear": linear, "angular": angular}
 
 
-def project(telemetry):
+def project(telemetry, *, reference=None):
     now = telemetry["capturedAt"]
     drives = [None] * 7
     joints = None
@@ -58,7 +58,7 @@ def project(telemetry):
                 if motor["level"] != 3 and raw is not None and motor["enabled"] is bool(raw & 0x40):
                     drives[i] = motor["enabled"]
     return {"schema": SCHEMA, "source": "STATION", "instanceId": telemetry["instanceId"],
-            "capturedAt": now, "driveEnabled": drives, "jointCheck": joint_check(joints, now),
+            "capturedAt": now, "driveEnabled": drives, "jointCheck": joint_check(joints, now, reference),
             "mode": "LOCKED", "reason": "NOT_COMMISSIONED",
             "servoState": "NOT_CONNECTED",
             "capabilities": {"enable": False, "jog": False, "hold": False},

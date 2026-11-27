@@ -14,7 +14,7 @@ import time
 from .nero_manual import Feedback,ManualEngine,Profile,JOINTS
 from .nero_local_approval import Approval
 from .nero_manual_transport import ManualOwnerServer
-from .nero_joint_limits import MODEL
+from .nero_joint_limits import sdk_bounds,model_bounds,intersection
 
 def _copy(packet,convert):
     if packet is None:raise ValueError("missing feedback")
@@ -109,15 +109,16 @@ class NativeRelay:
 
 class ManualRuntime:
     """Instantiate only with a commissioning authority, inside one ROS owner."""
-    def __init__(self,owner,*,profile,approval_directory,socket_path,relay_binary,pipeline_authority,native_hold):
+    def __init__(self,owner,*,profile,approval_directory,socket_path,relay_binary,pipeline_authority,native_hold,model_urdf):
         if (not isinstance(profile,Profile) or not callable(pipeline_authority)
                 or pipeline_authority() is not True or not callable(native_hold)
                 or owner._clear_commissioned or owner.fast_mode or not owner.physical_hold_enabled):
             raise ValueError("approved exclusive manual composition required")
-        limits=owner.agx_arm.get_config()["joint_limits"]
-        if set(limits)!=set(JOINTS) or any(lo<max(limits[n][0],model[0]) or hi>min(limits[n][1],model[1])
-                for n,(lo,hi),model in zip(JOINTS,profile.joint_limits,MODEL)):
-            raise ValueError("profile exceeds SDK or official MoveIt model limits")
+        # The commissioning composition supplies the actual loaded expanded
+        # robot_description, not a duplicated table or an old parked pose.
+        limits=intersection(sdk_bounds(owner.agx_arm.get_config()),model_bounds(model_urdf))
+        if any(lo<bound[0] or hi>bound[1] for (lo,hi),bound in zip(profile.joint_limits,limits)):
+            raise ValueError("profile exceeds actual SDK or loaded MoveIt model limits")
         self.relay=NativeRelay(relay_binary)
         self.server=None;self.timer=None
         try:
