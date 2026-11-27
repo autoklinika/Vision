@@ -78,6 +78,27 @@ in this commit.
   release and HOLD. The default DEV listener remains read-only for NERO.
 - Live acceptance of the real arm has **not** been performed.
 
+## DDS startup discovery regression
+
+The single verified publisher may briefly have Fast DDS placeholder node
+metadata before its identity is discovered. The native relay discards
+such samples before the first verified GID; it does not pin them or
+clear an already latched fault. After pinning, identity loss, replacement,
+multiple publishers and a mismatched known identity still fail closed.
+Start the pipeline only after its expected endpoints have been discovered.
+A duplicate-publisher test in the isolated GenericSystem fixture verified
+that reference delivery stops and does not resume automatically when the
+extra publisher disappears.
+
+The complete candidate planning scene (table plus attached tool) was
+read back from the Servo planning scene monitor during the isolated
+Servo/JTC regression. A valid static state is not evidence of usable
+manual speed: near-contact deceleration with the original Servo collision
+thresholds can make simulated motion very small. Neither a successful
+relay test nor this correction commissions a physical motion profile.
+Private station geometry, measured state and full test evidence remain
+on the station NVMe, outside Git.
+
 ## Physical commissioning still required
 
 Connect the approved station profile and live collision scene to the

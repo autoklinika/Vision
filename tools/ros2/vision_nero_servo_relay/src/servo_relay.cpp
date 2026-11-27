@@ -62,7 +62,19 @@ class Relay final:public rclcpp::Node {
     const auto list=get_publishers_info_by_topic(topic);
     if(list.size()!=1){if(pinned||list.size()>1)source_changed_=true;return false;}
     const auto& ep=list.front();
-    if(ep.node_namespace()!=ns || ep.node_name()!=name || ep.topic_type()!=type){source_changed_=true;return false;}
+    if(ep.node_namespace()!=ns || ep.node_name()!=name || ep.topic_type()!=type){
+      // Fast DDS can discover a single endpoint before its participant's
+      // node identity. Until the first verified GID, reject these samples
+      // without declaring a source replacement. Never accept unknown metadata.
+      // After pinning, identity loss (including this placeholder) still latches.
+      if(!pinned && ep.topic_type()==type &&
+         ep.node_namespace()=="_NODE_NAMESPACE_UNKNOWN_" &&
+         ep.node_name()=="_NODE_NAME_UNKNOWN_") {
+        RCLCPP_INFO_ONCE(get_logger(), "Waiting for complete DDS source identity");
+        return false;
+      }
+      source_changed_=true;return false;
+    }
     Gid actual{};
     const auto& gid=info.get_rmw_message_info().publisher_gid;
     std::copy_n(gid.data,actual.size(),actual.begin());
