@@ -164,3 +164,47 @@ before execution, so the new service/graph observation adapter still
 requires end-to-end ROS acceptance. Physical commissioning has not
 been performed. Operational services, geometry and the frozen baseline
 remain unchanged.
+
+## Integrated ROS observation regression
+
+The `servo_jtc_smoke.py` fixture now supports `--observe-stationary`
+and `--observe-pipeline` in the same isolated GenericSystem domain.
+The observation node has its own executor. The fixture uses an independent
+synthetic feedback publisher and a distant synthetic obstacle, not the
+real station scene or physical feedback. It verifies that the PSM follows
+the independently observed state while JTC is stationary.
+
+Corrections found by executing actual ROS 2 Jazzy components:
+- Generated numeric JointState fields are arrays; convert to a tuple
+  before validation and joint-name reordering.
+- Hash normalized message fields in canonical JSON instead of hashing
+  CDR bytes. Repeated equivalent PSM responses had different binary hashes.
+- Recognize the official generated Servo private-node state subscription
+  and pin its DDS endpoint. Reject replacement or a subscription to the
+  synthetic JTC state.
+- Maintain independently observed live feedback freshness without
+  extending the full configuration/scene evidence lease. Reject a gap,
+  replay, source replacement, or state disagreement.
+
+Validation on VENTUNO: NERO API/owner tests 67/67; ROS scene and JointState
+tests 6/6. Stationary integration passed: stable scene identity, independent
+state, verified monitor, feedback-loss latch without auto-resume, and scene
+change latch. Separately, the original Servo/JTC transport regression passed
+with 128 windows, 300 sampled JTC references and 263 source-checked relay
+samples (Servo status 0 and 1).
+
+**Dynamic observation acceptance is still blocked.** The full PSM service
+response does not contain a usable state timestamp. A diagnostic run found
+a live input age of about 2.5 ms, while the cached scene batch was about
+244 ms old; the joint comparison exceeded its 0.005 rad fixture tolerance.
+An experimental state-only service poll also produced late responses (one
+observed scene state age about 286 ms), including with a dedicated executor.
+That experiment is archived locally, not enabled in the candidate. The
+conservative mismatch and freshness checks remain active. No tolerances
+were relaxed to obtain a passing dynamic result.
+
+The successful stationary and transport tests are separate evidence, not
+an end-to-end dynamic acceptance. A reliable timestamped PSM state
+observation or independently verified bounded-latency architecture is
+required before dynamic acceptance and supervised hardware commissioning.
+No operational service or hardware control was changed by these tests.

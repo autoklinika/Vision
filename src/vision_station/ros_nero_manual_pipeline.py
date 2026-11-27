@@ -16,7 +16,7 @@ from .nero_manual_pipeline import (
 )
 
 
-def scene_fingerprint(scene):
+def normalized_scene(scene):
     """Fingerprint full collision-relevant readback, not dynamic joint state.
 
     Header timestamps and cosmetic colors/names are not configuration.
@@ -25,7 +25,6 @@ def scene_fingerprint(scene):
     reject equivalent reordered representations; it cannot silently ignore
     new geometry or an allowed-collision change.
     """
-    from rclpy.serialization import serialize_message
     from sensor_msgs.msg import JointState, MultiDOFJointState
     from builtin_interfaces.msg import Time
     s = deepcopy(scene)
@@ -45,13 +44,26 @@ def scene_fingerprint(scene):
         transform.header.stamp = Time()
     s.world.octomap.header.stamp = Time()
     s.world.octomap.octomap.header.stamp = Time()
-    return hashlib.sha256(serialize_message(s)).hexdigest()
+    return s
+
+
+def scene_fingerprint(scene):
+    # CDR includes padding which is not guaranteed to have stable bytes.
+    # The identity is over every normalized message field, not wire padding.
+    import json
+    from rosidl_runtime_py.convert import message_to_ordereddict
+    fields = message_to_ordereddict(normalized_scene(scene))
+    payload = json.dumps(fields, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def joint_vector(state):
-    if len(state.name) != 7 or set(state.name) != set(JOINTS) or not vector7(state.position):
+    # ROS generated float64[] fields are array.array, not Python lists.
+    # Convert the sequence once; keep the strict finite/names validation.
+    position = tuple(state.position)
+    if len(state.name) != 7 or set(state.name) != set(JOINTS) or not vector7(position):
         raise ValueError("invalid seven-joint state")
-    return tuple(float(state.position[state.name.index(name)]) for name in JOINTS)
+    return tuple(float(position[state.name.index(name)]) for name in JOINTS)
 
 
 def endpoint_node(ep):
@@ -63,7 +75,7 @@ def graph_evidence(node, routes):
               routes.synthetic_feedback_topic)
     publishers = tuple((topic, tuple(Endpoint(endpoint_node(ep), ep.topic_type, bytes(ep.endpoint_gid))
                          for ep in node.get_publishers_info_by_topic(topic))) for topic in topics)
-    subscribers = tuple((topic, tuple((endpoint_node(ep), ep.topic_type)
+    subscribers = tuple((topic, tuple(Endpoint(endpoint_node(ep), ep.topic_type, bytes(ep.endpoint_gid))
                          for ep in node.get_subscriptions_info_by_topic(topic))) for topic in
                         (routes.feedback_topic, routes.synthetic_feedback_topic))
     return publishers, subscribers
@@ -118,6 +130,7 @@ class RosPipelineMonitor:
         self.mode = twist_mode_confirmed
         self.authority = PipelineAuthority(contract, wall=wall, mono=mono)
         self.latest = None
+        self.last_state_readback = None
         self.futures = None
         self.started = 0.
         self.closed = False
@@ -164,6 +177,7 @@ class RosPipelineMonitor:
             if not 0 <= self.wall() - stamp <= AGE:
                 raise ValueError("feedback age")
             self.latest = (stamp, joint_vector(msg), bytes(rows[0].endpoint_gid))
+            self.authority.record_feedback(*self.latest)
         except Exception:
             self.latest = None
             self.authority.invalidate("FEEDBACK_UNVERIFIED")
@@ -194,9 +208,18 @@ class RosPipelineMonitor:
                     if len(eps) != 1 or eps[0].gid != gid:
                         raise ValueError("feedback source replaced")
                     controllers_ok, interpolator_only = controller_evidence(ctrl, hw)
+                    js = scene.scene.robot_state.joint_state
+                    sq = joint_vector(js)
+                    self.last_state_readback = {
+                        "sceneStamp":js.header.stamp.sec+js.header.stamp.nanosec/1e9,
+                        "feedbackStamp":stamp,
+                        "feedbackAgeS":self.wall()-stamp,
+                        "batchAgeS":self.mono()-self.started,
+                        "sceneVsLatestRad":max(abs(x-y) for x,y in zip(sq,q)),
+                    }
                     self.authority.observe(Evidence(
                         captured_mono=self.started, feedback_stamp=stamp, feedback_q=q,
-                        scene_q=joint_vector(scene.scene.robot_state.joint_state),
+                        scene_q=sq,
                         scene_digest=scene_fingerprint(scene.scene), parameters=values,
                         publishers=pubs, subscribers=subs, controllers_ok=controllers_ok,
                         interpolator_only=interpolator_only, twist_mode_confirmed=self.mode() is True))

@@ -5,7 +5,8 @@ import unittest
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import PlanningScene, CollisionObject, AllowedCollisionEntry
 from shape_msgs.msg import SolidPrimitive
-from vision_station.ros_nero_manual_pipeline import scene_fingerprint
+from vision_station.ros_nero_manual_pipeline import scene_fingerprint, joint_vector
+from sensor_msgs.msg import JointState
 
 
 class SceneFingerprintTests(unittest.TestCase):
@@ -22,6 +23,14 @@ class SceneFingerprintTests(unittest.TestCase):
         obj.primitive_poses = [pose]
         self.scene.world.collision_objects = [obj]
         self.baseline = scene_fingerprint(self.scene)
+
+    def test_actual_ros_joint_state_array_is_validated_and_reordered(self):
+        names = ["joint"+str(i) for i in range(7,0,-1)]
+        state = JointState(name=names, position=[float(i) for i in range(7,0,-1)])
+        self.assertEqual(joint_vector(state), tuple(float(i) for i in range(1,8)))
+        state.position[2] = float("nan")
+        with self.assertRaises(ValueError):
+            joint_vector(state)
 
     def test_dynamic_state_and_timestamps_are_not_configuration(self):
         s = deepcopy(self.scene)
@@ -51,6 +60,14 @@ class SceneFingerprintTests(unittest.TestCase):
         acm.entry_values[0].enabled = [False,False]
         acm.entry_values[1].enabled = [False,False]
         self.assertNotEqual(before, scene_fingerprint(s))
+
+    def test_equal_fields_from_separate_cdr_decodes_have_same_identity(self):
+        from rclpy.serialization import serialize_message, deserialize_message
+        data = serialize_message(self.scene)
+        for _ in range(12):
+            copy = deserialize_message(data, PlanningScene)
+            self.assertEqual(self.scene, copy)
+            self.assertEqual(self.baseline, scene_fingerprint(copy))
 
     def test_world_removal_is_detected(self):
         s = deepcopy(self.scene)

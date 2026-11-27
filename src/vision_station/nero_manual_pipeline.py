@@ -199,6 +199,7 @@ class PipelineAuthority:
         self.lock = RLock()
         self._pins = {}
         self._evidence = None
+        self._live_feedback = None
         self._latched = False
         self._ever_ready = False
         self.reason = "NO_EVIDENCE"
@@ -246,10 +247,22 @@ class PipelineAuthority:
             if topic in self._pins and self._pins[topic] != ep.gid:
                 return "SOURCE_REPLACED"
             pins[topic] = ep.gid
-        if (routes.servo_node, JOINT_STATE_TYPE) not in subs.get(routes.feedback_topic, ()):
-            return "SERVO_FEEDBACK_SUBSCRIPTION_MISSING"
-        if (routes.servo_node, JOINT_STATE_TYPE) in subs.get(routes.synthetic_feedback_topic, ()):
+        # Upstream Servo 2.12 creates its state monitor on a generated
+        # servo_node_private_<decimal> node. Pin the actual DDS endpoint,
+        # not just the predictable part of its node name.
+        def servo_state_reader(ep):
+            return (isinstance(ep, Endpoint) and ep.message_type == JOINT_STATE_TYPE
+                    and (ep.node == routes.servo_node
+                         or re.fullmatch(re.escape(routes.servo_node) + r"_private_[0-9]+", ep.node)))
+        if any(servo_state_reader(ep) for ep in subs.get(routes.synthetic_feedback_topic, ())):
             return "SERVO_FOLLOWS_INTERPOLATOR"
+        readers = tuple(ep for ep in subs.get(routes.feedback_topic, ()) if servo_state_reader(ep))
+        if len(readers) != 1 or type(readers[0].gid) is not bytes or not any(readers[0].gid):
+            return "SERVO_FEEDBACK_SUBSCRIPTION_MISSING"
+        reader_key = ("subscriber", routes.feedback_topic)
+        if reader_key in self._pins and self._pins[reader_key] != readers[0].gid:
+            return "SERVO_FEEDBACK_SUBSCRIPTION_REPLACED"
+        pins[reader_key] = readers[0].gid
         # Only the single owner (fixture node in the lab) may issue Twist.
         # Both endpoints must exist before a pipeline can become ready.
         for topic, node, kind in (
@@ -266,6 +279,29 @@ class PipelineAuthority:
         self._pins.update(pins)
         return None
 
+    def record_feedback(self, stamp, q, gid):
+        """Refresh only measured-state evidence, never the scene/config lease."""
+        with self.lock:
+            if self._latched:
+                return False
+            if not finite(stamp) or not 0 <= self.wall() - stamp <= AGE or not vector7(q):
+                return self._reject("FEEDBACK_STALE_OR_INVALID")
+            if type(gid) is not bytes or not any(gid):
+                return self._reject("SOURCE_UNVERIFIED")
+            pin = self._pins.get(self.contract.routes.feedback_topic)
+            if pin is not None and gid != pin:
+                return self._reject("SOURCE_REPLACED")
+            last = self._live_feedback
+            if last is not None and gid == last[2]:
+                if self._ever_ready and self.wall() - last[0] > AGE:
+                    return self._reject("FEEDBACK_STALE")
+                if stamp < last[0]:
+                    return self._reject("FEEDBACK_REPLAY")
+                if stamp == last[0] and tuple(q) != last[1]:
+                    return self._reject("FEEDBACK_STAMP_CONFLICT")
+            self._live_feedback = (stamp, tuple(q), gid)
+            return True
+
     def observe(self, evidence):
         with self.lock:
             if self._latched:
@@ -276,6 +312,9 @@ class PipelineAuthority:
                 reason = "EVIDENCE_INVALID"
             if reason:
                 return self._reject(reason)
+            gid = self._pins[self.contract.routes.feedback_topic]
+            if not self.record_feedback(evidence.feedback_stamp, evidence.feedback_q, gid):
+                return False
             self._evidence = evidence
             self._ever_ready = True
             self.reason = "VERIFIED"
@@ -293,7 +332,7 @@ class PipelineAuthority:
             if not self():
                 return False
             if (not isinstance(feedback, Feedback) or not feedback.valid(self.wall())
-                    or max(abs(a-b) for a,b in zip(feedback.q, self._evidence.feedback_q))
+                    or max(abs(a-b) for a,b in zip(feedback.q, self._live_feedback[1]))
                         > self.contract.scene_tracking_max_rad):
                 return self._reject("SDK_STATE_MISMATCH")
             return True
@@ -306,6 +345,9 @@ class PipelineAuthority:
             # Do not keep refreshing the same evidence or its timestamps.
             if not 0 <= self.mono() - self._evidence.captured_mono <= self.max_batch_age:
                 return self._reject("BATCH_STALE")
-            if not 0 <= self.wall() - self._evidence.feedback_stamp <= AGE:
+            live = self._live_feedback
+            if live is None or not 0 <= self.wall() - live[0] <= AGE:
                 return self._reject("FEEDBACK_STALE")
+            if max(abs(x-y) for x,y in zip(live[1],self._evidence.scene_q)) > self.contract.scene_tracking_max_rad:
+                return self._reject("SERVO_STATE_NOT_FEEDBACK")
             return True

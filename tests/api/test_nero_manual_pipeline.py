@@ -47,7 +47,7 @@ class PipelineTests(unittest.TestCase):
         self.e = Evidence(self.c.now, self.c.now-.01, (0.,)*7, (0.,)*7,
                           self.contract.scene_digest, self.contract.parameters,
                           publishers,
-                          ((self.routes.feedback_topic, ((self.routes.servo_node, "sensor_msgs/msg/JointState"),)),
+                          ((self.routes.feedback_topic, (Endpoint(self.routes.servo_node+"_private_123", "sensor_msgs/msg/JointState", bytes([51])),)),
                            (self.routes.synthetic_feedback_topic, ())),
                           True, True, True)
 
@@ -105,9 +105,17 @@ class PipelineTests(unittest.TestCase):
 
     def test_servo_must_not_subscribe_to_mock_joint_states(self):
         s = dict(self.e.subscribers)
-        s[self.routes.synthetic_feedback_topic] = ((self.routes.servo_node, "sensor_msgs/msg/JointState"),)
+        s[self.routes.synthetic_feedback_topic] = (Endpoint(self.routes.servo_node+"_private_123", "sensor_msgs/msg/JointState", bytes([51])),)
         self.assertFalse(self.guard.observe(replace(self.e, subscribers=tuple(s.items()))))
         self.assertEqual(self.guard.reason, "SERVO_FOLLOWS_INTERPOLATOR")
+
+    def test_servo_private_subscription_replacement_latches(self):
+        self.assertTrue(self.guard.observe(self.e))
+        rows = dict(self.e.subscribers)
+        topic = self.routes.feedback_topic
+        rows[topic] = (replace(rows[topic][0], gid=bytes([52])),)
+        self.assertFalse(self.guard.observe(replace(self.e, subscribers=tuple(rows.items()))))
+        self.assertEqual(self.guard.reason, "SERVO_FEEDBACK_SUBSCRIPTION_REPLACED")
 
     def test_scene_state_must_match_source(self):
         self.assertFalse(self.guard.observe(replace(self.e, scene_q=(.01,)*7)))
@@ -126,6 +134,41 @@ class PipelineTests(unittest.TestCase):
         self.c.now += .51
         self.assertFalse(self.guard())
         self.assertEqual(self.guard.reason, "BATCH_STALE")
+
+    def test_fresh_feedback_does_not_extend_scene_batch(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid = dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        for _ in range(5):
+            self.c.now += .1
+            self.assertTrue(self.guard.record_feedback(self.c.now, (0.,)*7, gid))
+        self.c.now += .01
+        self.assertFalse(self.guard())
+        self.assertEqual(self.guard.reason, "BATCH_STALE")
+
+    def test_fresh_feedback_can_outlive_batch_feedback_sample(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid = dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        for _ in range(3):
+            self.c.now += .1
+            self.assertTrue(self.guard.record_feedback(self.c.now, (.001,)*7, gid))
+            self.assertTrue(self.guard())
+        self.assertFalse(self.guard.record_feedback(self.c.now-.01, (.001,)*7, gid))
+        self.assertEqual(self.guard.reason, "FEEDBACK_REPLAY")
+
+    def test_gap_cannot_rearm_from_fresh_message(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid = dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        self.c.now += .16
+        self.assertFalse(self.guard.record_feedback(self.c.now, (0.,)*7, gid))
+        self.assertEqual(self.guard.reason, "FEEDBACK_STALE")
+
+    def test_current_observation_must_agree_with_scene(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid = dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        self.c.now += .02
+        self.assertTrue(self.guard.record_feedback(self.c.now, (.003,)*7, gid))
+        self.assertFalse(self.guard())
+        self.assertEqual(self.guard.reason, "SERVO_STATE_NOT_FEEDBACK")
 
     def test_actual_sdk_disagreement_latches(self):
         self.assertTrue(self.guard.observe(self.e))

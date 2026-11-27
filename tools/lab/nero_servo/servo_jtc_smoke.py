@@ -26,7 +26,14 @@ def main():
     p.add_argument("--servo-prefix",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
     p.add_argument("--relay",type=Path)
+    group=p.add_mutually_exclusive_group()
+    group.add_argument("--observe-pipeline",action="store_true")
+    group.add_argument("--observe-stationary",action="store_true",
+                       help="verify observation and fault latching without even synthetic motion")
     a=p.parse_args()
+    a.observe_pipeline=a.observe_pipeline or a.observe_stationary
+    if a.observe_pipeline and a.relay is None:
+        p.error("the software relay is required for observation tests")
     if os.environ.get("ROS_DOMAIN_ID")!=str(DOMAIN) or os.environ.get("ROS_LOCALHOST_ONLY")!="1":
         p.error("test-only local domain 224 required")
     if not all(x.is_absolute() and x.is_relative_to("/srv/vision-data") for x in (a.servo_prefix,a.output)):
@@ -43,6 +50,7 @@ def main():
     from moveit_msgs.srv import ServoCommandType
     from moveit_msgs.msg import ServoStatus
     from moveit_configs_utils import MoveItConfigsBuilder
+    from pipeline_observer_fixture import ObservationFixture
 
     cfg=(MoveItConfigsBuilder("agx_arm",package_name="agx_arm_moveit")
          .robot_description(file_path="config/agx_arm.urdf.xacro",mappings={
@@ -80,6 +88,15 @@ def main():
         "publish_joint_accelerations":False,"command_out_type":"trajectory_msgs/JointTrajectory",
         "apply_twist_commands_about_ee_frame":True,
     }
+    if a.observe_pipeline:
+        from vision_station.nero_manual_pipeline import Routes
+        params["moveit_servo"].update({
+            "joint_topic":Routes.fixture().feedback_topic,
+            "collision_check_rate":10.,
+            "self_collision_proximity_threshold":.01,
+            "scene_collision_proximity_threshold":.02,
+        })
+        params["use_sim_time"]=False
     a.output.mkdir(parents=True,exist_ok=True)
     servo_file=a.output/"servo.yaml";servo_file.write_text(yaml.safe_dump({NS+"/servo_node":{"ros__parameters":params}}))
     ctrl_file=a.output/"controllers.yaml"
@@ -99,6 +116,7 @@ def main():
     node=rclpy.create_node("fixture",namespace=NS,context=ctx,start_parameter_services=False)
     executor=SingleThreadedExecutor(context=ctx);executor.add_node(node)
     children=[];logs=[];relay_socket=None;relay_samples=[]
+    observer=ObservationFixture(node,params) if a.observe_pipeline else None
     def spawn(name,cmd):
         log=(a.output/(name+".log")).open("w");logs.append(log)
         child=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT,env=env);children.append(child)
@@ -107,6 +125,7 @@ def main():
         end=time.monotonic()+seconds
         while time.monotonic()<end:
             callback()
+            if observer is not None:observer.tick()
             executor.spin_once(timeout_sec=.005)
             if relay_socket is not None:
                 for _ in range(32):
@@ -115,6 +134,9 @@ def main():
                     if not data:break
                     relay_samples.append(json.loads(data))
     try:
+        # Never share the isolated fixture domain with another runtime.
+        spin(.9)
+        assert all(name=="fixture" and ns==NS for name,ns in node.get_node_names_and_namespaces())
         manager=spawn("controller_manager",["/opt/ros/jazzy/lib/controller_manager/ros2_control_node",
             "--ros-args","-r","__ns:="+NS,"--params-file",str(ctrl_file),
             "-r","~/robot_description:="+NS+"/robot_description"])
@@ -141,7 +163,10 @@ def main():
         servo=spawn("servo",[str(a.servo_prefix/"lib/moveit_servo/servo_node"),
              "--ros-args","-r","__ns:="+NS,"-r","__node:=servo_node","--params-file",str(servo_file)])
         joint_states=[];samples=[];windows=[];statuses=[]
-        sub=node.create_subscription(JointState,NS+"/joint_states",joint_states.append,1)
+        def receive_state(state):
+            joint_states.append(state)
+            if observer is not None:observer.receive_mock_state(state)
+        sub=node.create_subscription(JointState,NS+"/joint_states",receive_state,1)
         st=node.create_subscription(JointTrajectoryControllerState,NS+"/arm_controller/controller_state",samples.append,1)
         traj=node.create_subscription(JointTrajectory,NS+"/arm_controller/joint_trajectory",windows.append,1)
         status=node.create_subscription(ServoStatus,NS+"/servo_status",statuses.append,1)
@@ -158,9 +183,22 @@ def main():
         if not future.done() or not future.result().success:raise RuntimeError("TWIST mode not selected")
         spin(.75)
         if not samples:raise RuntimeError("no controller state")
+        if observer is not None:
+            observer.confirmed_twist=True
+            observer.prepare(spin,POSE)
+            if a.observe_stationary:
+                observer.test_loss(spin)
+                (a.output/"stationary_observation_result.json").write_text(json.dumps({
+                    "status":"PASS","independentObservedState":True,
+                    "monitorVerified":True,"feedbackLossLatched":True,
+                    "sceneChangeLatched":True,"syntheticOnly":True,
+                    "dynamicMotionTested":False,"realStationAcceptance":False},indent=2)+"\n")
+                print("STATIONARY_OBSERVATION_ONLY_PASS",flush=True)
+                return
         next_cmd=0.
         def drive(axis=None):
             nonlocal next_cmd
+            if observer is not None:observer.check()
             if time.monotonic()<next_cmd:return
             next_cmd=time.monotonic()+.02
             msg=TwistStamped();msg.header.stamp=node.get_clock().now().to_msg();msg.header.frame_id="base_link"
@@ -186,8 +224,17 @@ def main():
             if not relay_samples or not any(max(abs(q-p) for q,p in zip(s["positions"],POSE))>1e-5 for s in relay_samples):
                 raise RuntimeError("native source-checked relay delivered no valid references")
             print("NATIVE_GID_RELAY_PASS","samples",len(relay_samples),flush=True)
+        if observer is not None:
+            observer.test_loss(spin)
+            (a.output/"observation_result.json").write_text(json.dumps({
+                "status":"PASS","independentObservedState":True,
+                "monitorVerified":True,"feedbackLossLatched":True,
+                "sceneChangeLatched":True,"syntheticOnly":True,
+                "realStationAcceptance":False,
+                "relaySamples":len(relay_samples)},indent=2)+"\n")
         print("OFFLINE_ONLY_NO_HARDWARE_OUTPUT",flush=True)
     finally:
+        if observer is not None:observer.close()
         for child in reversed(children):
             if child.poll() is None:child.terminate()
         for child in reversed(children):
