@@ -28,7 +28,7 @@ def from_message(msg):
     return Evidence(msg.arm_stamp,msg.arm_status,msg.arm_mask,tuple(map(int,msg.drive_status)),tuple(map(float,msg.drive_stamps))).payload()
 
 
-def node_class():
+def node_class(*,manual_factory=None):
     # Import only in the isolated, deliberately launched ROS owner process.
     from agx_arm_ctrl.vision_nero_guarded_node import VisionNeroGuardedNode
     from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
@@ -46,6 +46,9 @@ def node_class():
                 self._approval=Approval(self.get_parameter("diagnostics_approval_directory").value)
             self.declare_parameter("servo_candidate_monitor_enabled",False)
             self._servo_candidate_receiver=None
+            self._manual_runtime=None
+            if manual_factory is not None and self._clear_commissioned:
+                raise ValueError("manual and clear commissioning are mutually exclusive")
             self._diagnostics_group=MutuallyExclusiveCallbackGroup()
             self._tx_lock=threading.RLock()
             self._stop_epoch=0
@@ -75,6 +78,9 @@ def node_class():
             if self._clear_commissioned:
                 self.create_service(ClearJointErrors,"diagnostics/clear_joint_errors",self._clear_callback,
                                     callback_group=self._diagnostics_group)
+            if manual_factory is not None:
+                # Explicit composition only, never a mutable ROS parameter.
+                self._manual_runtime=manual_factory(self,self._manual_native_hold)
 
         def _clear_interlock(self):
             can=sample_can()
@@ -86,9 +92,7 @@ def node_class():
                     and not self.vision_arbiter.motion_allowed()
                     and self.vision_arbiter.mode.value in ("LOCKED","STOP_LATCHED"))
 
-        def _controlled_stop_hold_callback(self,request,response):
-            # Invalidate any diagnostic verification immediately. Preserve
-            # the existing HOLD behavior; serialize only the SDK TX section.
+        def _perform_guarded_hold(self,request,response):
             self._stop_epoch+=1
             self._stop_in_progress=True
             try:
@@ -96,6 +100,24 @@ def node_class():
                     return super()._controlled_stop_hold_callback(request,response)
             finally:
                 self._stop_in_progress=False
+
+        def _manual_native_hold(self):
+            from std_srvs.srv import Trigger
+            return self._perform_guarded_hold(Trigger.Request(),Trigger.Response()).success
+
+        def _controlled_stop_hold_callback(self,request,response):
+            # Invalidate manual admission before the existing physical HOLD.
+            self._stop_in_progress=True
+            try:
+                with self._tx_lock:
+                    if self._manual_runtime is not None:self._manual_runtime.external_hold()
+                    return self._perform_guarded_hold(request,response)
+            finally:
+                self._stop_in_progress=False
+
+        def destroy_node(self):
+            if self._manual_runtime is not None:self._manual_runtime.close()
+            return super().destroy_node()
 
         def _clear_callback(self,request,response):
             self._clear_epoch=self._stop_epoch
@@ -111,7 +133,7 @@ def node_class():
     return GuardedDiagnosticsNode
 
 
-def main():
+def main(*,manual_factory=None):
     if (os.environ.get("ROS_DOMAIN_ID")!="181" or os.environ.get("ROS_LOCALHOST_ONLY")!="1"
             or os.environ.get("VISION_NERO_REPLACEMENT_OWNER")!="1"):
         raise SystemExit("fixed local domain and explicit replacement-owner commissioning required")
@@ -133,7 +155,7 @@ def main():
                     raise RuntimeError("existing guarded CAN owner detected")
         finally:
             probe.destroy_node()
-        node=node_class()();executor.add_node(node);executor.spin()
+        node=node_class(manual_factory=manual_factory)();executor.add_node(node);executor.spin()
     except (KeyboardInterrupt,ExternalShutdownException):
         pass
     finally:

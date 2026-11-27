@@ -952,3 +952,61 @@ test('NERO TCP control uses live drive readback and local-only speed and keyboar
  expect(requests).toBeGreaterThan(0);
  expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
+
+test('NERO manual operator workflow confirms enable, sends bounded key intent and releases',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ await page.route('**/api/v1/devices/nero',r=>r.fulfill({contentType,body:JSON.stringify(neroFixture())}));
+ await page.route('**/api/v1/devices/nero/control',r=>r.fulfill({contentType,body:JSON.stringify({
+   schema:'vision.api.nero-tcp.v1',source:'STATION',instanceId:'f'.repeat(32),capturedAt:Date.now()/1000,
+   driveEnabled:Array(7).fill(false),mode:'LOCKED',reason:'NOT_COMMISSIONED',servoState:'NOT_CONNECTED',
+   capabilities:{enable:false,jog:false,hold:false},speedLimits:{linearMin:1,linearMax:100,angularMin:1,angularMax:30},
+   defaults:{linearMmS:10,angularDegS:5},frames:['BASE','TOOL'],actualTcp:null
+ })}));
+ let phase='IDLE';
+ const commands:any[]=[];
+ await page.route('**/api/v1/devices/nero/manual',r=>r.fulfill({contentType,body:JSON.stringify({
+   schema:'vision.api.nero-manual.v1',source:'STATION',instanceId:'f'.repeat(32),
+   status:{state:phase,reason:'TEST_FIXTURE',driveEnabled:Array(7).fill(phase!=='IDLE'),
+     pipelineReady:true,enableAvailable:phase==='IDLE',jogAvailable:['READY','JOGGING'].includes(phase),
+     holdAvailable:['READY','JOGGING'].includes(phase),linearMax:25,angularMax:10}
+ })}));
+ await page.route('**/api/v1/devices/nero/manual/command',r=>{
+   const body=r.request().postDataJSON();commands.push(body);
+   if(body.action==='ENABLE')phase='READY';
+   else if(body.action==='JOG')phase='JOGGING';
+   else if(body.action==='RELEASE')phase='READY';
+   else if(body.action==='HOLD')phase='HOLD';
+   else if(body.action==='CLOSE')phase='IDLE';
+   return r.fulfill({contentType,body:JSON.stringify({
+     schema:'vision.api.nero-manual-command.v1',source:'STATION',instanceId:body.instanceId,
+     result:{operationId:body.operationId,action:body.action,sequence:body.sequence,accepted:true,reason:'TEST_FIXTURE',state:phase}
+   })});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Control',exact:true}).click();
+ const control=panel.getByRole('region',{name:'TCP control'});
+ await control.getByRole('button',{name:'Enable drives',exact:true}).click();
+ expect(commands).toHaveLength(0);
+ await control.getByRole('button',{name:'Confirm drive enable',exact:true}).click();
+ await expect.poll(()=>commands.filter(x=>x.action==='ENABLE').length).toBe(1);
+ await control.getByRole('button',{name:'Normal speed',exact:true}).click();
+ await control.getByLabel('Reference frame').selectOption('TOOL');
+ await control.getByRole('button',{name:'Start manual keyboard',exact:true}).click();
+ const area=control.getByRole('group',{name:'Keyboard test area'});await area.focus();
+ await page.keyboard.down('ArrowUp');
+ await expect.poll(()=>commands.filter(x=>x.action==='JOG').length).toBeGreaterThan(1);
+ const first=commands.find(x=>x.action==='JOG');
+ expect(first.declaration).toEqual({frame:'TOOL',linearMmS:25,angularDegS:10});
+ expect(first.axis).toBe('X');expect(first.direction).toBe(1);
+ await page.keyboard.up('ArrowUp');
+ await expect.poll(()=>commands.filter(x=>x.action==='RELEASE').length).toBe(1);
+ const count=commands.filter(x=>x.action==='JOG').length;
+ await page.waitForTimeout(250);
+ expect(commands.filter(x=>x.action==='JOG').length).toBe(count);
+ await control.getByRole('button',{name:'STOP / HOLD',exact:true}).click();
+ await expect.poll(()=>commands.filter(x=>x.action==='HOLD').length).toBe(1);
+ expect(commands.filter(x=>x.action==='ENABLE').length).toBe(1);
+});

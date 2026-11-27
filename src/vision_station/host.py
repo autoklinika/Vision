@@ -10,6 +10,8 @@ from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 from .luxonis import LuxonisMonitor
 from .nero import NeroMonitor
 from .nero_tcp import project as project_nero_tcp
+from .nero_manual import valid_intent as valid_manual_intent
+from .nero_manual_api import locked as manual_locked,status as manual_status,envelope as manual_envelope,outcome as manual_outcome
 from .nero_diagnostics import projection
 from .nero_history import FaultHistory, HistorySampler
 from .nero_clear import result as clear_result, validate_result as validate_clear_result
@@ -27,7 +29,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None, nero_manual_transport=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -52,6 +54,10 @@ class CoreHost:
         self._nero_history = None
         self._nero_clear_transport = nero_clear_transport
         self._nero_clear_interlock = nero_clear_interlock
+        self._nero_manual_transport=nero_manual_transport
+        self._manual_binding=None
+        if nero_manual_transport is not None and (nero_clear_transport is not None or composition is not None):
+            raise ValueError("exclusive manual maintenance composition required")
         if nero_clear_transport is not None and (nero_history_directory is None or nero_clear_interlock is None):
             raise ValueError("NERO clear requires durable history and separate idle interlock")
         if nero_history_directory is not None:
@@ -67,6 +73,42 @@ class CoreHost:
 
     def nero_tcp_report(self):
         return project_nero_tcp(self.nero_report())
+
+    def nero_manual_report(self):
+        instance=self.station_report()["instanceId"]
+        if self._nero_manual_transport is None:return manual_locked(instance)
+        try:return manual_status(instance,self._nero_manual_transport.status())
+        except Exception:return manual_locked(instance)
+
+    def nero_manual_command(self, *, operator, **intent):
+        if not valid_manual_intent(intent) or not valid_actor(operator):
+            raise ValueError("invalid manual intent")
+        instance=self.station_report()["instanceId"]
+        def deny(reason,state="LOCKED"):
+            return manual_envelope(instance,manual_outcome(intent,False,reason,state))
+        if not self._lifecycle_lock.acquire(timeout=.05):return deny("BUSY")
+        try:
+            if (intent["instanceId"]!=instance or self._nero_manual_transport is None
+                    or self.station_report()["state"]!="NO_ACTIVE_SESSION"
+                    or self._runtime is not None or self._inspection._poisoned or self._inspection._marker_exists()):
+                return deny("NOT_COMMISSIONED")
+            binding=(instance,intent["operationId"],operator)
+            if intent["action"]=="ENABLE":
+                # Only the authoritative owner can declare an old session idle.
+                try:state=self._nero_manual_transport.status()["state"]
+                except Exception:return deny("TRANSPORT_UNVERIFIED")
+                if state!="IDLE":return deny("INTERLOCK",state)
+                self._manual_binding=binding
+            elif self._manual_binding!=binding:return deny("NO_SESSION")
+            try:
+                r=self._nero_manual_transport.command(intent)
+            except Exception:
+                # No retry or optimistic outcome; owner lease remains authoritative.
+                return deny("TRANSPORT_UNVERIFIED")
+            if r["state"] in ("HOLD","FAULT","IDLE"):self._manual_binding=None
+            return manual_envelope(instance,r)
+        finally:
+            self._lifecycle_lock.release()
 
     def nero_diagnostics_report(self):
         r=self.nero_report()
@@ -135,6 +177,8 @@ class CoreHost:
         if not isinstance(runtime, VisionRuntimeCoordinator):
             raise ValueError("an existing Vision Runtime coordinator is required")
         with self._lifecycle_lock:
+            if self._nero_manual_transport is not None:
+                raise ValueError("manual maintenance excludes inspections")
             if self._inspection.owned_id is not None:
                 raise ValueError("owned inspection cannot be replaced")
             view_id = self._reader.bind_core(runtime.engine)
@@ -216,6 +260,7 @@ class CoreHost:
         if not self._lifecycle_lock.acquire(timeout=EDITOR_LOCK_TIMEOUT):
             raise InspectionRejected()
         try:
+            if self._nero_manual_transport is not None:raise InspectionRejected()
             return self._inspection.start(**intent)
         finally:
             self._lifecycle_lock.release()

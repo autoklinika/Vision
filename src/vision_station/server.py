@@ -12,6 +12,7 @@ from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected
 from .nero_history import valid_query as valid_nero_history_query
 from .nero_clear_coordinator import valid_intent, valid_actor
+from .nero_manual import valid_intent as valid_manual_intent
 from .luxonis_ir import IRRejected, validate_request
 from .draft_editor import DraftConflict, DraftNotFound, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
 from .protocol import (EXCHANGE_TIMEOUT, PROTOCOL, REQUEST_LIMIT, RESPONSE_LIMIT, LEGACY_REQUEST_LIMIT,
@@ -36,6 +37,12 @@ def dispatch(host, request):
         return host.nero_report()
     if operation == "nero_tcp" and not query:
         return host.nero_tcp_report()
+    if operation == "nero_manual" and not query:
+        return host.nero_manual_report()
+    if operation == "nero_manual_command" and "operator" in query:
+        intent={k:v for k,v in query.items() if k!="operator"}
+        if valid_manual_intent(intent) and valid_actor(query["operator"]):
+            return host.nero_manual_command(**query)
     if operation == "nero_diagnostics" and not query:
         return host.nero_diagnostics_report()
     if operation == "nero_history" and set(query) == {"source","status","before"} and valid_nero_history_query(**query):

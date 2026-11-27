@@ -1,3 +1,5 @@
+import {isManualReport,isManualResult} from './neroManualContract';
+import type {ManualReport,ManualResult,ManualIntent} from './neroManualContract';
 import {isTcpReport} from './neroTcpContract';
 import type {TcpReport} from './neroTcpContract';
 import {isDiagnosticsReport,isHistoryReport,isAttemptReport,isClearEnvelope} from './neroDiagnosticsContract';
@@ -88,6 +90,15 @@ export function readNero():Promise<StationResult<NeroReport>>{
   return request<NeroReport,never>('/api/v1/devices/nero',isNeroReport,undefined,undefined,16384);
 }
 
+export function readNeroManual():Promise<StationResult<ManualReport>>{
+ return request<ManualReport,never>('/api/v1/devices/nero/manual',isManualReport,undefined,undefined,4096,1200);
+}
+export async function sendNeroManual(intent:ManualIntent):Promise<StationResult<ManualResult>>{
+ const r=await request<ManualResult,never>('/api/v1/devices/nero/manual/command',isManualResult,JSON.stringify(intent),undefined,4096,1200);
+ if(r.status==='AVAILABLE'&&(r.report.instanceId!==intent.instanceId||r.report.result.operationId!==intent.operationId||
+   r.report.result.action!==intent.action||r.report.result.sequence!==intent.sequence))return unavailable;
+ return r;
+}
 export function readNeroTcp():Promise<StationResult<TcpReport>>{
   return request<TcpReport,never>('/api/v1/devices/nero/control',isTcpReport,undefined,undefined,16384);
 }
