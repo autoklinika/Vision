@@ -47,10 +47,19 @@ class NativePorts:
         o=self.owner
         # Legacy motion endpoints stay locked. This is a separate manual
         # admission inside the same owner and shares the existing HOLD latch.
-        return (self.authority() is True and self.relay.alive()
-                and o.vision_arbiter.mode.value=="LOCKED" and not o._stop_in_progress
+        if not (self.authority() is True and self.relay.alive()):
+            return False
+        # The scene's observed joint state must also agree with the
+        # independent SDK cache in this owner. ROS graph metadata alone
+        # cannot establish the authenticity of hardware feedback.
+        if not (o.vision_arbiter.mode.value=="LOCKED" and not o._stop_in_progress
                 and o.physical_hold_enabled and not o.fast_mode and not o.auto_enable and not o.control_enabled
-                and not o.get_parameter("auto_enable").value and not o.get_parameter("control_enabled").value)
+                and not o.get_parameter("auto_enable").value and not o.get_parameter("control_enabled").value):
+            return False
+        feedback = self.read_feedback()
+        # Not yet in CAN control or no usable feedback: no admission.
+        # During an active session the engine itself latches loss of feedback.
+        return feedback is not None and self.authority.agrees_with_feedback(feedback)
     def approve(self,intent):return self.approval.consume(intent["operationId"],255)
     def enable(self):
         if not self.pipeline_ready():raise RuntimeError("manual interlock")
@@ -110,8 +119,17 @@ class NativeRelay:
 class ManualRuntime:
     """Instantiate only with a commissioning authority, inside one ROS owner."""
     def __init__(self,owner,*,profile,approval_directory,socket_path,relay_binary,pipeline_authority,native_hold,model_urdf):
-        if (not isinstance(profile,Profile) or not callable(pipeline_authority)
-                or pipeline_authority() is not True or not callable(native_hold)
+        from .nero_manual_pipeline import Routes
+        from .ros_nero_manual_pipeline import RosPipelineMonitor
+        # Only an explicitly composed station observer, never an arbitrary
+        # lambda or synthetic fixture, can back the native hardware ports.
+        # It may initially be unready while the owner starts publishing:
+        # the engine remains IDLE and fails closed until observed readiness.
+        if (not isinstance(profile,Profile) or not isinstance(pipeline_authority,RosPipelineMonitor)
+                or pipeline_authority.contract.routes != Routes.physical()
+                or dict(pipeline_authority.contract.parameters)["robot_description"] != model_urdf
+                or pipeline_authority.contract.scene_tracking_max_rad > profile.tracking_error_max
+                or not callable(native_hold)
                 or owner._clear_commissioned or owner.fast_mode or not owner.physical_hold_enabled):
             raise ValueError("approved exclusive manual composition required")
         # The commissioning composition supplies the actual loaded expanded
@@ -120,6 +138,7 @@ class ManualRuntime:
         if any(lo<bound[0] or hi>bound[1] for (lo,hi),bound in zip(profile.joint_limits,limits)):
             raise ValueError("profile exceeds actual SDK or loaded MoveIt model limits")
         self.relay=NativeRelay(relay_binary)
+        self.authority=pipeline_authority
         self.server=None;self.timer=None
         try:
             self.ports=NativePorts(owner,approval=Approval(approval_directory),relay=self.relay,
@@ -127,12 +146,17 @@ class ManualRuntime:
             self.engine=ManualEngine(profile,self.ports,lock=owner._tx_lock)
             self.server=ManualOwnerServer(socket_path,self.engine)
             self.timer=owner.create_timer(.02,self.engine.tick)
+            self.authority.start()
         except BaseException:
+            if self.timer:self.timer.cancel()
             if self.server:self.server.close()
-            self.relay.close();raise
+            self.relay.close()
+            self.authority.close()
+            raise
     def external_hold(self):self.engine.external_hold()
     def close(self):
         if self.timer:self.timer.cancel()
         if self.server:self.server.close()
         self.engine.shutdown()
         self.relay.close()
+        self.authority.close()

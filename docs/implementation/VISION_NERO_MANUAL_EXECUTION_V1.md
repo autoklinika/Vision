@@ -114,3 +114,53 @@ accepted speed envelope; verify JTC timing and tracking on the physical arm.
 Until then no physical command listener/owner factory is enabled, the
 existing physical HOLD and operational services are unchanged, and no
 actuation claim is made.
+
+## Observed-feedback pipeline admission
+
+The next implementation candidate separates the measured arm state from
+the virtual interpolation state. `Routes.physical()` fixes the Servo
+joint-state input to the existing guarded NERO feedback topic.
+The namespaced JTC uses GenericSystem only as a timing/interpolation
+component; its synthetic joint states are not admissible Servo feedback.
+
+`Contract`, `PipelineAuthority` and `RosPipelineMonitor` provide a
+concrete read-only observation interface for explicit composition. Before
+readiness, the monitor requires the expected source endpoints, Servo
+configuration and expanded model, the independently accepted collision
+scene fingerprint, actual joint-state agreement, the active official JTC,
+the virtual interpolation hardware inventory, and a trusted TWIST-mode
+bootstrap confirmation. The native ports additionally compare observed
+positions against the owner's fresh SDK cache.
+
+Service reads are asynchronous, in a separate mutually exclusive callback
+group; the motion admission callback reads cached evidence only. A
+configuration/source mismatch or expiry after verified readiness latches
+the observer. Restoration of a publisher or feedback does not auto-rearm.
+The existing native relay retains per-sample output GID checks.
+
+The fingerprint covers full collision-relevant scene readback: world and
+attached geometry, octomap, allowed-collision entries, fixed transforms,
+padding and scale. Dynamic joint states and cosmetic data are excluded.
+The expected fingerprint and parameter inventory must come from separate
+validation, never blind acceptance of a live readback. A strict comparison
+can conservatively reject reordered but otherwise equivalent scene data.
+
+This is not a functional-safety certification. ROS graph metadata is not
+cryptographic attribution, and the TWIST confirmation is supplied by the
+trusted bootstrap, not a continuous upstream command-type query.
+Independent fixture and station contracts cannot be interchanged.
+
+`ManualRuntime` now requires the concrete station monitor and matching
+loaded model. During startup its engine stays IDLE until complete evidence
+is observed; no initialization command enables drives. No deployment
+entrypoint or accepted physical profile is supplied by this change.
+
+Validation on VENTUNO: NERO API/owner tests 62/62; ROS PlanningScene
+serialization tests 4/4. These include stale/duplicate/replaced sources,
+changed collision permissions, missing endpoints, wrong model/state
+routing, SDK disagreement and collision-scene fingerprint sensitivity.
+The expanded live-ROS GenericSystem integration attempt was blocked
+before execution, so the new service/graph observation adapter still
+requires end-to-end ROS acceptance. Physical commissioning has not
+been performed. Operational services, geometry and the frozen baseline
+remain unchanged.
