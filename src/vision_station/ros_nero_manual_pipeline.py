@@ -6,13 +6,15 @@ The caller supplies an independently verified scene fingerprint and a
 trusted bootstrap confirmation that TWIST was selected.
 """
 from copy import deepcopy
+from collections import deque
+import re
 import hashlib
 import time
 
 from .nero_manual import JOINTS, AGE, vector7
 from .nero_manual_pipeline import (
     Contract, Endpoint, Evidence, PipelineAuthority, JOINT_STATE_TYPE,
-    JTC_TYPE, JSB_TYPE, MOCK_PLUGIN,
+    JTC_TYPE, JSB_TYPE, MOCK_PLUGIN, PLANNING_SCENE_TYPE,
 )
 
 
@@ -72,7 +74,7 @@ def endpoint_node(ep):
 
 def graph_evidence(node, routes):
     topics = (*routes.endpoints(), routes.twist, routes.controller_command,
-              routes.synthetic_feedback_topic)
+              routes.synthetic_feedback_topic, routes.scene_topic)
     publishers = tuple((topic, tuple(Endpoint(endpoint_node(ep), ep.topic_type, bytes(ep.endpoint_gid))
                          for ep in node.get_publishers_info_by_topic(topic))) for topic in topics)
     subscribers = tuple((topic, tuple(Endpoint(endpoint_node(ep), ep.topic_type, bytes(ep.endpoint_gid))
@@ -119,6 +121,7 @@ class RosPipelineMonitor:
                  wall=time.time, mono=time.monotonic):
         from rcl_interfaces.srv import GetParameters
         from moveit_msgs.srv import GetPlanningScene
+        from moveit_msgs.msg import PlanningScene
         from controller_manager_msgs.srv import ListControllers, ListHardwareComponents
         from sensor_msgs.msg import JointState
         from rclpy.qos import qos_profile_sensor_data
@@ -127,10 +130,14 @@ class RosPipelineMonitor:
             raise ValueError("explicit contract and trusted TWIST bootstrap required")
         self.node, self.contract = node, contract
         self.wall, self.mono = wall, mono
+        self.observation_epoch = wall()
         self.mode = twist_mode_confirmed
         self.authority = PipelineAuthority(contract, wall=wall, mono=mono)
         self.latest = None
         self.last_state_readback = None
+        self.pending_scene_updates = deque()
+        self.last_timestamped_update = None
+        self.last_received_scene_update = None
         self.futures = None
         self.started = 0.
         self.closed = False
@@ -152,11 +159,82 @@ class RosPipelineMonitor:
         self.requests[1][1].components.components = 1023
         self.sub = node.create_subscription(JointState, routes.feedback_topic, self._feedback,
                                             qos_profile_sensor_data, callback_group=self.group)
+        self.scene_sub = node.create_subscription(PlanningScene,routes.scene_topic,
+                                        self._scene_update,10,callback_group=self.group)
 
     def start(self):
         if self.closed or self.timer is not None:
             raise RuntimeError("monitor already started or closed")
         self.timer = self.node.create_timer(.05, self.poll, callback_group=self.group)
+
+    def _scene_update(self,msg,info):
+        if self.closed:
+            return
+        try:
+            routes=self.contract.routes
+            rows=self.node.get_publishers_info_by_topic(routes.scene_topic)
+            if (len(rows)!=1 or rows[0].topic_type!=PLANNING_SCENE_TYPE
+                    or not (endpoint_node(rows[0])==routes.servo_node
+                            or re.fullmatch(re.escape(routes.servo_node)+r"_private_[0-9]+",endpoint_node(rows[0])))):
+                raise ValueError("unverified scene publisher")
+            gid=bytes(rows[0].endpoint_gid)
+            sample_gid=info.get("publisher_gid")
+            if sample_gid is not None and bytes(sample_gid)!=gid:
+                raise ValueError("unverified scene sample")
+            # A full scene snapshot may be sent to a late subscriber
+            # with the last motion stamp, even if the robot is stationary.
+            # It is not a new joint-state update and never renews evidence.
+            # Complete static scene identity is checked via the service.
+            if not msg.is_diff:
+                return
+            state=msg.robot_state.joint_state
+            # Geometry-only updates are still covered by complete scene
+            # readback. They do not prove a joint-state update.
+            if not state.name and not state.position:
+                return
+            stamp=state.header.stamp.sec+state.header.stamp.nanosec/1e9
+            # The upstream PSM also emits un-stamped state snapshots.
+            # They are not timing evidence, and must never renew a
+            # verified motion update. The service readback is checked
+            # independently against recent observed positions.
+            if stamp==0.:
+                return
+            # A newly created subscriber can receive the previous PSM
+            # state even after its first successful service readback.
+            # Pre-subscription states cannot attest this new epoch. Do
+            # not accept them, restamp them, or renew any deadline.
+            if stamp < self.observation_epoch:
+                if self.last_timestamped_update is not None:
+                    self.authority.invalidate("SCENE_UPDATE_PREVIOUS_EPOCH")
+                return
+            if len(self.pending_scene_updates)>=16:
+                raise ValueError("scene update backlog")
+            self.last_received_scene_update={"sourceStamp":stamp,"receivedAgeS":self.wall()-stamp,
+                                             "diff":msg.is_diff,"stateDiff":msg.robot_state.is_diff}
+            self.pending_scene_updates.append((stamp,joint_vector(state),gid))
+            self._match_scene_updates()
+        except Exception:
+            self.authority.invalidate("SCENE_UPDATE_UNVERIFIED")
+
+    def _match_scene_updates(self):
+        # Before the first complete graph/scene readback, the publisher
+        # identity is not yet pinned. Discard old startup publications,
+        # not evidence acquired during an active verified session.
+        while self.pending_scene_updates:
+            stamp,q,gid=self.pending_scene_updates[0]
+            if not self.authority._ever_ready:
+                self.pending_scene_updates.popleft()
+                continue
+            result=self.authority.record_scene_update(stamp,q,gid)
+            if result=="PENDING":
+                if self.wall()-stamp>self.authority.max_batch_age:
+                    self.pending_scene_updates.popleft()
+                    self.authority.invalidate("SCENE_INPUT_TIMESTAMP_NOT_OBSERVED")
+                    continue
+                break
+            self.pending_scene_updates.popleft()
+            if result=="MATCH":
+                self.last_timestamped_update={"sourceStamp":stamp,"receivedAgeS":self.wall()-stamp}
 
     def _feedback(self, msg, info):
         if self.closed:
@@ -178,6 +256,7 @@ class RosPipelineMonitor:
                 raise ValueError("feedback age")
             self.latest = (stamp, joint_vector(msg), bytes(rows[0].endpoint_gid))
             self.authority.record_feedback(*self.latest)
+            self._match_scene_updates()
         except Exception:
             self.latest = None
             self.authority.invalidate("FEEDBACK_UNVERIFIED")
@@ -186,6 +265,7 @@ class RosPipelineMonitor:
         from rclpy.parameter import parameter_value_to_python
         if self.closed:
             return
+        self._match_scene_updates()
         now = self.mono()
         if self.futures is not None:
             if now - self.started > .4:
@@ -255,5 +335,6 @@ class RosPipelineMonitor:
                     future.cancel()
             self.futures = None
         self.node.destroy_subscription(self.sub)
+        self.node.destroy_subscription(self.scene_sub)
         for client, _ in self.requests:
             self.node.destroy_client(client)

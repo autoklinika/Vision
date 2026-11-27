@@ -208,3 +208,54 @@ an end-to-end dynamic acceptance. A reliable timestamped PSM state
 observation or independently verified bounded-latency architecture is
 required before dynamic acceptance and supervised hardware commissioning.
 No operational service or hardware control was changed by these tests.
+
+## Time-aligned dynamic observation — software fixture accepted
+
+The earlier dynamic failure compared a historical, un-stamped
+GetPlanningScene state to a different, current JointState. The installed
+Servo 2.12.4 PlanningSceneMonitor also publishes maintained-scene updates
+on its own publish_planning_scene topic. A diagnostic probe confirmed
+source stamps in state-change diffs and also found zero-stamped or retained
+snapshots. The latter are not accepted as fresh motion evidence.
+
+The observation authority now maintains a bounded 256-sample history
+(maximum horizon 650 ms with the existing default configuration). It
+associates the unstamped service state with an observed configuration
+inside the bounded request window, using the existing comparison
+tolerance; this is a bounded configuration match, not a proof of its
+exact acquisition time. The PSM state-change publication is independently
+checked against the corresponding source timestamp in the history and
+the pinned publisher identity. A changed state without a timely
+timestamped witness expires admission. Duplicate/late samples cannot
+renew an expired witness. Initial snapshots from before subscription
+are not admitted as current observations. The live feedback age limit
+remains 150 ms, full configuration/scene evidence age limit remains
+500 ms and comparison tolerances remain unchanged. The actual SDK
+position comparison remains independent of the historical scene match.
+
+The isolated test keeps the official Servo collision checks, JTC
+interpolation and native per-sample relay unchanged. A change to PSM
+publication settings was not executed, so this result does not depend
+on changing upstream parameters. Geometry and calibration are unchanged.
+
+Validation on VENTUNO:
+- NERO API/owner tests 74/74; actual ROS message/scene tests 6/6.
+- First complete dynamic fixture: 137 windows, 284 JTC references,
+  280 relay samples, 26 time-aligned scene updates.
+- Final regression: 137 windows, 290 JTC references, 279 relay samples,
+  28 time-aligned scene updates, Servo status 0/1.
+- Both complete fixtures verified independent observed state, stable
+  scene identity, dynamic readiness, loss-of-feedback latch without
+  auto-resume, and scene-change latch after explicit fixture reconstruction.
+
+The diagnostic RViz software-rendered preview was consuming about three
+CPU cores. Earlier integration runs with that preview open failed the
+existing evidence deadline. The two complete passing runs were performed
+after stopping only that diagnostic visualization; operational services
+were not restarted. The high-load condition is not accepted. The station
+must preserve sufficient compute capacity for the manual pipeline.
+
+This supersedes the earlier blocked dynamic **software fixture** result.
+The fixture has a synthetic obstacle and synthetic observed feedback;
+it does not constitute real-station geometry/TCP, speed envelope, or
+physical execution acceptance. No physical deployment, motion or merge.

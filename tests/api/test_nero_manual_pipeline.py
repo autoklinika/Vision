@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 
 from vision_station.nero_manual import Feedback, JOINTS
 from vision_station.nero_manual_pipeline import (
-    Contract, Endpoint, Evidence, PipelineAuthority, Routes, TRAJECTORY_TYPE, TWIST_TYPE,
+    Contract, Endpoint, Evidence, PipelineAuthority, Routes, TRAJECTORY_TYPE, TWIST_TYPE, PLANNING_SCENE_TYPE,
 )
 from vision_station.ros_nero_manual_pipeline import controller_evidence
 
@@ -41,6 +41,7 @@ class PipelineTests(unittest.TestCase):
         publishers = tuple((topic, (Endpoint(node, kind, bytes([i+1])),))
                            for i,(topic,(node,kind)) in enumerate(self.routes.endpoints().items()))
         publishers += (
+            (self.routes.scene_topic,(Endpoint(self.routes.servo_node+"_private_123",PLANNING_SCENE_TYPE,b"\x66"),)),
             (self.routes.twist,(Endpoint(self.routes.feedback_node,TWIST_TYPE,b"\x77"),)),
             (self.routes.controller_command,(Endpoint("/vision_servo_sample_relay",TRAJECTORY_TYPE,b"\x88"),)),
         )
@@ -119,7 +120,7 @@ class PipelineTests(unittest.TestCase):
 
     def test_scene_state_must_match_source(self):
         self.assertFalse(self.guard.observe(replace(self.e, scene_q=(.01,)*7)))
-        self.assertEqual(self.guard.reason, "SERVO_STATE_NOT_FEEDBACK")
+        self.assertEqual(self.guard.reason, "SERVO_STATE_NOT_OBSERVED")
 
     def test_stale_feedback_no_rearm(self):
         self.assertTrue(self.guard.observe(self.e))
@@ -162,13 +163,80 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(self.guard.record_feedback(self.c.now, (0.,)*7, gid))
         self.assertEqual(self.guard.reason, "FEEDBACK_STALE")
 
-    def test_current_observation_must_agree_with_scene(self):
+    def test_time_aligned_scene_not_compared_to_newer_position(self):
         self.assertTrue(self.guard.observe(self.e))
         gid = dict(self.e.publishers)[self.routes.feedback_topic][0].gid
         self.c.now += .02
         self.assertTrue(self.guard.record_feedback(self.c.now, (.003,)*7, gid))
+        # Fresh observed q is different from the earlier PSM response.
+        # The latter still matches the source sample at its own time.
+        self.assertTrue(self.guard())
+        e=replace(self.e,captured_mono=self.c.now-.02,
+                  feedback_stamp=self.c.now,feedback_q=(.003,)*7)
+        self.assertTrue(self.guard.observe(e))
+        self.assertEqual(self.guard.record_scene_update(self.e.feedback_stamp,(0.,)*7,b"\x66"),"MATCH")
+        self.assertEqual(self.guard.matched_scene_updates,1)
+        self.assertEqual(self.guard.record_scene_update(self.c.now,(.003,)*7,b"\x66"),"MATCH")
+        self.assertEqual(self.guard.matched_scene_updates,2)
+
+    def test_unstamped_readback_must_match_recent_history(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid=dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        for _ in range(3):
+            self.c.now+=.08
+            self.assertTrue(self.guard.record_feedback(self.c.now,(.01,)*7,gid))
+        stale=replace(self.e,captured_mono=self.c.now,feedback_stamp=self.c.now,
+                      feedback_q=(.01,)*7,scene_q=(0.,)*7)
+        self.assertFalse(self.guard.observe(stale))
+        self.assertEqual(self.guard.reason,"SERVO_STATE_NOT_OBSERVED")
+
+    def test_stamped_scene_must_match_same_time_not_latest(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid=dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        self.c.now+=.04
+        self.assertTrue(self.guard.record_feedback(self.c.now,(.01,)*7,gid))
+        self.assertEqual(self.guard.record_scene_update(self.e.feedback_stamp,(.01,)*7,b"\x66"),"REJECTED")
+        self.assertEqual(self.guard.reason,"SCENE_TIMESTAMP_STATE_MISMATCH")
+
+    def test_state_change_needs_timestamped_witness(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid=dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        for i in range(7):
+            self.c.now+=.09
+            q=(.001*(i+1),)*7
+            self.assertTrue(self.guard.record_feedback(self.c.now,q,gid))
+            self.assertTrue(self.guard.observe(replace(self.e,captured_mono=self.c.now,
+                feedback_stamp=self.c.now,feedback_q=q,scene_q=q)))
         self.assertFalse(self.guard())
-        self.assertEqual(self.guard.reason, "SERVO_STATE_NOT_FEEDBACK")
+        self.assertEqual(self.guard.reason,"SCENE_UPDATE_MISSING_DURING_CHANGE")
+
+    def test_late_scene_update_cannot_recover_expired_witness(self):
+        self.assertTrue(self.guard.observe(self.e))
+        gid=dict(self.e.publishers)[self.routes.feedback_topic][0].gid
+        for i in range(7):
+            self.c.now+=.09
+            q=(.001*(i+1),)*7
+            self.assertTrue(self.guard.record_feedback(self.c.now,q,gid))
+            self.assertTrue(self.guard.observe(replace(self.e,captured_mono=self.c.now,
+                feedback_stamp=self.c.now,feedback_q=q,scene_q=q)))
+        self.assertEqual(self.guard.record_scene_update(self.c.now,q,b"\x66"),"REJECTED")
+        self.assertEqual(self.guard.reason,"SCENE_UPDATE_MISSING_DURING_CHANGE")
+
+    def test_changed_scene_publisher_cannot_submit_state(self):
+        self.assertTrue(self.guard.observe(self.e))
+        self.assertEqual(self.guard.record_scene_update(self.e.feedback_stamp,(0.,)*7,b"\x67"),"REJECTED")
+        self.assertEqual(self.guard.reason,"SCENE_SOURCE_REPLACED")
+
+    def test_scene_update_missing_stamp_never_guesses(self):
+        self.assertTrue(self.guard.observe(self.e))
+        self.assertEqual(self.guard.record_scene_update(self.c.now,(0.,)*7,b"\x66"),"PENDING")
+        self.assertEqual(self.guard.matched_scene_updates,0)
+
+    def test_scene_publisher_must_match_psm_reader(self):
+        p=dict(self.e.publishers)
+        p[self.routes.scene_topic]=(Endpoint("/wrong",PLANNING_SCENE_TYPE,b"\x66"),)
+        self.assertFalse(self.guard.observe(replace(self.e,publishers=tuple(p.items()))))
+        self.assertEqual(self.guard.reason,"SCENE_SOURCE_UNVERIFIED")
 
     def test_actual_sdk_disagreement_latches(self):
         self.assertTrue(self.guard.observe(self.e))

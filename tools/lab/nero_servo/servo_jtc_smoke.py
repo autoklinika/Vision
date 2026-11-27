@@ -225,12 +225,17 @@ def main():
                 raise RuntimeError("native source-checked relay delivered no valid references")
             print("NATIVE_GID_RELAY_PASS","samples",len(relay_samples),flush=True)
         if observer is not None:
+            observer.check()
+            matched=observer.monitor.authority.matched_scene_updates
+            assert matched>0, "no timestamp-aligned scene updates during motion"
+            print("TIMESTAMP_ALIGNED_SCENE_PASS",matched,observer.monitor.last_timestamped_update,flush=True)
             observer.test_loss(spin)
             (a.output/"observation_result.json").write_text(json.dumps({
                 "status":"PASS","independentObservedState":True,
                 "monitorVerified":True,"feedbackLossLatched":True,
                 "sceneChangeLatched":True,"syntheticOnly":True,
                 "realStationAcceptance":False,
+                "matchedSceneUpdates":matched,
                 "relaySamples":len(relay_samples)},indent=2)+"\n")
         print("OFFLINE_ONLY_NO_HARDWARE_OUTPUT",flush=True)
     finally:

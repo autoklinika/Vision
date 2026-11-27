@@ -169,7 +169,7 @@ class ObservationFixture:
                     return
             if self.monitor.authority._latched:
                 break
-        print("STARTUP_READBACK_DIAGNOSTIC",self.monitor.last_state_readback,flush=True)
+        print("STARTUP_READBACK_DIAGNOSTIC",self.monitor.last_state_readback,self.monitor.last_received_scene_update,flush=True)
         raise RuntimeError("pipeline monitor rejected fixture: "+self.monitor.authority.reason)
 
     def check(self):
@@ -177,7 +177,7 @@ class ObservationFixture:
             e=self.monitor.authority._evidence
             live=self.monitor.authority._live_feedback
             if not self.monitor():
-                print("READBACK_DIAGNOSTIC",self.monitor.last_state_readback,flush=True)
+                print("READBACK_DIAGNOSTIC",self.monitor.last_state_readback,self.monitor.last_received_scene_update,flush=True)
                 if e is not None and live is not None:
                     print("CACHED_SCENE_VS_LIVE",max(abs(x-y) for x,y in zip(e.scene_q,live[1])),
                           "scene_batch_age",time.monotonic()-e.captured_mono,
