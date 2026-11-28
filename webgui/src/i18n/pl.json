@@ -1099,6 +1099,7 @@
   "Close manual session": "Zakończ sesję ręczną",
   "Accepted speed envelope": "Dopuszczalna prędkość",
   "REVIEW_ONLY": "Odbiór bez ruchu",
+  "START_STATE_UNALIGNED": "Niezsynchronizowana pozycja początkowa JTC",
   "Review speed envelope": "Proponowany zakres prędkości do odbioru",
   "Start manual keyboard": "Uruchom sterowanie klawiaturą",
   "End manual keyboard": "Zakończ sterowanie klawiaturą",

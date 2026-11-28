@@ -12,9 +12,10 @@ import hashlib
 import time
 
 from .nero_manual import JOINTS, AGE, vector7
+from .nero_manual_start import ControllerStart
 from .nero_manual_pipeline import (
     Contract, Endpoint, Evidence, PipelineAuthority, JOINT_STATE_TYPE,
-    JTC_TYPE, JSB_TYPE, MOCK_PLUGIN, PLANNING_SCENE_TYPE,
+    JTC_TYPE, JSB_TYPE, MOCK_PLUGIN, PLANNING_SCENE_TYPE, CONTROLLER_STATE_TYPE,
 )
 
 
@@ -124,6 +125,7 @@ class RosPipelineMonitor:
         from moveit_msgs.msg import PlanningScene
         from controller_manager_msgs.srv import ListControllers, ListHardwareComponents
         from sensor_msgs.msg import JointState
+        from control_msgs.msg import JointTrajectoryControllerState
         from rclpy.qos import qos_profile_sensor_data
         from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
         if not isinstance(contract, Contract) or not callable(twist_mode_confirmed):
@@ -134,6 +136,7 @@ class RosPipelineMonitor:
         self.mode = twist_mode_confirmed
         self.authority = PipelineAuthority(contract, wall=wall, mono=mono)
         self.latest = None
+        self.controller_start = None
         self.last_state_readback = None
         self.pending_scene_updates = deque()
         self.last_timestamped_update = None
@@ -161,6 +164,52 @@ class RosPipelineMonitor:
                                             qos_profile_sensor_data, callback_group=self.group)
         self.scene_sub = node.create_subscription(PlanningScene,routes.scene_topic,
                                         self._scene_update,10,callback_group=self.group)
+        self.controller_sub = node.create_subscription(JointTrajectoryControllerState,
+                    routes.controller_state,self._controller_state,1,callback_group=self.group)
+
+    def _controller_state(self,msg,info):
+        if self.closed:
+            return
+        try:
+            routes=self.contract.routes
+            rows=self.node.get_publishers_info_by_topic(routes.controller_state)
+            if (len(rows)!=1 or endpoint_node(rows[0])!=routes.controller
+                    or rows[0].topic_type!=CONTROLLER_STATE_TYPE):
+                raise ValueError("unverified controller source")
+            gid=bytes(rows[0].endpoint_gid)
+            sample_gid=info.get("publisher_gid")
+            if sample_gid is not None and bytes(sample_gid)!=gid:
+                raise ValueError("unverified controller sample")
+            if len(msg.joint_names)!=7 or set(msg.joint_names)!=set(JOINTS) or msg.multi_dof_joint_names:
+                raise ValueError("invalid controller joint inventory")
+            def ordered(values):
+                values=tuple(values)
+                if not vector7(values):
+                    raise ValueError("invalid controller state")
+                return tuple(values[msg.joint_names.index(n)] for n in JOINTS)
+            stamp=msg.header.stamp.sec+msg.header.stamp.nanosec/1e9
+            evidence=ControllerStart(stamp,gid,ordered(msg.feedback.positions),
+                ordered(msg.reference.positions),ordered(msg.feedback.velocities),
+                ordered(msg.reference.velocities))
+            with self.authority.lock:
+                last=self.controller_start
+                if stamp<self.observation_epoch or (last is not None and stamp<=last.stamp):
+                    return
+                self.controller_start=evidence
+        except Exception:
+            with self.authority.lock:
+                self.controller_start=None
+
+    def start_aligned(self,feedback):
+        # Read-only cached witness. Do not query or reset JTC inside the
+        # hardware TX lock. A stale/unaligned idle controller is unavailable,
+        # not a reason to send a physical correction to its reference.
+        with self.authority.lock:
+            sample=self.controller_start
+            pin=self.authority._pins.get(self.contract.routes.controller_state)
+            return (not self.closed and self.authority.agrees_with_feedback(feedback)
+                    and sample is not None and sample.matches(feedback,now=self.wall(),expected_gid=pin))
+
 
     def start(self):
         if self.closed or self.timer is not None:
@@ -336,5 +385,6 @@ class RosPipelineMonitor:
             self.futures = None
         self.node.destroy_subscription(self.sub)
         self.node.destroy_subscription(self.scene_sub)
+        self.node.destroy_subscription(self.controller_sub)
         for client, _ in self.requests:
             self.node.destroy_client(client)

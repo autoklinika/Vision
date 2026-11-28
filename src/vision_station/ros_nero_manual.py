@@ -60,11 +60,13 @@ class NativePorts:
         # Not yet in CAN control or no usable feedback: no admission.
         # During an active session the engine itself latches loss of feedback.
         return feedback is not None and self.authority.agrees_with_feedback(feedback)
+    def start_aligned(self,feedback):
+        return self.authority.start_aligned(feedback)
     def approve(self,intent):return self.approval.consume(intent["operationId"],255)
     def enable(self):
         if not self.pipeline_ready():raise RuntimeError("manual interlock")
         f=self.read_feedback()
-        if f is None or not f.clean(time.time()) or any(f.drives()) or f.arm_status not in (0,6):
+        if f is None or not f.clean(time.time()) or any(f.drives()) or f.arm_status not in (0,6) or not self.start_aligned(f):
             raise RuntimeError("enable readback rejected")
         # Existing firmware-specific vendor SDK. No retry, reset or disable.
         self.owner.agx_arm.enable(timeout=0.)

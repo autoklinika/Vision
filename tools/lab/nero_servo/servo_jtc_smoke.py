@@ -29,6 +29,8 @@ def main():
     p.add_argument("--station-candidate",type=Path,
                    help="offline review bundle; recorded pose is replayed only")
     p.add_argument("--mesh-source-root",type=Path)
+    p.add_argument("--replay-station-observation",type=Path,
+                   help="explicit offline replay of measured joint positions, never live motion authorization")
     group=p.add_mutually_exclusive_group()
     group.add_argument("--observe-pipeline",action="store_true")
     group.add_argument("--observe-stationary",action="store_true",
@@ -41,6 +43,10 @@ def main():
             not a.station_candidate.is_absolute() or
             not a.station_candidate.resolve().is_relative_to("/srv/vision-data")):
         p.error("private NVMe candidate only")
+    if a.replay_station_observation is not None and (a.station_candidate is None
+            or not a.replay_station_observation.is_absolute()
+            or not a.replay_station_observation.resolve().is_relative_to("/srv/vision-data")):
+        p.error("explicit private candidate and observation receipt required")
     if a.observe_pipeline and a.relay is None:
         p.error("the software relay is required for observation tests")
     if os.environ.get("ROS_DOMAIN_ID")!=str(DOMAIN) or os.environ.get("ROS_LOCALHOST_ONLY")!="1":
@@ -73,7 +79,9 @@ def main():
     for section in (cfg.robot_description,cfg.robot_description_semantic,cfg.robot_description_kinematics,cfg.joint_limits):
         params.update(section)
     candidate=None
+    profile=None
     pose=POSE
+    pose_source='SYNTHETIC_FIXTURE'
     if a.station_candidate is not None:
         from ament_index_python.packages import get_package_share_directory
         from vision_station.nero_manual_station import load
@@ -82,19 +90,37 @@ def main():
                        mesh_source_root=a.mesh_source_root)
         params["robot_description"]=candidate.urdf
         params["robot_description_semantic"]=candidate.srdf
+        from vision_station.nero_manual_composition import review_profile
+        from vision_station.nero_manual_start import seed_virtual_model
+        from vision_station.nero_manual_station import read_bounded,decode,sha
+        profile=review_profile(candidate)
         pose=list(candidate.historical_q)
-        print("OFFLINE_STATION_CANDIDATE_LOADED",flush=True)
+        pose_source="HISTORICAL_RAISED_POSE_REPLAY"
+        if a.replay_station_observation is not None:
+            receipt=decode(read_bounded(a.replay_station_observation))
+            if (receipt.get("status")!="LIVE_STATION_SHADOW_READBACK_PASS"
+                    or receipt.get("physicalExecutionAllowed") is not False
+                    or receipt.get("stationAcceptance") is not False
+                    or receipt.get("noMotionPath") is not True
+                    or receipt.get("candidateManifestSha256")!=sha(read_bounded(a.station_candidate/"manifest.json"))
+                    or not profile.contains(receipt.get("jointRad"))):
+                raise ValueError("invalid explicit offline replay receipt")
+            pose=list(receipt["jointRad"])
+            pose_source="MEASURED_STATION_POSE_REPLAY"
+        params["robot_description"]=seed_virtual_model(candidate.urdf,pose,profile)
+        print("OFFLINE_STATION_CANDIDATE_LOADED",pose_source,flush=True)
     model=ET.fromstring(params["robot_description"])
     control=model.find("ros2_control")
     if control is None or control.findtext("hardware/plugin")!="mock_components/GenericSystem":
         raise RuntimeError("not GenericSystem")
     if {j.get("name") for j in control.findall("joint")}!=set(NAMES):
         raise RuntimeError("unexpected controller joints")
-    for joint in control.findall("joint"):
-        for interface in joint.findall("state_interface"):
-            if interface.get("name")=="position":
-                interface.find("param").text=str(pose[NAMES.index(joint.get("name"))])
-    params["robot_description"]=ET.tostring(model,encoding="unicode")
+    if candidate is None:
+        for joint in control.findall("joint"):
+            for interface in joint.findall("state_interface"):
+                if interface.get("name")=="position":
+                    interface.find("param").text=str(pose[NAMES.index(joint.get("name"))])
+        params["robot_description"]=ET.tostring(model,encoding="unicode")
     params["moveit_servo"]={
         "move_group_name":"arm","command_in_type":"speed_units",
         "scale":{"linear":.1,"rotational":math.radians(30),"joint":.2},
@@ -118,10 +144,8 @@ def main():
             "scene_collision_proximity_threshold":.02,
         })
         params["use_sim_time"]=False
-    profile=None
     if candidate is not None:
-        from vision_station.nero_manual_composition import review_profile,servo_parameters,planning_parameters
-        profile=review_profile(candidate)
+        from vision_station.nero_manual_composition import servo_parameters,planning_parameters
         params["moveit_servo"]=servo_parameters(Routes.fixture(),profile)
         params.update(planning_parameters({"robot_description_planning":params["robot_description_planning"]},
                                          params["robot_description"],profile))
@@ -214,6 +238,31 @@ def main():
         if observer is not None:
             observer.confirmed_twist=True
             observer.prepare(spin,pose)
+            # Verify the actual JTC readback at rest before sending even a
+            # synthetic jog. Its state and initial reference must equal
+            # the explicit input pose, never an old fixture's pose or zero.
+            from vision_station.nero_manual import Feedback
+            from vision_station.nero_manual_start import POSITION_ERROR
+            def start_matches():
+                live=observer.monitor.latest
+                if live is None or not 0<=time.time()-live[0]<=.10:return False
+                t,q,_=live
+                if max(abs(x-y) for x,y in zip(q,pose))>1e-6:
+                    raise RuntimeError("unexpected fixture starting state")
+                fake=Feedback(tuple(pose),(0.,)*7,t,t,6,0,1,(0,)*7,(t,)*7,(t,)*7)
+                return observer.monitor.start_aligned(fake)
+            end=time.monotonic()+2.
+            while not start_matches() and time.monotonic()<end:spin(.02)
+            assert start_matches(),"JTC startup not aligned"
+            start_sample=observer.monitor.controller_start
+            assert start_sample is not None
+            initial_error=max(abs(x-y) for q in (start_sample.q,start_sample.reference) for x,y in zip(q,pose))
+            assert initial_error<=POSITION_ERROR
+            print("JTC_INITIAL_STATE_AND_REFERENCE_PASS",pose_source,initial_error,flush=True)
+            (a.output/"initial-state.json").write_text(json.dumps({
+                "status":"PASS","source":pose_source,"jointRad":pose,
+                "initialReferenceMaxErrorRad":initial_error,
+                "syntheticOnly":True,"physicalExecutionAllowed":False},indent=2)+"\n")
             if a.observe_stationary:
                 observer.test_loss(spin)
                 (a.output/"stationary_observation_result.json").write_text(json.dumps({
@@ -221,6 +270,7 @@ def main():
                     "monitorVerified":True,"feedbackLossLatched":True,
                     "sceneChangeLatched":True,"syntheticOnly":True,
                     "dynamicMotionTested":False,"realStationAcceptance":False,
+                    "initialStateVerified":True,"poseSource":pose_source,
                     "fullStationCandidate":candidate is not None},indent=2)+"\n")
                 print("STATIONARY_OBSERVATION_ONLY_PASS",flush=True)
                 return
@@ -281,6 +331,7 @@ def main():
                 "sceneChangeLatched":True,"syntheticOnly":True,
                 "realStationAcceptance":False,
                 "matchedSceneUpdates":matched,"fullStationCandidate":candidate is not None,
+                "initialStateVerified":True,"poseSource":pose_source,
                 "reviewProfileEnvelopeVerified":profile is not None,
                 "relaySamples":len(relay_samples)},indent=2)+"\n")
         print("OFFLINE_ONLY_NO_HARDWARE_OUTPUT",flush=True)

@@ -446,3 +446,49 @@ Physical commissioning remains separate: the robot must be in a verified
 clear working pose with an operator present, and the proposed profile,
 as-built clearances and firmware-limit provenance must be accepted.
 The existing guard and local confirmation are not bypassed.
+
+## MANUAL starts from the measured position, not PARK or HOME
+
+Operator decision: MANUAL must accept the current measured seven-axis
+position, regardless of earlier positioning through the factory panel or
+Vision. PARK and HOME are separate future functions, not prerequisites
+or automatic startup destinations. This does not imply that every direction
+is feasible at every pose: existing position, collision and feedback
+interlocks still apply.
+
+The new stationary-seed helper requires two distinct fresh stationary SDK
+observations inside the position envelope. It constructs only the virtual
+GenericSystem initial position values, leaving the factory moving-joint
+geometry, mechanical TCP and scene unchanged. It does not send an actuator
+setpoint. The live owner must also independently verify a fresh,
+source-attributed JTC state and reference against its actual SDK feedback.
+The controller witness has a 100 ms maximum age and 0.001 rad position
+agreement threshold; the existing stationary velocity threshold is
+0.01 rad/s. These are software admission tolerances, not independently
+validated physical accuracy.
+
+The manual engine verifies this agreement before ENABLE, at observed
+enable completion, at the beginning of each new JOG and before its first
+Twist. An old JTC position cannot make an idle session available or admit
+a new jog. During a jog, the existing independent tracking and reference
+envelope checks remain in force. A changed initial position requires a
+fresh virtual interpolation context, not a physical correction toward an
+old reference. No automatic recovery or movement to PARK/HOME is added.
+
+Acceptance on VENTUNO: 105/105 NERO API/owner tests and 6/6 ROS
+message/scene tests passed. A read-only live shadow collected current
+joint observations (157 forwarded; maximum observed age 31.01 ms);
+the first shadow attempt encountered incomplete DDS discovery and the
+bounded discovery wait was corrected without relaxing source identity.
+Two separate isolated GenericSystem fixtures initialized from different
+recorded station joint vectors, each with zero numerical error in the
+initial JTC state/reference comparison. The first was a stationary test
+with a replay of the current measured position; the other replayed an
+earlier raised pose and completed the dynamic Servo/JTC/Relay test
+(129 windows, 263 JTC references, 280 relay references and 55 matched
+scene updates). Loss of feedback and scene-change latching passed.
+All replay tests were software-only; replay receipts cannot authorize
+motion. The real CAN owner and operational services remain unchanged.
+The actual single-owner commissioning startup still has to call the
+live-seed builder and verify the resulting JTC context before admission.
+No physical manual runtime was installed or activated by this step.

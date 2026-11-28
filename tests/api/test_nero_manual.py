@@ -11,12 +11,15 @@ class Ports:
     def __init__(self,c):
         self.c=c;self.drives=False;self.approval=False;self.ready=True
         self.enables=0;self.positions=[];self.holds=0;self.twists=[];self.q=(0.,)*7;self.ref=None
-        self.stale=False;self.bad=False
+        self.stale=False;self.bad=False;self.jtc_q=None
     def read_feedback(self):
         t=self.c.now-(.3 if self.stale else .005)
         return Feedback(self.q,(0.,)*7,t,t,0 if self.drives else 6,1 if self.bad else 0,1,
                         (64 if self.drives else 0,)*7,(t,)*7,(t,)*7)
     def pipeline_ready(self):return self.ready
+    def start_aligned(self,f):
+        return self.jtc_q is None or max(abs(x-y) for x,y in zip(self.jtc_q,f.q))<=.001
+
     def approve(self,v):
         ok=self.approval;self.approval=False;return ok
     def enable(self):self.enables+=1
@@ -67,6 +70,51 @@ class ManualTests(unittest.TestCase):
     def test_feedback_lost(self):
         self.enabled();self.jog();self.p.stale=True;self.tick()
         self.assertEqual(self.p.positions,[]);self.assertEqual(self.e.state,"HOLD")
+    def test_start_from_distinct_actual_poses(self):
+        for i,pose in enumerate(((.4,-.2,.3,.8,.1,-.2,.2),(-.7,.1,-.4,.5,-.1,.2,-.3))):
+            with self.subTest(pose=pose):
+                self.setUp()
+                self.p.q=pose;self.p.jtc_q=pose
+                self.enabled()
+                self.assertEqual(self.p.positions,[])
+                self.assertTrue(self.jog()["accepted"])
+                self.assertEqual(self.e.last_q,pose)
+                self.c.step(.02);self.ref()
+                self.p.ref["positions"]=[q+.0002 for q in pose]
+                self.e.tick()
+                self.assertEqual(len(self.p.positions),1)
+                self.assertEqual(self.p.positions[0],tuple(q+.0002 for q in pose))
+    def test_idle_controller_at_old_pose_blocks_enable(self):
+        self.p.q=(.3,)*7;self.p.jtc_q=(0.,)*7;self.p.approval=True
+        self.assertEqual(self.e.report()["reason"],"START_STATE_UNALIGNED")
+        self.assertFalse(self.e.report()["enableAvailable"])
+        self.assertFalse(self.cmd("ENABLE")["accepted"])
+        self.assertEqual((self.p.enables,self.p.positions,self.p.twists),(0,[],[]))
+    def test_old_jtc_reference_after_external_pose_change_blocks_jog(self):
+        self.p.jtc_q=self.p.q
+        self.enabled()
+        self.p.q=(.2,)*7
+        self.assertFalse(self.e.report()["jogAvailable"])
+        self.assertEqual(self.jog()["reason"],"START_STATE_UNALIGNED")
+        self.assertEqual(self.p.positions,[])
+        self.assertEqual(self.p.twists,[])
+    def test_pose_changes_between_jog_admission_and_first_tick(self):
+        self.p.jtc_q=self.p.q
+        self.enabled()
+        self.assertTrue(self.jog()["accepted"])
+        self.p.q=(.2,)*7
+        self.c.step(.02);self.ref();self.e.tick()
+        self.assertEqual(self.e.state,"HOLD")
+        self.assertEqual(self.p.positions,[])
+        self.assertTrue(all(not any(v["linear"]) and not any(v["angular"]) for v in self.p.twists))
+    def test_enable_readback_must_remain_aligned(self):
+        self.p.jtc_q=self.p.q
+        self.p.approval=True
+        self.assertTrue(self.cmd("ENABLE")["accepted"])
+        self.p.drives=True;self.p.q=(.2,)*7
+        self.tick();self.tick()
+        self.assertEqual(self.e.state,"ENABLING")
+        self.assertEqual(self.p.positions,[])
     def test_bad_speed(self):
         self.enabled();self.assertFalse(self.cmd("JOG",1,declaration={"frame":"BASE","linearMmS":100,"angularDegS":5},axis="X",direction=1)["accepted"])
         self.assertEqual(self.p.positions,[])
@@ -141,6 +189,7 @@ class ManualBoundaryTests(unittest.TestCase):
         native.owner=NS(agx_arm=NS(enable=lambda **kw:calls.append(("enable",kw))),
                         _control_arm_joints=lambda q:calls.append(("position",q)))
         native.pipeline_ready=lambda:True;native.read_feedback=p.read_feedback
+        native.start_aligned=p.start_aligned
         with patch("vision_station.ros_nero_manual.time.time",c.wall):
             native.enable()
             self.assertEqual(calls,[("enable",{"timeout":0.})])

@@ -127,6 +127,7 @@ class ManualEngine:
         self.sent_at=self.enable_sample=0.;self.enable_count=0
         self.last_stamp=0;self.last_reference_at=0.;self.last_q=None;self.last_send=0.
         self.stable_since=None
+        self.start_pending=False
 
     def feedback(self):
         try:
@@ -138,6 +139,12 @@ class ManualEngine:
         try:return self.ports.pipeline_ready() is True
         except Exception:return False
 
+    def start_aligned(self,f):
+        if f is None or not self.profile.contains(f.q):
+            return False
+        try:return self.ports.start_aligned(f) is True
+        except Exception:return False
+
     def zero(self):
         try:self.ports.twist({"frameId":"base_link","linear":[0.]*3,"angular":[0.]*3})
         except Exception:pass
@@ -145,6 +152,7 @@ class ManualEngine:
     def latch(self,reason,*,invoke=True):
         self.state="HOLD";self.reason=reason;self.session=None
         self.intent=self.declaration=None
+        self.start_pending=False
         self.zero()
         if invoke:
             try:
@@ -162,11 +170,13 @@ class ManualEngine:
         with self.lock:
             f=self.feedback();drives=list(f.drives()) if f else [None]*7
             ready=self.ready()
+            aligned=self.start_aligned(f) if ready and self.state in ("IDLE","READY") else False
             possible=(self.state=="IDLE" and ready and f is not None and f.clean(self.wall())
                       and f.arm_status in (0,6) and (all(drives) or not any(drives))
-                      and self.profile.contains(f.q) and max(abs(x) for x in f.velocity)<=.01)
-            return {"state":self.state,"reason":self.reason,"driveEnabled":drives,"pipelineReady":ready,
-                    "enableAvailable":possible,"jogAvailable":self.state in ("READY","JOGGING") and ready and f is not None and f.normal(self.wall()),
+                      and aligned and max(abs(x) for x in f.velocity)<=.01)
+            reason=("START_STATE_UNALIGNED" if self.state in ("IDLE","READY") and ready and f is not None and not aligned else self.reason)
+            return {"state":self.state,"reason":reason,"driveEnabled":drives,"pipelineReady":ready,
+                    "enableAvailable":possible,"jogAvailable":self.state in ("READY","JOGGING") and ready and f is not None and f.normal(self.wall()) and (self.state=="JOGGING" or aligned),
                     "holdAvailable":self.state in ("ENABLING","READY","JOGGING","STOPPING"),
                     "linearMax":self.profile.linear_max,"angularMax":self.profile.angular_max}
 
@@ -180,7 +190,7 @@ class ManualEngine:
                 if not 0<=now-v["sentAt"]<=1.:return out(False,"STALE")
                 if self.state!="IDLE" or op in self.used or len(self.used)>=10000:return out(False,"INTERLOCK")
                 f=self.feedback()
-                if not self.report()["enableAvailable"] or f is None:return out(False,"INTERLOCK")
+                if not self.report()["enableAvailable"] or f is None or not self.start_aligned(f):return out(False,"INTERLOCK")
                 if not self.ports.approve(v):return out(False,"NO_LOCAL_CONFIRMATION")
                 self.used.add(op);self.session=(v["instanceId"],op);self.sequence=0
                 self.phase_start=mono;self.idle_until=mono+SESSION_IDLE
@@ -215,9 +225,12 @@ class ManualEngine:
             if self.state=="JOGGING" and (self.intent!=key or self.declaration!=d):
                 self.latch("INPUT_CHANGED_WHILE_MOVING");return out(False,self.reason)
             if self.state=="READY":
+                if not self.start_aligned(f):
+                    return out(False,"START_STATE_UNALIGNED")
                 self.state="JOGGING";self.reason="JOG_ACTIVE";self.phase_start=mono
                 self.last_reference_at=mono;self.last_q=tuple(f.q);self.last_send=mono
                 self.last_stamp=int(now*NANO);self.intent=key;self.declaration=dict(d)
+                self.start_pending=True
                 try:self.ports.reference()  # discard queued sample from previous input
                 except Exception:self.latch("TRANSPORT_LOST");return out(False,self.reason)
             self.lease=mono+LEASE;self.idle_until=mono+SESSION_IDLE
@@ -229,7 +242,7 @@ class ManualEngine:
             if self.state=="ENABLING":
                 f=self.feedback()
                 if not self.ready() or mono-self.phase_start>2.5:self.latch("ENABLE_UNVERIFIED");return
-                if f and f.normal(now) and f.stamp_min()>max(self.sent_at,self.enable_sample):
+                if f and f.normal(now) and self.start_aligned(f) and f.stamp_min()>max(self.sent_at,self.enable_sample):
                     self.enable_sample=f.stamp_min();self.enable_count+=1
                     if self.enable_count>=2:
                         self.state="READY";self.reason="DRIVES_ENABLED_OBSERVED";self.idle_until=mono+SESSION_IDLE
@@ -245,6 +258,10 @@ class ManualEngine:
                     or any(abs(v)>lim+.01 for v,lim in zip(f.velocity,self.profile.joint_velocity_max))):
                 self.latch("FEEDBACK_OR_PIPELINE_LOST");return
             if self.state=="JOGGING" and mono>=self.lease:self.latch("INPUT_LEASE_EXPIRED");return
+            if self.start_pending:
+                self.start_pending=False
+                if not self.start_aligned(f):
+                    self.latch("START_STATE_UNALIGNED");return
             try:
                 if self.state=="JOGGING":self.ports.twist(twist_intent(self.declaration,*self.intent))
                 else:self.zero()

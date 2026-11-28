@@ -186,7 +186,15 @@ def main():
         # Discovery before any shadow process is created.
         spin(1.)
         assert set(view.get_node_names_and_namespaces())=={("review",NS)}
-        assert [ns.rstrip("/")+"/"+n for n,ns in reader.get_node_names_and_namespaces()].count(NODE)==1
+        # DDS discovery can complete after the initial one-second sample.
+        # Wait only for the expected unique owner; never accept duplicates.
+        discovery_end=time.monotonic()+3.
+        while True:
+            n=[ns.rstrip("/")+"/"+n for n,ns in reader.get_node_names_and_namespaces()].count(NODE)
+            if n>1:raise RuntimeError("ambiguous guarded source")
+            if n==1 and all(endpoint(k) is not None for k in specs):break
+            if time.monotonic()>=discovery_end:raise RuntimeError("guarded source discovery incomplete")
+            spin(.05)
         for key,(topic,kind,msgtype,_) in specs.items():
             pins[key]=endpoint(key)
             if pins[key] is None:raise RuntimeError("unverified feedback source "+key)
