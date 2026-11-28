@@ -313,3 +313,52 @@ the boot receiver identity check rejected the currently enumerated USB
 device. No receiver configuration, operational service, actuator state,
 production or baseline was changed. The actual AgileX receiver and fresh
 feedback must be restored before a separate supervised physical acceptance.
+
+## Real feedback — stationary shadow acceptance
+
+The original AgileX USB-CAN receiver became available after the operator
+restored the USB hub and restarted VENTUNO. The receiver preflight passed
+without configuration changes. The existing guarded owner remains the
+sole operational CAN owner, with legacy motion and auto-enable disabled.
+
+The new station_live_shadow.py utility subscribes to the existing joint,
+arm and motor diagnostics in local domain 181. Its only service request
+there is GetParameters on the guarded owner. The pinned real JointState
+is copied with its original source timestamp into isolated domain 232.
+The official Servo PlanningSceneMonitor loads the exact offline review
+bundle, with its own separate scene input and unused command topics.
+No controller manager, relay, motion publisher, command-type selection,
+SDK owner or CAN socket is created in the shadow runtime. It is not a
+commissioning launcher and cannot grant physical execution authority.
+
+The stationary review requires the seven drives to be disabled and
+fault-free, unchanged actual joint position, source identity, bounded
+source age and receipt gaps, archived position limits and a matching full
+PSM readback. A snapshot of motor diagnostics is not equivalent to
+checking fresh per-axis SDK caches at every future motion command.
+The scene service has no usable source state stamp; equality is checked
+in a stationary pose, not presented as dynamic physical validation.
+
+Observed acceptance: 207 joint observations, 135 arm and 136 motor
+diagnostic observations; 160 real joint samples forwarded. Maximum
+joint source age 48.25 ms, maximum receipt gap 58.21 ms; five full PSM
+readbacks matched the seven measured joint positions exactly, including
+the verified table and attached tool with unchanged collision permissions.
+CAN counter changes: 17,237 received, no additional drops or errors,
+zero transmitted. The isolated runtime was stopped after the test.
+
+The current measured joint vector was also checked in the exact
+candidate using the existing native offline proximity probe. No modeled
+world or self collision was found; nearest world pair was table/Sony
+(6.08 mm) and nearest self pair flange/link5 (8.42 mm).
+The factory FK and unchanged arm kinematics agree numerically.
+The proposed mechanical mount-face TCP was about 73.99 mm above the
+modeled table. These values are model results, not independently
+verified physical clearances. The proximity thresholds predict strong
+deceleration in this parked configuration; no margin was reduced.
+
+Actual mode remains WEB, with all drives disabled. The candidate is
+still a review-only geometry/configuration. No live manual owner or
+production launch has been installed. The operator's TCP reference
+selection, explicit motion envelope, sufficient actual clearance and
+separate supervised commissioning remain required.
