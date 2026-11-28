@@ -259,3 +259,57 @@ This supersedes the earlier blocked dynamic **software fixture** result.
 The fixture has a synthetic obstacle and synthetic observed feedback;
 it does not constitute real-station geometry/TCP, speed envelope, or
 physical execution acceptance. No physical deployment, motion or merge.
+
+## Station-derived offline review candidate
+
+The private review bundle generator now binds the previously documented
+post-calibration assembly, unchanged SRDF and scene, historical firmware
+limit observation, recorded stationary raised pose, and the nine installed
+NERO collision meshes. The candidate URDF changes only the geometry-free
+fixed TCP joint. Its proposed reference is the center of the mechanical
+mount face with the factory flange axes, not the camera optical center.
+The actual operator TCP selection and physical clearance acceptance remain
+open. Factory moving joints and collision meshes are unchanged.
+
+The candidate derives position bounds from the intersection of recorded
+controller, SDK and model limits; recorded controller maximum velocities
+are not approved manual operating speeds. The local preparation tool
+checks the installed SDK against its archived reference without opening
+a CAN interface. Symlink-installed collision meshes must resolve to the
+exact relative filenames in an explicitly named source package. Changes
+to a model, scene, manifest or installed mesh are rejected on reloading
+the candidate. This is consistency checking, not cryptographic operator
+approval. The candidate has no executable physical owner configuration.
+
+The existing isolated GenericSystem smoke fixture accepts the private
+candidate explicitly. It reads back both the table and attached tool from
+the Servo PSM, checks composed primitive transforms, unchanged allowed
+collision matrix and touch links, and verifies the timestamp-aligned
+observer. The simulated observation now preserves the mock broadcaster's
+original timestamp instead of making a cached sample appear fresh.
+The test executor is joined before its ROS handles are destroyed.
+
+Validation on VENTUNO: NERO API/owner tests 84/84, including ten new
+candidate-bundle tests; actual ROS message/scene tests 6/6. The complete
+candidate dynamic fixture passed (120 trajectory windows, 232 sampled JTC
+references, 279 Relay samples, 50 time-aligned scene updates, Servo status
+0 and 4). Both independent observed state and the full station scene were
+verified; loss of feedback and scene change latched admission. A previous
+attempt correctly failed the existing feedback-age limit. The earlier
+stationary fixture exposed an executor cleanup race, fixed in the final
+passing dynamic run.
+
+The replayed raised pose has no modeled collision, but minimum self
+clearance is about 4.49 mm (flange/link5); the model predicts proximity
+deceleration. The maximum simulated joint displacement was only
+0.0007116 rad. This passes software transport/observation, not a practical
+motion-speed envelope or a physical clearance test. No collision threshold
+was reduced. The model still contains a diagnostic Sony proxy and the
+candidate table transform, rather than a formally approved as-built
+station release.
+
+At the start of this work the physical guarded owner was not available:
+the boot receiver identity check rejected the currently enumerated USB
+device. No receiver configuration, operational service, actuator state,
+production or baseline was changed. The actual AgileX receiver and fresh
+feedback must be restored before a separate supervised physical acceptance.

@@ -26,12 +26,21 @@ def main():
     p.add_argument("--servo-prefix",type=Path,required=True)
     p.add_argument("--output",type=Path,required=True)
     p.add_argument("--relay",type=Path)
+    p.add_argument("--station-candidate",type=Path,
+                   help="offline review bundle; recorded pose is replayed only")
+    p.add_argument("--mesh-source-root",type=Path)
     group=p.add_mutually_exclusive_group()
     group.add_argument("--observe-pipeline",action="store_true")
     group.add_argument("--observe-stationary",action="store_true",
                        help="verify observation and fault latching without even synthetic motion")
     a=p.parse_args()
     a.observe_pipeline=a.observe_pipeline or a.observe_stationary
+    if a.station_candidate is not None and not a.observe_pipeline:
+        p.error("candidate requires an explicit observation fixture")
+    if a.station_candidate is not None and (
+            not a.station_candidate.is_absolute() or
+            not a.station_candidate.resolve().is_relative_to("/srv/vision-data")):
+        p.error("private NVMe candidate only")
     if a.observe_pipeline and a.relay is None:
         p.error("the software relay is required for observation tests")
     if os.environ.get("ROS_DOMAIN_ID")!=str(DOMAIN) or os.environ.get("ROS_LOCALHOST_ONLY")!="1":
@@ -63,6 +72,18 @@ def main():
     params={}
     for section in (cfg.robot_description,cfg.robot_description_semantic,cfg.robot_description_kinematics,cfg.joint_limits):
         params.update(section)
+    candidate=None
+    pose=POSE
+    if a.station_candidate is not None:
+        from ament_index_python.packages import get_package_share_directory
+        from vision_station.nero_manual_station import load
+        candidate=load(a.station_candidate,
+                       mesh_root=get_package_share_directory("agx_arm_description"),
+                       mesh_source_root=a.mesh_source_root)
+        params["robot_description"]=candidate.urdf
+        params["robot_description_semantic"]=candidate.srdf
+        pose=list(candidate.historical_q)
+        print("OFFLINE_STATION_CANDIDATE_LOADED",flush=True)
     model=ET.fromstring(params["robot_description"])
     control=model.find("ros2_control")
     if control is None or control.findtext("hardware/plugin")!="mock_components/GenericSystem":
@@ -72,7 +93,7 @@ def main():
     for joint in control.findall("joint"):
         for interface in joint.findall("state_interface"):
             if interface.get("name")=="position":
-                interface.find("param").text=str(POSE[NAMES.index(joint.get("name"))])
+                interface.find("param").text=str(pose[NAMES.index(joint.get("name"))])
     params["robot_description"]=ET.tostring(model,encoding="unicode")
     params["moveit_servo"]={
         "move_group_name":"arm","command_in_type":"speed_units",
@@ -116,7 +137,7 @@ def main():
     node=rclpy.create_node("fixture",namespace=NS,context=ctx,start_parameter_services=False)
     executor=SingleThreadedExecutor(context=ctx);executor.add_node(node)
     children=[];logs=[];relay_socket=None;relay_samples=[]
-    observer=ObservationFixture(node,params) if a.observe_pipeline else None
+    observer=ObservationFixture(node,params,station_candidate=candidate) if a.observe_pipeline else None
     def spawn(name,cmd):
         log=(a.output/(name+".log")).open("w");logs.append(log)
         child=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT,env=env);children.append(child)
@@ -185,14 +206,15 @@ def main():
         if not samples:raise RuntimeError("no controller state")
         if observer is not None:
             observer.confirmed_twist=True
-            observer.prepare(spin,POSE)
+            observer.prepare(spin,pose)
             if a.observe_stationary:
                 observer.test_loss(spin)
                 (a.output/"stationary_observation_result.json").write_text(json.dumps({
                     "status":"PASS","independentObservedState":True,
                     "monitorVerified":True,"feedbackLossLatched":True,
                     "sceneChangeLatched":True,"syntheticOnly":True,
-                    "dynamicMotionTested":False,"realStationAcceptance":False},indent=2)+"\n")
+                    "dynamicMotionTested":False,"realStationAcceptance":False,
+                    "fullStationCandidate":candidate is not None},indent=2)+"\n")
                 print("STATIONARY_OBSERVATION_ONLY_PASS",flush=True)
                 return
         next_cmd=0.
@@ -203,12 +225,12 @@ def main():
             next_cmd=time.monotonic()+.02
             msg=TwistStamped();msg.header.stamp=node.get_clock().now().to_msg();msg.header.frame_id="base_link"
             if axis:
-                v=twist_intent({"frame":"BASE","linearMmS":10,"angularDegS":5},axis,1)
+                v=twist_intent({"frame":"BASE","linearMmS":5 if candidate is not None else 10,"angularDegS":5},axis,1)
                 msg.twist.linear.x,msg.twist.linear.y,msg.twist.linear.z=v["linear"]
                 msg.twist.angular.x,msg.twist.angular.y,msg.twist.angular.z=v["angular"]
             twist.publish(msg)
         before=len(samples);start=dict(zip(samples[-1].joint_names,samples[-1].reference.positions))
-        spin(2.,lambda:drive("X"))
+        spin(2.,lambda:drive("Z" if candidate is not None else "X"))
         spin(.6,lambda:drive())
         spin(.4)
         if not windows or not statuses:raise RuntimeError("no Servo output")
@@ -221,7 +243,7 @@ def main():
               "max_synthetic_displacement_rad",round(displacement,7),
               "status_codes",sorted(set(s.code for s in statuses)),flush=True)
         if a.relay:
-            if not relay_samples or not any(max(abs(q-p) for q,p in zip(s["positions"],POSE))>1e-5 for s in relay_samples):
+            if not relay_samples or not any(max(abs(q-p) for q,p in zip(s["positions"],pose))>1e-5 for s in relay_samples):
                 raise RuntimeError("native source-checked relay delivered no valid references")
             print("NATIVE_GID_RELAY_PASS","samples",len(relay_samples),flush=True)
         if observer is not None:
@@ -235,7 +257,7 @@ def main():
                 "monitorVerified":True,"feedbackLossLatched":True,
                 "sceneChangeLatched":True,"syntheticOnly":True,
                 "realStationAcceptance":False,
-                "matchedSceneUpdates":matched,
+                "matchedSceneUpdates":matched,"fullStationCandidate":candidate is not None,
                 "relaySamples":len(relay_samples)},indent=2)+"\n")
         print("OFFLINE_ONLY_NO_HARDWARE_OUTPUT",flush=True)
     finally:

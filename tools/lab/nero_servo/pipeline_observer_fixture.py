@@ -9,12 +9,13 @@ from vision_station.ros_nero_manual_pipeline import (
 
 
 class ObservationFixture:
-    def __init__(self, node, params):
+    def __init__(self, node, params, station_candidate=None):
         from sensor_msgs.msg import JointState
         from moveit_msgs.srv import GetPlanningScene
         from moveit_msgs.msg import PlanningScene
         self.node = node
         self.params = params
+        self.station_candidate = station_candidate
         self.routes = Routes.fixture()
         self.msg_type = JointState
         self.pub = node.create_publisher(JointState, self.routes.feedback_topic, 10)
@@ -26,10 +27,13 @@ class ObservationFixture:
         self.observer_node = None
         self.observer_executor = None
         self.observer_thread = None
+        self.observer_stop = None
+        self.observer_error = None
         self.enabled = True
         self.override = None
         self.last = None
         self.next_publish = 0.
+        self.last_published_stamp = None
         self.confirmed_twist = False
         self.scene = None
         self.contract = None
@@ -45,7 +49,15 @@ class ObservationFixture:
         m = self.msg_type()
         m.name = ["joint"+str(i) for i in range(1,8)]
         m.position = q
-        m.header.stamp = self.node.get_clock().now().to_msg()
+        # The override is a deliberate synthetic measurement. Otherwise
+        # preserve the actual mock-state timestamp and never restamp cached
+        # controller positions as fresh observations.
+        m.header.stamp = (self.node.get_clock().now().to_msg() if self.override is not None
+                          else self.last.header.stamp)
+        stamp = (m.header.stamp.sec,m.header.stamp.nanosec)
+        if self.last_published_stamp is not None and stamp<=self.last_published_stamp:
+            return
+        self.last_published_stamp=stamp
         self.pub.publish(m)
 
     def read_scene(self, spin):
@@ -77,21 +89,31 @@ class ObservationFixture:
         self.override = None
         spin(.4)
 
-        # Only a synthetic obstacle distant from the simulated arm. No station
-        # geometry, real feedback, or physical driver is used in this fixture.
         old = self.read_scene(spin)
         assert not old.world.collision_objects
         assert not old.robot_state.attached_collision_objects
-        obj = CollisionObject(id="observer_fixture_box")
-        obj.header.frame_id = "world"
-        obj.pose.position.x = 3.
-        obj.pose.orientation.w = 1.
-        obj.primitives = [SolidPrimitive(type=SolidPrimitive.BOX,dimensions=[.1,.1,.1])]
-        obj.primitive_poses = [Pose()]
-        obj.primitive_poses[0].orientation.w = 1.
-        scene = PlanningScene(is_diff=True)
-        scene.robot_state.is_diff = True
-        scene.world.collision_objects = [obj]
+        if self.station_candidate is None:
+            # The original synthetic obstacle regression.
+            obj = CollisionObject(id="observer_fixture_box")
+            obj.header.frame_id = "world"
+            obj.pose.position.x = 3.
+            obj.pose.orientation.w = 1.
+            obj.primitives = [SolidPrimitive(type=SolidPrimitive.BOX,dimensions=[.1,.1,.1])]
+            obj.primitive_poses = [Pose()]
+            obj.primitive_poses[0].orientation.w = 1.
+            scene = PlanningScene(is_diff=True)
+            scene.robot_state.is_diff = True
+            scene.world.collision_objects = [obj]
+        else:
+            from rclpy.serialization import deserialize_message
+            scene=deserialize_message(self.station_candidate.scene,PlanningScene)
+            assert scene.is_diff and scene.robot_state.is_diff
+            assert len(scene.world.collision_objects)==1
+            assert len(scene.robot_state.attached_collision_objects)==1
+            assert not scene.robot_state.joint_state.name
+            assert not scene.allowed_collision_matrix.entry_names
+            assert not scene.allowed_collision_matrix.default_entry_names
+            assert not scene.world.octomap.octomap.data
         deadline = time.monotonic()+5.
         while self.scene_pub.get_subscription_count() != 1 and time.monotonic()<deadline:
             spin(.05)
@@ -99,12 +121,16 @@ class ObservationFixture:
         self.scene_pub.publish(scene)
         spin(.45)
         actual = self.read_scene(spin)
-        assert len(actual.world.collision_objects)==1
-        result = actual.world.collision_objects[0]
-        assert result.id == obj.id and result.primitives == obj.primitives
-        assert abs(result.pose.position.x+result.primitive_poses[0].position.x-3.) < 1e-8
+        if self.station_candidate is None:
+            assert len(actual.world.collision_objects)==1
+            result = actual.world.collision_objects[0]
+            assert result.id == obj.id and result.primitives == obj.primitives
+            assert abs(result.pose.position.x+result.primitive_poses[0].position.x-3.) < 1e-8
+            assert not actual.robot_state.attached_collision_objects
+        else:
+            self.verify_station_geometry(scene,actual)
+            print("FULL_STATION_SCENE_READBACK_PASS",flush=True)
         assert actual.allowed_collision_matrix == old.allowed_collision_matrix
-        assert not actual.robot_state.attached_collision_objects
         assert max(abs(a-b) for a,b in zip(joint_vector(actual.robot_state.joint_state),pose)) < 1e-6
         self.scene = actual
         # Independently reread the entire static scene multiple times.
@@ -134,10 +160,57 @@ class ObservationFixture:
         self.start_monitor()
         self.wait_ready(spin)
 
+    @staticmethod
+    def verify_station_geometry(expected,actual):
+        # Compare composed primitive transforms instead of assuming MoveIt
+        # preserves the decomposition between object pose and shape pose.
+        import numpy as np
+        def pos(p):
+            return np.array([p.x,p.y,p.z])
+        def rot(p):
+            q=np.array([p.x,p.y,p.z,p.w])
+            assert abs(np.linalg.norm(q)-1.)<1e-6
+            x,y,z,w=q/np.linalg.norm(q)
+            return np.array([[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],
+                             [2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],
+                             [2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]])
+        def check(a,b):
+            assert a.id==b.id and a.header.frame_id==b.header.frame_id
+            assert a.primitives==b.primitives
+            assert not a.meshes and not b.meshes and not a.planes and not b.planes
+            assert not a.subframe_names and not b.subframe_names
+            assert len(a.primitive_poses)==len(b.primitive_poses)==len(a.primitives)
+            for x,y in zip(a.primitive_poses,b.primitive_poses):
+                ap=pos(a.pose.position)+rot(a.pose.orientation)@pos(x.position)
+                bp=pos(b.pose.position)+rot(b.pose.orientation)@pos(y.position)
+                assert np.linalg.norm(ap-bp)<1e-8
+                assert np.max(np.abs(rot(a.pose.orientation)@rot(x.orientation)
+                    -rot(b.pose.orientation)@rot(y.orientation)))<1e-7
+        assert len(actual.world.collision_objects)==len(expected.world.collision_objects)==1
+        assert len(actual.robot_state.attached_collision_objects)==len(expected.robot_state.attached_collision_objects)==1
+        table=expected.world.collision_objects[0]
+        assert table.id=="vision_table_1500x780_candidate"
+        check(table,actual.world.collision_objects[0])
+        a=expected.robot_state.attached_collision_objects[0]
+        b=actual.robot_state.attached_collision_objects[0]
+        assert a.link_name==b.link_name=="link7"
+        assert list(a.touch_links)==list(b.touch_links)==["flange_link"]
+        assert len(a.object.primitives)==3
+        check(a.object,b.object)
+        acm=actual.allowed_collision_matrix
+        if b.object.id in acm.default_entry_names:
+            assert not acm.default_entry_values[acm.default_entry_names.index(b.object.id)]
+        if b.object.id in acm.entry_names:
+            i=acm.entry_names.index(b.object.id)
+            for other in ("link5","link6",table.id):
+                if other in acm.entry_names:
+                    assert not acm.entry_values[i].enabled[acm.entry_names.index(other)]
+        assert not actual.world.octomap.octomap.data
+
     def start_monitor(self):
         import rclpy
         from rclpy.executors import SingleThreadedExecutor
-        from threading import Thread
+        from threading import Event, Thread
         self.observer_node = rclpy.create_node("pipeline_observer",namespace=self.routes.namespace,
                                 context=self.node.context,start_parameter_services=False)
         self.observer_executor = SingleThreadedExecutor(context=self.node.context)
@@ -145,18 +218,34 @@ class ObservationFixture:
         self.monitor = RosPipelineMonitor(self.observer_node,self.contract,
                              twist_mode_confirmed=lambda:self.confirmed_twist)
         self.monitor.start()
-        self.observer_thread = Thread(target=self.observer_executor.spin,daemon=True)
+        self.observer_stop=Event()
+        self.observer_error=None
+        def observe():
+            try:
+                while not self.observer_stop.is_set():
+                    self.observer_executor.spin_once(timeout_sec=.02)
+            except Exception as exc:
+                self.observer_error=exc
+                self.monitor.authority.invalidate("OBSERVER_EXECUTOR_FAILED")
+        self.observer_thread = Thread(target=observe,daemon=True)
         self.observer_thread.start()
 
     def stop_monitor(self):
         if self.observer_executor is not None:
+            # Join before destroying the ROS executor guard conditions.
+            self.observer_stop.set()
+            self.observer_thread.join(timeout=3.)
+            if self.observer_thread.is_alive():
+                raise RuntimeError("observer executor did not stop")
+            self.observer_executor.remove_node(self.observer_node)
             self.observer_executor.shutdown(timeout_sec=2.)
-            self.observer_thread.join(timeout=2.)
         if self.monitor is not None:
             self.monitor.close()
         if self.observer_node is not None:
             self.observer_node.destroy_node()
         self.observer_executor = self.observer_thread = self.observer_node = self.monitor = None
+        if self.observer_error is not None:
+            raise RuntimeError("observer executor failed") from self.observer_error
 
     def wait_ready(self, spin):
         deadline = time.monotonic()+8.
