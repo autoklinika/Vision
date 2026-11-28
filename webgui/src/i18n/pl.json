@@ -1128,5 +1128,9 @@
   "Actual control mode feedback": "Rzeczywisty odczyt trybu sterowania",
   "Operator request only. Uses the factory disable command; requires all drives disabled and stationary.": "Tylko na żądanie operatora. Fabryczne polecenie disable; wymagany postój i wszystkie napędy wyłączone.",
   "CAN_CONNECTED": "Potwierdzono przejęcie sterowania CAN",
-  "CAN_CONNECT_UNVERIFIED": "Nie potwierdzono przejęcia sterowania CAN"
+  "CAN_CONNECT_UNVERIFIED": "Nie potwierdzono przejęcia sterowania CAN",
+  "ALREADY_CAN": "Sterowanie CAN jest już aktywne",
+  "CAN is already connected.": "Sterowanie CAN jest już aktywne.",
+  "CAN connection not available: verify the owner, idle station and disabled drives.": "Połączenie CAN niedostępne: sprawdź właściciela CAN, bezczynność stanowiska i wyłączone napędy.",
+  "Motion control is not commissioned. CAN connection is independent. The keyboard test does not send robot commands.": "Sterowanie ruchem nie zostało jeszcze odebrane. Połączenie CAN jest niezależne. Test klawiatury nie wysyła poleceń do robota."
 }

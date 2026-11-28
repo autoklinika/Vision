@@ -23,6 +23,7 @@ from .status import boot_status
 from vision_station.inspection import InspectionRejected, ID, HEX32
 from vision_station.luxonis_ir import IRRejected, validate_request
 from vision_station.nero_manual import valid_intent as valid_manual_intent
+from vision_station import nero_can_connection as can_connection
 from vision_station.nero_manual_api import locked as manual_locked
 from vision_station.nero_clear_coordinator import valid_intent
 from vision_station.draft_editor import DraftConflict, DraftNotFound, FIELDS, EDITOR_WIRE_LIMIT, ASSET_WIRE_LIMIT
@@ -116,7 +117,7 @@ def _origins(values):
 class StationApplication:
     """Authentication is enforced before accessing any protected owner. Session commands also require operator permission."""
 
-    def __init__(self, *, identity, owner, dist_root, origins, manual_local=False, manual_review_local=False):
+    def __init__(self, *, identity, owner, dist_root, origins, manual_local=False, manual_review_local=False, nero_can_enabled=False):
         self.identity = identity
         self.owner = owner
         self.origins = _origins(origins)
@@ -124,6 +125,7 @@ class StationApplication:
             raise ValueError("manual listener is local-only")
         if manual_local and manual_review_local:
             raise ValueError("review listener must not expose the command route")
+        self.nero_can_enabled=bool(nero_can_enabled)
         self.manual_local=bool(manual_local)
         self.manual_review_local=bool(manual_review_local)
         self.static = _load_static(dist_root)
@@ -277,6 +279,15 @@ class StationApplication:
                 self.identity.logout(token)
             return self._json(start_response, 200, {"schema": "vision.api.logout.v1", "loggedOut": True},
                               extra=[("Set-Cookie", self._cookie("", secure=secure, clear=True))])
+        if method == "POST" and target == "/api/v1/devices/nero/can-connection":
+            if not self.nero_can_enabled:return self._error(start_response,403,"OPERATOR_REQUIRED")
+            if environ.get("HTTP_ORIGIN")!=origin or environ.get("HTTP_X_VISION_CLIENT")!="webgui":
+                return self._error(start_response,403,"ORIGIN_REJECTED")
+            identity=self._authorize(environ,touch=False)
+            if identity["role"]!="operator":return self._error(start_response,403,"OPERATOR_REQUIRED")
+            value=self._body(environ,{"instanceId","operationId","sentAt"},1024)
+            if not can_connection.valid_intent(value):raise ValueError("invalid CAN connection")
+            return self._json(start_response,200,self.owner.nero_can_command(**value,operator=identity["username"]))
         if method == "POST" and target == "/api/v1/devices/nero/manual/command":
             if not self.manual_local or environ.get("REMOTE_ADDR")!="127.0.0.1":
                 return self._error(start_response,403,"OPERATOR_REQUIRED")
@@ -348,6 +359,11 @@ class StationApplication:
             return self._json(start_response, 200, boot_status())
         if target == "/api/v1/auth/session":
             return self._json(start_response, 200, self._authorize(environ, touch=False))
+        if target == "/api/v1/devices/nero/can-connection":
+            identity=self._authorize(environ,touch=False)
+            if not self.nero_can_enabled or identity["role"]!="operator":
+                return self._json(start_response,200,can_connection.status(self.owner.station_report()["instanceId"],{"mode":None,"available":False}))
+            return self._json(start_response,200,self.owner.nero_can_report())
         if target == "/api/v1/devices/nero/manual":
             identity=self._authorize(environ,touch=False)
             if not (self.manual_local or self.manual_review_local) or environ.get("REMOTE_ADDR")!="127.0.0.1" or identity["role"]!="operator":

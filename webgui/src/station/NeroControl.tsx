@@ -6,6 +6,7 @@ import {keyboardMap} from './neroTcpContract';
 import type {TcpReport,TcpIntent,TcpFrame} from './neroTcpContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 import {useNeroManual} from './useNeroManual';
+import {useNeroCanConnection} from './useNeroCanConnection';
 import {manualSpeedLimits,displayedManualSpeed} from './neroManualContract';
 import {NeroJointPreflight} from './NeroJointPreflight';
 
@@ -33,6 +34,7 @@ export function NeroControl({station,active,controlMode}:{station:StationPresent
  const keyboard=useRef<HTMLDivElement>(null);
  const enabled=active&&!station.accountBusy&&station.report.coreConnection==='CONNECTED';
  const manual=useNeroManual(owner,enabled&&station.identity.role==='operator');
+ const canConnection=useNeroCanConnection(owner,enabled&&station.identity.role==='operator');
  const [physical,setPhysical]=useState(false);
  const stop=()=>{held.current=null;setKey(null);manual.release();};
  const reviewOnly=manual.status?.reason==='REVIEW_ONLY';
@@ -87,16 +89,19 @@ export function NeroControl({station,active,controlMode}:{station:StationPresent
  const label=(intent:TcpIntent)=>intent.axis+' '+(intent.direction===1?'+':'−');
  return <section aria-label={t('TCP control')} className="nero-tcp-control">
    <div className="luxonis-section-heading"><div><h2>{t('TCP control')}</h2><p>MoveIt Servo · Cartesian teleoperation</p></div><Badge appearance="tint" color={manual.status?.pipelineReady?'informative':'warning'}>{t(reviewOnly?'REVIEW_ONLY':manual.status?.state??'NOT_COMMISSIONED')}</Badge></div>
-   {(!manual.status||reviewOnly)&&<MessageBar intent="warning"><MessageBarBody>{t('Physical control is not commissioned. The keyboard test does not send robot commands.')}</MessageBarBody></MessageBar>}
+   {(!manual.status||reviewOnly)&&<MessageBar intent="warning"><MessageBarBody>{t('Motion control is not commissioned. CAN connection is independent. The keyboard test does not send robot commands.')}</MessageBarBody></MessageBar>}
    {manual.status&&!reviewOnly&&<p className="fine-print">{t('Local maintenance session')} · {t(manual.status.reason)}</p>}
    {manual.notice&&<MessageBar intent={manual.notice==='CAN_CONNECTED'?'success':'warning'}><MessageBarBody>{t(manual.notice)}</MessageBarBody></MessageBar>}
    <section className="luxonis-settings-card" aria-label={t('CAN connection')}>
      <h3>{t('CAN connection')}</h3>
      <div className="nero-tcp-drive-row">
        <div><Badge appearance="tint" color={controlMode===1?'success':controlMode===3?'warning':'informative'}>{controlMode===1?'CAN · 0x01':controlMode===3?'WEB · 0x03':controlMode===null?t('Unknown'):'0x'+controlMode.toString(16).padStart(2,'0')}</Badge><p className="fine-print">{t('Actual control mode feedback')}</p></div>
-       <Button appearance="primary" disabled={!enabled||controlMode===null||controlMode===1||!manual.status?.canConnectAvailable||manual.busy||manual.hasSession||!!manual.approval} onClick={()=>void manual.connectCan()}>{t('Connect CAN')}</Button>
+       <Button appearance="primary" disabled={!enabled||controlMode===null||controlMode===1||!canConnection.status?.available||canConnection.status.mode!==controlMode||canConnection.busy||manual.busy||manual.hasSession||!!manual.approval} onClick={()=>void canConnection.connect()}>{t('Connect CAN')}</Button>
      </div>
      <p className="fine-print">{t('Operator request only. Uses the factory disable command; requires all drives disabled and stationary.')}</p>
+     {canConnection.notice&&<MessageBar intent={['CAN_CONNECTED','ALREADY_CAN'].includes(canConnection.notice)?'success':'warning'}><MessageBarBody>{t(canConnection.notice)}</MessageBarBody></MessageBar>}
+     {controlMode===1&&<p className="fine-print">{t('CAN is already connected.')}</p>}
+     {controlMode!==1&&!canConnection.status?.available&&<p className="fine-print">{t('CAN connection not available: verify the owner, idle station and disabled drives.')}</p>}
    </section>
    <NeroJointPreflight check={check}/>
    <section className="luxonis-settings-card">

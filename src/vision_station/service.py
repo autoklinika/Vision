@@ -9,6 +9,7 @@ from .luxonis_ir import IRController
 from .nero_clear_coordinator import RosClearTransport
 from .client import RemoteStationOwner
 from .nero_manual_transport import ManualTransport
+from .nero_can_connection import CanConnectionTransport
 from .nero_joint_limits import InstalledJointLimits
 
 
@@ -19,6 +20,8 @@ def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None, rev
     parser.add_argument("--session-root", help="Existing private 0700 directory; no runtime composition is enabled by this option alone.")
     parser.add_argument("--diagnostics-disabled", action="store_true", help="Explicitly disable service probes in isolated fixtures.")
     parser.add_argument("--readiness-report", help="Explicit private local ROS observer metadata file (diagnostic only).")
+    parser.add_argument("--nero-can-socket", help="Standalone diagnostic owner CAN connection socket.")
+    parser.add_argument("--nero-can-idle-socket", help="Independent production idle interlock.")
     parser.add_argument("--nero-manual-socket", help="Explicit sole-owner manual maintenance socket; excludes inspections and clear.")
     parser.add_argument("--nero-model-urdf", help="Installed official NERO URDF for read-only joint limit comparison.")
     parser.add_argument("--nero-sdk-profile", help="Selected SDK firmware profile of the existing guarded owner.")
@@ -38,6 +41,8 @@ def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None, rev
     clear_options=(args.nero_clear_overlay,args.nero_clear_ros_directory,args.nero_clear_idle_socket)
     if any(clear_options) and (not all(clear_options) or not args.nero_history_directory):
         parser.error("NERO clear requires all explicit overlay, ROS directory, idle socket and history options")
+    if bool(args.nero_can_socket)!=bool(args.nero_can_idle_socket) or (args.nero_can_socket and (not args.nero_directory or args.nero_manual_socket or any(clear_options) or composition is not None or composition_factory is not None)):
+        parser.error("standalone CAN owner requires observer and exclusive diagnostic composition")
     if args.nero_manual_socket and (any(clear_options) or composition is not None or composition_factory is not None or not args.nero_directory):
         parser.error("exclusive manual maintenance requires NERO observer, no inspection composition or clear")
     if bool(args.nero_model_urdf)!=bool(args.nero_sdk_profile) or (args.nero_model_urdf and not args.nero_directory):
@@ -58,7 +63,7 @@ def main(argv=None, *, composition=None, catalog_dir=None, diagnostics=None, rev
     try:
         server = CoreServer(args.socket, host_factory=lambda: CoreHost(
             args.library_root, session_root=args.session_root, composition=composition,
-            catalog_dir=catalog_dir, review_authority=review_authority, composition_factory=composition_factory, nero_directory=args.nero_directory, nero_joint_limits=InstalledJointLimits(args.nero_model_urdf,args.nero_sdk_profile) if args.nero_model_urdf else None, nero_history_directory=args.nero_history_directory, nero_manual_transport=ManualTransport(args.nero_manual_socket) if args.nero_manual_socket else None, nero_clear_transport=RosClearTransport(args.nero_clear_overlay,args.nero_clear_ros_directory) if args.nero_clear_overlay else None, nero_clear_interlock=RemoteStationOwner(args.nero_clear_idle_socket).station_report if args.nero_clear_idle_socket else None, luxonis_directory=args.luxonis_directory, luxonis_ir=IRController() if args.luxonis_ir_control else None, luxonis_ir_interlock=RemoteStationOwner(args.luxonis_ir_idle_socket).station_report if args.luxonis_ir_idle_socket else None, diagnostics=(lambda: ()) if args.diagnostics_disabled else diagnostics))
+            catalog_dir=catalog_dir, review_authority=review_authority, composition_factory=composition_factory, nero_directory=args.nero_directory, nero_joint_limits=InstalledJointLimits(args.nero_model_urdf,args.nero_sdk_profile) if args.nero_model_urdf else None, nero_history_directory=args.nero_history_directory, nero_manual_transport=ManualTransport(args.nero_manual_socket) if args.nero_manual_socket else None, nero_can_transport=CanConnectionTransport(args.nero_can_socket) if args.nero_can_socket else None, nero_can_interlock=RemoteStationOwner(args.nero_can_idle_socket).station_report if args.nero_can_idle_socket else None, nero_clear_transport=RosClearTransport(args.nero_clear_overlay,args.nero_clear_ros_directory) if args.nero_clear_overlay else None, nero_clear_interlock=RemoteStationOwner(args.nero_clear_idle_socket).station_report if args.nero_clear_idle_socket else None, luxonis_directory=args.luxonis_directory, luxonis_ir=IRController() if args.luxonis_ir_control else None, luxonis_ir_interlock=RemoteStationOwner(args.luxonis_ir_idle_socket).station_report if args.luxonis_ir_idle_socket else None, diagnostics=(lambda: ()) if args.diagnostics_disabled else diagnostics))
     except Exception:
         parser.exit(1, "Core station configuration rejected; check private paths and ownership.\n")
     try:

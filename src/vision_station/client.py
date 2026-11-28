@@ -11,6 +11,7 @@ from vision_api.station_owner import NoActiveSession
 from .inspection import InspectionRejected, validate_inspection_report
 from .luxonis import validate_luxonis_report
 from .nero import validate_nero_report
+from . import nero_can_connection as can_connection
 from .nero_tcp import validate_report as validate_nero_tcp
 from .nero_manual import valid_intent as valid_manual_intent
 from .nero_manual_api import validate_status as validate_manual_status,validate_command as validate_manual_command
@@ -147,6 +148,15 @@ class RemoteStationOwner:
 
     def nero_tcp_report(self):
         return self._read("nero_tcp",{},validate_nero_tcp)
+
+    def nero_can_report(self):
+        return self._read("nero_can",{},can_connection.valid_status)
+
+    def nero_can_command(self,*,operator,**intent):
+        if not valid_actor(operator) or not can_connection.valid_intent(intent):raise ValueError("invalid CAN connection")
+        r=self._read("nero_can_command",{**intent,"operator":operator},can_connection.valid_result)
+        if r["instanceId"]!=intent["instanceId"] or r["result"]["operationId"]!=intent["operationId"]:raise ReportUnavailable()
+        return r
 
     def nero_manual_report(self):
         return self._read("nero_manual",{},validate_manual_status)

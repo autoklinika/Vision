@@ -1,3 +1,5 @@
+import {isCanConnectionReport,isCanConnectionResult} from './neroCanConnectionContract';
+import type {CanConnectionReport,CanConnectionIntent,CanConnectionResult} from './neroCanConnectionContract';
 import {isManualReport,isManualResult} from './neroManualContract';
 import type {ManualReport,ManualResult,ManualIntent} from './neroManualContract';
 import {isTcpReport} from './neroTcpContract';
@@ -90,6 +92,14 @@ export function readNero():Promise<StationResult<NeroReport>>{
   return request<NeroReport,never>('/api/v1/devices/nero',isNeroReport,undefined,undefined,16384);
 }
 
+export function readNeroCanConnection():Promise<StationResult<CanConnectionReport>>{
+ return request<CanConnectionReport,never>('/api/v1/devices/nero/can-connection',isCanConnectionReport,undefined,undefined,4096,2500);
+}
+export async function connectNeroCan(intent:CanConnectionIntent):Promise<StationResult<CanConnectionResult>>{
+ const r=await request<CanConnectionResult,never>('/api/v1/devices/nero/can-connection',isCanConnectionResult,JSON.stringify(intent),undefined,4096,3500);
+ if(r.status==='AVAILABLE'&&(r.report.instanceId!==intent.instanceId||r.report.result.operationId!==intent.operationId))return unavailable;
+ return r;
+}
 export function readNeroManual():Promise<StationResult<ManualReport>>{
  return request<ManualReport,never>('/api/v1/devices/nero/manual',isManualReport,undefined,undefined,4096,1200);
 }

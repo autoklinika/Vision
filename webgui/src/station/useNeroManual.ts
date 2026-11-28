@@ -15,7 +15,6 @@ export function useNeroManual(instance:string,enabled:boolean){
  const input=useRef<ActiveInput|null>(null);
  const interval=useRef<ReturnType<typeof setInterval>|null>(null);
  const pending=useRef(false);
- const connecting=useRef(false);
  const generation=useRef(0);
  const statusEpoch=useRef(0);
  const active=useRef(enabled);active.current=enabled;
@@ -44,15 +43,6 @@ export function useNeroManual(instance:string,enabled:boolean){
  function hold(){
   stopTimer();const s=session.current;session.current=null;setHasSession(false);
   finish(s,'HOLD');
- }
- async function connectCan(){
-  if(!active.current||connecting.current||busy||session.current||approval||!latest.current?.canConnectAvailable)return;
-  connecting.current=true;setBusy(true);setNotice('');statusEpoch.current++;
-  const s={id:crypto.randomUUID().replaceAll('-',''),seq:0};
-  try{
-   const r=await sendNeroManual(make('CONNECT_CAN',s));
-   if(active.current)setNotice(r.status==='AVAILABLE'?r.report.result.reason:'CAN_CONNECT_UNVERIFIED');
-  }finally{connecting.current=false;statusEpoch.current++;setBusy(false);}
  }
  function prepare(){
   if(active.current&&latest.current?.enableAvailable&&!session.current&&!busy)setApproval(crypto.randomUUID().replaceAll('-',''));
@@ -118,5 +108,5 @@ export function useNeroManual(instance:string,enabled:boolean){
   };
  },[instance]);
  useEffect(()=>{if(!enabled){close();}},[enabled]);
- return {status,approval,hasSession,busy,notice,connectCan,prepare,enable,cancelApproval:()=>setApproval(null),start,release,hold,close};
+ return {status,approval,hasSession,busy,notice,prepare,enable,cancelApproval:()=>setApproval(null),start,release,hold,close};
 }

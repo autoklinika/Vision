@@ -9,6 +9,7 @@ from .inspection import InspectionOwner, InspectionRejected
 from .draft_editor import DraftEditor, DraftConflict, EDITOR_LOCK_TIMEOUT
 from .luxonis import LuxonisMonitor
 from .nero import NeroMonitor
+from . import nero_can_connection as can_connection
 from .nero_tcp import project as project_nero_tcp
 from .nero_manual import valid_intent as valid_manual_intent
 from .nero_manual_api import locked as manual_locked,status as manual_status,envelope as manual_envelope,outcome as manual_outcome
@@ -29,7 +30,7 @@ class CoreHost:
     Neither attachment nor cleanup is exposed by the private read protocol.
     """
 
-    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None, nero_manual_transport=None, nero_joint_limits=None):
+    def __init__(self, library_root, *, composition=None, session_root=None, diagnostics=None, catalog_dir=None, review_authority=None, composition_factory=None, luxonis_directory=None, luxonis_ir=None, luxonis_ir_interlock=None, nero_directory=None, nero_history_directory=None, nero_clear_transport=None, nero_clear_interlock=None, nero_manual_transport=None, nero_joint_limits=None, nero_can_transport=None, nero_can_interlock=None):
         self.library = ECULibraryService(library_root, catalog_dir=catalog_dir)
         if review_authority is not None:
             from .reference_review import ReviewAuthority
@@ -57,6 +58,10 @@ class CoreHost:
         self._nero_history = None
         self._nero_clear_transport = nero_clear_transport
         self._nero_clear_interlock = nero_clear_interlock
+        self._nero_can_transport=nero_can_transport
+        self._nero_can_interlock=nero_can_interlock
+        if nero_can_transport is not None and (nero_can_interlock is None or nero_manual_transport is not None or nero_clear_transport is not None or composition is not None):
+            raise ValueError("standalone CAN connection requires exclusive diagnostic owner and independent idle interlock")
         self._nero_manual_transport=nero_manual_transport
         self._manual_binding=None
         if nero_manual_transport is not None and (nero_clear_transport is not None or composition is not None):
@@ -80,6 +85,40 @@ class CoreHost:
             try:reference=self._nero_joint_limits()
             except Exception:pass  # unavailable model/SDK must never mean in-range
         return project_nero_tcp(self.nero_report(),reference=reference)
+
+    def _nero_can_idle(self):
+        if (self._nero_can_transport is None or self._runtime is not None
+                or self.station_report()["state"]!="NO_ACTIVE_SESSION"
+                or self._inspection._poisoned or self._inspection._marker_exists()):
+            return False
+        try:
+            other=self._nero_can_interlock()
+            return other["coreConnection"]=="CONNECTED" and other["state"]=="NO_ACTIVE_SESSION"
+        except Exception:return False
+
+    def nero_can_report(self):
+        instance=self.station_report()["instanceId"]
+        value={"mode":None,"available":False}
+        if self._lifecycle_lock.acquire(timeout=.05):
+            try:
+                if self._nero_can_idle():
+                    try:value=self._nero_can_transport.status()
+                    except Exception:pass
+            finally:self._lifecycle_lock.release()
+        return can_connection.status(instance,value)
+
+    def nero_can_command(self,*,operator,**intent):
+        if not can_connection.valid_intent(intent) or not valid_actor(operator):
+            raise ValueError("invalid CAN connection")
+        instance=self.station_report()["instanceId"]
+        op=intent["operationId"]
+        def reply(reason):return can_connection.envelope(instance,can_connection.result(op,reason))
+        if not self._lifecycle_lock.acquire(timeout=.05):return reply("BUSY")
+        try:
+            if intent["instanceId"]!=instance or not self._nero_can_idle():return reply("INTERLOCK")
+            try:return can_connection.envelope(instance,self._nero_can_transport.connect(intent))
+            except Exception:return reply("CAN_CONNECT_UNVERIFIED")
+        finally:self._lifecycle_lock.release()
 
     def nero_manual_report(self):
         instance=self.station_report()["instanceId"]

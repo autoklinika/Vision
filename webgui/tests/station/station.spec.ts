@@ -967,18 +967,20 @@ test('NERO CAN connection is explicit and shows independent mode feedback',async
    return r.fulfill({contentType,body:JSON.stringify(f)});
  });
  await page.route('**/api/v1/devices/nero/manual',r=>r.fulfill({contentType,body:JSON.stringify({
-   schema:'vision.api.nero-manual.v1',source:'STATION',instanceId:'f'.repeat(32),
-   status:{state:'IDLE',reason:'TEST_FIXTURE',driveEnabled:Array(7).fill(false),pipelineReady:false,
-     canConnectAvailable:available,enableAvailable:false,jogAvailable:false,holdAvailable:false,linearMax:5,angularMax:2}
+   schema:'vision.api.nero-manual.v1',source:'STATION',instanceId:'f'.repeat(32),status:null
  })}));
- await page.route('**/api/v1/devices/nero/manual/command',r=>{
-   const b=r.request().postDataJSON();commands.push(b.action);submitted=true;available=false;
-   expect(b.sequence).toBe(0);expect(b.axis).toBeNull();expect(b.declaration).toBeNull();
+ await page.route('**/api/v1/devices/nero/can-connection',r=>{
+   if(r.request().method()==='GET')return r.fulfill({contentType,body:JSON.stringify({
+     schema:'vision.api.nero-can-connection.v1',source:'STATION',instanceId:'f'.repeat(32),status:{mode,available}
+   })});
+   const b=r.request().postDataJSON();commands.push('CONNECT_CAN');submitted=true;available=false;
+   expect(Object.keys(b).sort()).toEqual(['instanceId','operationId','sentAt']);
    return r.fulfill({contentType,body:JSON.stringify({
-     schema:'vision.api.nero-manual-command.v1',source:'STATION',instanceId:b.instanceId,
-     result:{operationId:b.operationId,action:b.action,sequence:b.sequence,accepted:true,reason:'CAN_CONNECTED',state:'IDLE'}
+     schema:'vision.api.nero-can-connection-result.v1',source:'STATION',instanceId:b.instanceId,
+     result:{operationId:b.operationId,accepted:true,reason:'CAN_CONNECTED'}
    })});
  });
+ await page.route('**/api/v1/devices/nero/manual/command',r=>{throw new Error('MANUAL command must not be sent');});
  await page.goto('/');await login(page,'operator','mock-password');
  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
  await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
