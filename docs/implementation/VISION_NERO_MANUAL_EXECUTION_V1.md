@@ -412,3 +412,37 @@ service, physical configuration or baseline was changed. The actual
 owner still needs separate, supervised commissioning with verified
 as-built scene clearance, current firmware-limit provenance and a
 reviewed operating profile. No merge or deployment.
+
+## Local review deployment acceptance (no motion)
+
+The review-only Core specialization consumes the validated private
+station candidate and the existing passive NERO observation directory.
+It exposes the proposed Precision envelope and real drive state, but no
+manual transport, inspection runtime, IR or clear transport. The local
+authenticated review HTTP listener is mutually exclusive with the
+physical-command listener and rejects manual POST requests before they
+reach Core. A mismatched Core response cannot appear commissioned.
+WebGUI explicitly labels this mode as review-only.
+
+A bounded test on VENTUNO compiled the station WebGUI, created a private
+temporary library and temporary operator identity, started the real Core
+IPC server and loopback HTTP server, loaded built HTML and its linked
+assets, authenticated, and checked actual NERO telemetry and position
+bounds. The proposed profile was reported as 5 mm/s and 2 deg/s; all
+actuation capabilities remained false. A valid manual request was
+rejected by HTTP (403) and a direct request to the isolated Core was
+rejected as NOT_COMMISSIONED. The temporary server and account were
+removed after the test. This is an HTTP/IPC deployment smoke test,
+not an interactive browser acceptance or a persistent installed service.
+
+The CAN counter increased by 2158 received frames with no new drops,
+errors or transmitted frames. Operational service PIDs were unchanged.
+The initial pre-bound HTTP socket was corrected to use the Waitress
+sockets interface; the subsequent complete test passed. The review
+receipt is private on VENTUNO. The physical owner was not replaced.
+No change to the original geometry, calibration, production, or baseline.
+
+Physical commissioning remains separate: the robot must be in a verified
+clear working pose with an operator present, and the proposed profile,
+as-built clearances and firmware-limit provenance must be accepted.
+The existing guard and local confirmation are not bypassed.

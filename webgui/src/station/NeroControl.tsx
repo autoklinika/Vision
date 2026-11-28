@@ -35,6 +35,7 @@ export function NeroControl({station,active}:{station:StationPresentation;active
  const manual=useNeroManual(owner,enabled&&station.identity.role==='operator');
  const [physical,setPhysical]=useState(false);
  const stop=()=>{held.current=null;setKey(null);manual.release();};
+ const reviewOnly=manual.status?.reason==='REVIEW_ONLY';
  const {linearMax,angularMax}=manualSpeedLimits(manual.status);
  const {linear,angular}=displayedManualSpeed(requestedLinear,requestedAngular,manual.status);
  useEffect(()=>{
@@ -85,9 +86,9 @@ export function NeroControl({station,active}:{station:StationPresentation;active
  }
  const label=(intent:TcpIntent)=>intent.axis+' '+(intent.direction===1?'+':'−');
  return <section aria-label={t('TCP control')} className="nero-tcp-control">
-   <div className="luxonis-section-heading"><div><h2>{t('TCP control')}</h2><p>MoveIt Servo · Cartesian teleoperation</p></div><Badge appearance="tint" color={manual.status?.pipelineReady?'informative':'warning'}>{t(manual.status?.state??'NOT_COMMISSIONED')}</Badge></div>
-   {!manual.status&&<MessageBar intent="warning"><MessageBarBody>{t('Physical control is not commissioned. The keyboard test does not send robot commands.')}</MessageBarBody></MessageBar>}
-   {manual.status&&<p className="fine-print">{t('Local maintenance session')} · {t(manual.status.reason)}</p>}
+   <div className="luxonis-section-heading"><div><h2>{t('TCP control')}</h2><p>MoveIt Servo · Cartesian teleoperation</p></div><Badge appearance="tint" color={manual.status?.pipelineReady?'informative':'warning'}>{t(reviewOnly?'REVIEW_ONLY':manual.status?.state??'NOT_COMMISSIONED')}</Badge></div>
+   {(!manual.status||reviewOnly)&&<MessageBar intent="warning"><MessageBarBody>{t('Physical control is not commissioned. The keyboard test does not send robot commands.')}</MessageBarBody></MessageBar>}
+   {manual.status&&!reviewOnly&&<p className="fine-print">{t('Local maintenance session')} · {t(manual.status.reason)}</p>}
    {manual.notice&&<MessageBar intent="warning"><MessageBarBody>{t(manual.notice)}</MessageBarBody></MessageBar>}
    <NeroJointPreflight check={check}/>
    <section className="luxonis-settings-card">
@@ -111,7 +112,7 @@ export function NeroControl({station,active}:{station:StationPresentation;active
        </Field>
      </div>
      <div className="nero-planned">{presets.map(p=><Button key={p.name} disabled={p.linear>linearMax||p.angular>angularMax} appearance={linear===p.linear&&angular===p.angular?'primary':'secondary'} onClick={()=>{stop();setLinear(p.linear);setAngular(p.angular);}}>{t(p.name)}</Button>)}</div>
-     <p className="fine-print">{manual.status?t('Accepted speed envelope')+': '+manual.status.linearMax+' mm/s · '+manual.status.angularMax+' °/s':t('Draft speed limits for commissioning; declaration is not applied to the real robot.')}</p>
+     <p className="fine-print">{manual.status?t(reviewOnly?'Review speed envelope':'Accepted speed envelope')+': '+manual.status.linearMax+' mm/s · '+manual.status.angularMax+' °/s':t('Draft speed limits for commissioning; declaration is not applied to the real robot.')}</p>
      <dl className="nero-details"><dt>{t('Actual linear TCP speed')}</dt><dd>— mm/s</dd><dt>{t('Actual angular TCP speed')}</dt><dd>— °/s</dd></dl>
    </section>
    <section className="luxonis-settings-card">

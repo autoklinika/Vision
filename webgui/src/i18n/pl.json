@@ -1098,6 +1098,8 @@
   "Confirm drive enable": "Potwierdź włączenie napędów",
   "Close manual session": "Zakończ sesję ręczną",
   "Accepted speed envelope": "Dopuszczalna prędkość",
+  "REVIEW_ONLY": "Odbiór bez ruchu",
+  "Review speed envelope": "Proponowany zakres prędkości do odbioru",
   "Start manual keyboard": "Uruchom sterowanie klawiaturą",
   "End manual keyboard": "Zakończ sterowanie klawiaturą",
   "AWAITING_DRIVE_FEEDBACK": "Oczekiwanie na potwierdzenie napędów",

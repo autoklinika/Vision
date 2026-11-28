@@ -116,13 +116,16 @@ def _origins(values):
 class StationApplication:
     """Authentication is enforced before accessing any protected owner. Session commands also require operator permission."""
 
-    def __init__(self, *, identity, owner, dist_root, origins, manual_local=False):
+    def __init__(self, *, identity, owner, dist_root, origins, manual_local=False, manual_review_local=False):
         self.identity = identity
         self.owner = owner
         self.origins = _origins(origins)
-        if manual_local and (len(self.origins)!=1 or not all(v.startswith("http://127.0.0.1:") for v in self.origins.values())):
-            raise ValueError("manual command listener is local-only")
+        if (manual_local or manual_review_local) and (len(self.origins)!=1 or not all(v.startswith("http://127.0.0.1:") for v in self.origins.values())):
+            raise ValueError("manual listener is local-only")
+        if manual_local and manual_review_local:
+            raise ValueError("review listener must not expose the command route")
         self.manual_local=bool(manual_local)
+        self.manual_review_local=bool(manual_review_local)
         self.static = _load_static(dist_root)
 
     @staticmethod
@@ -347,9 +350,19 @@ class StationApplication:
             return self._json(start_response, 200, self._authorize(environ, touch=False))
         if target == "/api/v1/devices/nero/manual":
             identity=self._authorize(environ,touch=False)
-            if not self.manual_local or environ.get("REMOTE_ADDR")!="127.0.0.1" or identity["role"]!="operator":
+            if not (self.manual_local or self.manual_review_local) or environ.get("REMOTE_ADDR")!="127.0.0.1" or identity["role"]!="operator":
                 return self._json(start_response,200,manual_locked(self.owner.station_report()["instanceId"]))
-            return self._json(start_response,200,self.owner.nero_manual_report())
+            value=self.owner.nero_manual_report()
+            if self.manual_review_local:
+                # A miswired Core must never be shown as commissioned by
+                # this review-only listener. The POST route remains closed.
+                review=value.get("status")
+                if (review is None or review.get("reason")!="REVIEW_ONLY"
+                        or review.get("state")!="IDLE"
+                        or any(review.get(k) is not False for k in
+                               ("pipelineReady","enableAvailable","jogAvailable","holdAvailable"))):
+                    return self._json(start_response,200,manual_locked(self.owner.station_report()["instanceId"]))
+            return self._json(start_response,200,value)
         if target == "/api/v1/devices/nero/control":
             self._authorize(environ,touch=False)
             return self._json(start_response,200,self.owner.nero_tcp_report())
