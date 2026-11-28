@@ -11,7 +11,7 @@ from .nero_clear import valid_id
 from .nero_tcp import AXES, validate_declaration, twist_intent
 
 JOINTS=tuple(f"joint{i}" for i in range(1,8))
-ACTIONS=("ENABLE","JOG","RELEASE","HOLD","CLOSE")
+ACTIONS=("CONNECT_CAN","ENABLE","JOG","RELEASE","HOLD","CLOSE")
 STATES=("IDLE","ENABLING","READY","JOGGING","STOPPING","HOLD","FAULT")
 AGE=.15
 LEASE=.30
@@ -33,7 +33,7 @@ def valid_intent(v):
         return (v["sequence"]>0 and validate_declaration(v["declaration"])
                 and v["axis"] in AXES and type(v["direction"]) is int and v["direction"] in (-1,1))
     return (v["declaration"] is None and v["axis"] is None and v["direction"] is None
-            and (v["sequence"]==0 if v["action"]=="ENABLE" else v["sequence"]>0))
+            and (v["sequence"]==0 if v["action"] in ("ENABLE","CONNECT_CAN") else v["sequence"]>0))
 
 @dataclass(frozen=True)
 class Profile:
@@ -84,13 +84,13 @@ class Feedback:
     drive_stamps:tuple
     velocity_stamps:tuple
 
-    def valid(self,now):
+    def valid(self,now,*,require_can=True):
         return (vector7(self.q) and vector7(self.velocity)
                 and len(self.drive_status)==len(self.drive_stamps)==len(self.velocity_stamps)==7
                 and all(finite(t) and 0<=now-t<=AGE for t in (self.joint_stamp,self.arm_stamp,*self.drive_stamps,*self.velocity_stamps))
                 and all(type(v) is int and 0<=v<=255 for v in self.drive_status)
                 and type(self.arm_status) is int and 0<=self.arm_status<=255
-                and type(self.arm_mask) is int and 0<=self.arm_mask<=65535 and self.control_mode==1)
+                and type(self.arm_mask) is int and 0<=self.arm_mask<=65535 and type(self.control_mode) is int and (self.control_mode==1 if require_can else self.control_mode in (0,1,3)))
 
     def clean(self,now):
         return self.valid(now) and self.arm_mask==0 and not any(v&0xBF for v in self.drive_status)
@@ -166,6 +166,12 @@ class ManualEngine:
         with self.lock:
             if self.state in ("ENABLING","READY","JOGGING","STOPPING"):self.latch("SHUTDOWN")
 
+    def can_connect_available(self):
+        if self.state!="IDLE" or self.session is not None:
+            return False
+        try:return self.ports.can_connect_available() is True
+        except Exception:return False
+
     def report(self):
         with self.lock:
             f=self.feedback();drives=list(f.drives()) if f else [None]*7
@@ -176,7 +182,7 @@ class ManualEngine:
                       and aligned and max(abs(x) for x in f.velocity)<=.01)
             reason=("START_STATE_UNALIGNED" if self.state in ("IDLE","READY") and ready and f is not None and not aligned else self.reason)
             return {"state":self.state,"reason":reason,"driveEnabled":drives,"pipelineReady":ready,
-                    "enableAvailable":possible,"jogAvailable":self.state in ("READY","JOGGING") and ready and f is not None and f.normal(self.wall()) and (self.state=="JOGGING" or aligned),
+                    "canConnectAvailable":self.can_connect_available(),"enableAvailable":possible,"jogAvailable":self.state in ("READY","JOGGING") and ready and f is not None and f.normal(self.wall()) and (self.state=="JOGGING" or aligned),
                     "holdAvailable":self.state in ("ENABLING","READY","JOGGING","STOPPING"),
                     "linearMax":self.profile.linear_max,"angularMax":self.profile.angular_max}
 
@@ -186,6 +192,15 @@ class ManualEngine:
             op=v["operationId"];act=v["action"];now=self.wall();mono=self.mono()
             def out(ok,reason):
                 return {"operationId":op,"action":act,"sequence":v["sequence"],"accepted":ok,"reason":reason,"state":self.state}
+            if act=="CONNECT_CAN":
+                # Standalone operator command. Never opens a motion session or enables drives.
+                if not 0<=now-v["sentAt"]<=1.:return out(False,"STALE")
+                if op in self.used or len(self.used)>=10000:return out(False,"REPLAY")
+                if not self.can_connect_available():return out(False,"INTERLOCK")
+                self.used.add(op)
+                try:connected=self.ports.connect_can() is True
+                except Exception:connected=False
+                return out(connected,"CAN_CONNECTED" if connected else "CAN_CONNECT_UNVERIFIED")
             if act=="ENABLE":
                 if not 0<=now-v["sentAt"]<=1.:return out(False,"STALE")
                 if self.state!="IDLE" or op in self.used or len(self.used)>=10000:return out(False,"INTERLOCK")

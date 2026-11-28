@@ -34,7 +34,7 @@ class ManualReviewTests(unittest.TestCase):
         self.assertEqual(r["reason"],"REVIEW_ONLY")
         self.assertEqual((r["linearMax"],r["angularMax"]),(5,2))
         self.assertEqual(r["driveEnabled"],[None]*7)
-        self.assertTrue(all(r[k] is False for k in ("pipelineReady","enableAvailable","jogAvailable","holdAvailable")))
+        self.assertTrue(all(r[k] is False for k in ("pipelineReady","canConnectAvailable","enableAvailable","jogAvailable","holdAvailable")))
         with patch.object(self.host,"nero_manual_command",side_effect=AssertionError("command reached Core")):
             out=self.web.request(self.route+"/command",method="POST",cookie=self.cookie,
                                  headers=self.headers,value={})

@@ -44,6 +44,45 @@ class ManualTests(unittest.TestCase):
     def ref(self,q=.0002):
         self.p.ref={"stampNs":int(self.c.now*NANO),"windowEndNs":int((self.c.now+.1)*NANO),
                     "status":0,"positions":[q]*7,"velocities":[.01]*7}
+    def test_connect_can_is_explicit_standalone_and_one_shot(self):
+        calls=[]
+        self.p.can_connect_available=lambda:True
+        self.p.connect_can=lambda:calls.append("disable") or True
+        self.assertTrue(self.e.report()["canConnectAvailable"])
+        self.assertEqual(calls,[])
+        result=self.cmd("CONNECT_CAN")
+        self.assertTrue(result["accepted"])
+        self.assertEqual(result["reason"],"CAN_CONNECTED")
+        self.assertEqual(self.e.state,"IDLE")
+        self.assertIsNone(self.e.session)
+        self.assertEqual(self.p.enables,0)
+        self.assertEqual(self.p.positions,[])
+        self.assertFalse(self.cmd("CONNECT_CAN")["accepted"])
+        self.assertEqual(calls,["disable"])
+
+    def test_connect_can_rejects_stale_unavailable_and_active_session(self):
+        calls=[]
+        self.p.can_connect_available=lambda:False
+        self.p.connect_can=lambda:calls.append("disable") or True
+        self.assertFalse(self.cmd("CONNECT_CAN")["accepted"])
+        self.p.can_connect_available=lambda:True
+        v={"instanceId":ID,"operationId":OP,"action":"CONNECT_CAN","sequence":0,
+           "sentAt":self.c.now-2,"declaration":None,"axis":None,"direction":None}
+        self.assertEqual(self.e.command(v)["reason"],"STALE")
+        self.enabled()
+        self.assertFalse(self.e.report()["canConnectAvailable"])
+        self.assertFalse(self.e.command({**v,"operationId":"c"*32,"sentAt":self.c.now})["accepted"])
+        self.assertEqual(calls,[])
+
+    def test_connect_can_failed_readback_no_retry(self):
+        calls=[]
+        self.p.can_connect_available=lambda:True
+        self.p.connect_can=lambda:calls.append("disable") or False
+        self.assertEqual(self.cmd("CONNECT_CAN")["reason"],"CAN_CONNECT_UNVERIFIED")
+        self.assertFalse(self.cmd("CONNECT_CAN")["accepted"])
+        self.assertEqual(calls,["disable"])
+        self.assertEqual(self.e.state,"IDLE")
+
     def test_enable_explicit_and_observed(self):
         self.assertFalse(self.cmd("ENABLE")["accepted"]);self.assertEqual(self.p.enables,0)
         self.enabled();self.assertEqual(self.p.enables,1);self.assertEqual(self.p.positions,[])
@@ -159,6 +198,18 @@ class ManualBoundaryTests(unittest.TestCase):
         self.assertIsNone(web.request(route,cookie=cookie,headers={**headers,"REMOTE_ADDR":"192.0.2.1"})["json"]["status"])
         self.assertEqual(web.request(route+"/command",method="POST",cookie=cookie,value=req,
                                     headers={**headers,"REMOTE_ADDR":"192.0.2.1"})["status"],403)
+        calls=[]
+        p.can_connect_available=lambda:not calls
+        p.connect_can=lambda:calls.append("disable") or True
+        connect={**req,"action":"CONNECT_CAN","operationId":"c"*32}
+        self.assertTrue(web.request(route,cookie=cookie,headers=headers)["json"]["status"]["canConnectAvailable"])
+        self.assertEqual(web.request(route+"/command",method="POST",cookie=cookie,value=connect,
+                                    headers={**headers,"REMOTE_ADDR":"192.0.2.1"})["status"],403)
+        self.assertEqual(calls,[])
+        connected=web.request(route+"/command",method="POST",cookie=cookie,value=connect,headers=headers)["json"]["result"]
+        self.assertTrue(connected["accepted"]);self.assertEqual(connected["state"],"IDLE")
+        self.assertFalse(web.request(route+"/command",method="POST",cookie=cookie,value=connect,headers=headers)["json"]["result"]["accepted"])
+        self.assertEqual(calls,["disable"]);self.assertEqual(p.enables,0)
         self.assertTrue(web.request(route,cookie=cookie,headers=headers)["json"]["status"]["enableAvailable"])
         denied=web.request(route+"/command",method="POST",cookie=cookie,value=req,headers=headers)["json"]["result"]
         self.assertEqual(denied["reason"],"NO_LOCAL_CONFIRMATION");self.assertEqual(p.enables,0)
@@ -178,6 +229,33 @@ class ManualBoundaryTests(unittest.TestCase):
         self.assertTrue(web.request(route+"/command",method="POST",cookie=cookie,value=hold,headers=headers)["json"]["result"]["accepted"])
         self.assertEqual(p.holds,1);self.assertEqual(engine.state,"HOLD")
         with self.assertRaises(InspectionRejected):host.start_inspection()
+
+    def test_native_connect_uses_disable_and_fresh_readback(self):
+        from types import SimpleNamespace as NS
+        from unittest.mock import patch
+        from vision_station.ros_nero_manual import NativePorts
+        import time
+        native=NativePorts.__new__(NativePorts)
+        calls=[]
+        native.owner=NS(agx_arm=NS(disable=lambda **kw:calls.append(("disable",kw))),
+                        vision_arbiter=NS(mode=NS(value="LOCKED")),_stop_in_progress=False,
+                        physical_hold_enabled=True,fast_mode=False,auto_enable=False,control_enabled=False,
+                        _clear_commissioned=False,get_parameter=lambda n:NS(value=False))
+        def feedback(mode,drive=0,vel=0,age=.001):
+            t=time.time()-age
+            return Feedback((0.,)*7,(vel,)*7,t,t,6,0,mode,(drive,)*7,(t,)*7,(t,)*7)
+        with patch("vision_station.ros_nero_manual.sdk_feedback",side_effect=lambda *a,**kw:feedback(1 if calls else 3,age=0.)):
+            self.assertTrue(native.can_connect_available())
+            self.assertEqual(calls,[])
+            self.assertTrue(native.connect_can())
+            self.assertEqual(calls,[("disable",{"timeout":0.})])
+            self.assertFalse(native.can_connect_available())
+        for mode,drive,vel in ((2,0,0),(3,64,0),(3,1,0),(3,0,.01)):
+            with self.subTest(mode=mode,drive=drive,vel=vel):
+                with patch("vision_station.ros_nero_manual.sdk_feedback",return_value=feedback(mode,drive,vel)):
+                    self.assertFalse(native.can_connect_available())
+                    self.assertFalse(native.connect_can())
+        self.assertEqual(len(calls),1)
 
     def test_native_ports_delegate_only_existing_owner(self):
         from types import SimpleNamespace as NS

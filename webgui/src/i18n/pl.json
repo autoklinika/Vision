@@ -1121,5 +1121,12 @@
   "Actual position": "Położenie rzeczywiste",
   "Reference: installed SDK V121 and official MoveIt model. In-range does not certify physical readiness. No limits are changed.": "Odniesienie: zainstalowany SDK V121 i fabryczny model MoveIt. Zgodność z zakresami nie potwierdza gotowości fizycznej. Limity nie zostały zmienione.",
   "Read from installed SDK and official model, not firmware configuration. In-range does not certify physical readiness.": "Odczyt z zainstalowanego SDK i fabrycznego modelu, nie z konfiguracji firmware. Zgodność z zakresami nie potwierdza gotowości fizycznej.",
-  "Joint limit sources unavailable. Drive enable remains locked.": "Źródła limitów niedostępne. Włączenie napędów pozostaje zablokowane."
+  "Joint limit sources unavailable. Drive enable remains locked.": "Źródła limitów niedostępne. Włączenie napędów pozostaje zablokowane.",
+  "WEB / Ethernet": "WEB / Ethernet",
+  "CAN connection": "Połączenie CAN",
+  "Connect CAN": "Połącz CAN",
+  "Actual control mode feedback": "Rzeczywisty odczyt trybu sterowania",
+  "Operator request only. Uses the factory disable command; requires all drives disabled and stationary.": "Tylko na żądanie operatora. Fabryczne polecenie disable; wymagany postój i wszystkie napędy wyłączone.",
+  "CAN_CONNECTED": "Potwierdzono przejęcie sterowania CAN",
+  "CAN_CONNECT_UNVERIFIED": "Nie potwierdzono przejęcia sterowania CAN"
 }

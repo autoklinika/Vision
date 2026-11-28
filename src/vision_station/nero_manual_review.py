@@ -31,7 +31,7 @@ class ManualReviewHost(CoreHost):
         return status(instance, {
             "state": "IDLE", "reason": REASON,
             "driveEnabled": telemetry["driveEnabled"],
-            "pipelineReady": False, "enableAvailable": False,
+            "pipelineReady": False, "canConnectAvailable": False, "enableAvailable": False,
             "jogAvailable": False, "holdAvailable": False,
             "linearMax": self._profile.linear_max,
             "angularMax": self._profile.angular_max,

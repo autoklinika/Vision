@@ -360,7 +360,7 @@ class StationApplication:
                 if (review is None or review.get("reason")!="REVIEW_ONLY"
                         or review.get("state")!="IDLE"
                         or any(review.get(k) is not False for k in
-                               ("pipelineReady","enableAvailable","jogAvailable","holdAvailable"))):
+                               ("pipelineReady","canConnectAvailable","enableAvailable","jogAvailable","holdAvailable"))):
                     return self._json(start_response,200,manual_locked(self.owner.station_report()["instanceId"]))
             return self._json(start_response,200,value)
         if target == "/api/v1/devices/nero/control":

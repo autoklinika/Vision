@@ -15,6 +15,7 @@ export function useNeroManual(instance:string,enabled:boolean){
  const input=useRef<ActiveInput|null>(null);
  const interval=useRef<ReturnType<typeof setInterval>|null>(null);
  const pending=useRef(false);
+ const connecting=useRef(false);
  const generation=useRef(0);
  const statusEpoch=useRef(0);
  const active=useRef(enabled);active.current=enabled;
@@ -24,7 +25,7 @@ export function useNeroManual(instance:string,enabled:boolean){
   if(interval.current!==null){clearInterval(interval.current);interval.current=null;}
  };
  function make(action:ManualAction,s:Session,axis:ActiveInput|null=null):ManualIntent{
-  return {instanceId:instance,operationId:s.id,action,sequence:action==='ENABLE'?0:++s.seq,sentAt:Date.now()/1000,
+  return {instanceId:instance,operationId:s.id,action,sequence:action==='ENABLE'||action==='CONNECT_CAN'?0:++s.seq,sentAt:Date.now()/1000,
    declaration:axis?.declaration??null,axis:axis?.intent.axis??null,direction:axis?.intent.direction??null};
  }
  const finish=(s:Session|null,action:'HOLD'|'CLOSE'|'RELEASE')=>{
@@ -43,6 +44,15 @@ export function useNeroManual(instance:string,enabled:boolean){
  function hold(){
   stopTimer();const s=session.current;session.current=null;setHasSession(false);
   finish(s,'HOLD');
+ }
+ async function connectCan(){
+  if(!active.current||connecting.current||busy||session.current||approval||!latest.current?.canConnectAvailable)return;
+  connecting.current=true;setBusy(true);setNotice('');statusEpoch.current++;
+  const s={id:crypto.randomUUID().replaceAll('-',''),seq:0};
+  try{
+   const r=await sendNeroManual(make('CONNECT_CAN',s));
+   if(active.current)setNotice(r.status==='AVAILABLE'?r.report.result.reason:'CAN_CONNECT_UNVERIFIED');
+  }finally{connecting.current=false;statusEpoch.current++;setBusy(false);}
  }
  function prepare(){
   if(active.current&&latest.current?.enableAvailable&&!session.current&&!busy)setApproval(crypto.randomUUID().replaceAll('-',''));
@@ -108,5 +118,5 @@ export function useNeroManual(instance:string,enabled:boolean){
   };
  },[instance]);
  useEffect(()=>{if(!enabled){close();}},[enabled]);
- return {status,approval,hasSession,busy,notice,prepare,enable,cancelApproval:()=>setApproval(null),start,release,hold,close};
+ return {status,approval,hasSession,busy,notice,connectCan,prepare,enable,cancelApproval:()=>setApproval(null),start,release,hold,close};
 }

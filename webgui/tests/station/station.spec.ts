@@ -958,6 +958,46 @@ test('NERO TCP control uses live drive readback and local-only speed and keyboar
  expect(state.writes).toEqual(['/api/v1/auth/login']);
 });
 
+test('NERO CAN connection is explicit and shows independent mode feedback',async({page})=>{
+ const state=await mockStation(page);state.role='operator';
+ let mode=3,submitted=false,available=true;
+ const commands:string[]=[];
+ await page.route('**/api/v1/devices/nero',r=>{
+   const f=neroFixture();if(f.arm)f.arm.controlMode=mode;
+   return r.fulfill({contentType,body:JSON.stringify(f)});
+ });
+ await page.route('**/api/v1/devices/nero/manual',r=>r.fulfill({contentType,body:JSON.stringify({
+   schema:'vision.api.nero-manual.v1',source:'STATION',instanceId:'f'.repeat(32),
+   status:{state:'IDLE',reason:'TEST_FIXTURE',driveEnabled:Array(7).fill(false),pipelineReady:false,
+     canConnectAvailable:available,enableAvailable:false,jogAvailable:false,holdAvailable:false,linearMax:5,angularMax:2}
+ })}));
+ await page.route('**/api/v1/devices/nero/manual/command',r=>{
+   const b=r.request().postDataJSON();commands.push(b.action);submitted=true;available=false;
+   expect(b.sequence).toBe(0);expect(b.axis).toBeNull();expect(b.declaration).toBeNull();
+   return r.fulfill({contentType,body:JSON.stringify({
+     schema:'vision.api.nero-manual-command.v1',source:'STATION',instanceId:b.instanceId,
+     result:{operationId:b.operationId,action:b.action,sequence:b.sequence,accepted:true,reason:'CAN_CONNECTED',state:'IDLE'}
+   })});
+ });
+ await page.goto('/');await login(page,'operator','mock-password');
+ await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+ await page.getByRole('dialog',{name:'Navigation',exact:true}).getByRole('button',{name:'NERO',exact:true}).click();
+ const panel=page.locator('[data-module="nero"]');
+ await panel.getByRole('tab',{name:'Control',exact:true}).click();
+ const connection=panel.getByRole('region',{name:'CAN connection'});
+ const connect=connection.getByRole('button',{name:'Connect CAN',exact:true});
+ await expect(connection).toContainText('WEB · 0x03');
+ await expect(connect).toBeEnabled();expect(commands).toEqual([]);
+ await connect.click();
+ await expect.poll(()=>submitted).toBe(true);
+ await expect(connection).toContainText('WEB · 0x03'); // no optimistic mode update
+ mode=1;
+ await expect(connection).toContainText('CAN · 0x01');
+ await expect(connect).toBeDisabled();
+ await expect(panel.getByRole('button',{name:'Enable drives',exact:true})).toBeDisabled();
+ expect(commands).toEqual(['CONNECT_CAN']);
+});
+
 test('NERO manual operator workflow confirms enable, sends bounded key intent and releases',async({page})=>{
  const state=await mockStation(page);state.role='operator';
  await page.route('**/api/v1/devices/nero',r=>r.fulfill({contentType,body:JSON.stringify(neroFixture())}));
@@ -972,7 +1012,7 @@ test('NERO manual operator workflow confirms enable, sends bounded key intent an
  await page.route('**/api/v1/devices/nero/manual',r=>r.fulfill({contentType,body:JSON.stringify({
    schema:'vision.api.nero-manual.v1',source:'STATION',instanceId:'f'.repeat(32),
    status:{state:phase,reason:'TEST_FIXTURE',driveEnabled:Array(7).fill(phase!=='IDLE'),
-     pipelineReady:true,enableAvailable:phase==='IDLE',jogAvailable:['READY','JOGGING'].includes(phase),
+     pipelineReady:true,canConnectAvailable:false,enableAvailable:phase==='IDLE',jogAvailable:['READY','JOGGING'].includes(phase),
      holdAvailable:['READY','JOGGING'].includes(phase),linearMax:25,angularMax:10}
  })}));
  await page.route('**/api/v1/devices/nero/manual/command',r=>{

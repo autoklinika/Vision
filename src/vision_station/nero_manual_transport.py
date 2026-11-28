@@ -11,14 +11,14 @@ from .nero_manual import valid_intent,STATES,ACTIONS
 
 LIMIT=4096
 TIMEOUT=.8
-STATUS_FIELDS={"state","reason","driveEnabled","pipelineReady","enableAvailable","jogAvailable","holdAvailable","linearMax","angularMax"}
+STATUS_FIELDS={"state","reason","driveEnabled","pipelineReady","canConnectAvailable","enableAvailable","jogAvailable","holdAvailable","linearMax","angularMax"}
 
 def valid_status(v):
     return (type(v) is dict and set(v)==STATUS_FIELDS and v["state"] in STATES
             and isinstance(v["reason"],str) and 0<len(v["reason"])<=80
             and type(v["driveEnabled"]) is list and len(v["driveEnabled"])==7
             and all(x is None or type(x) is bool for x in v["driveEnabled"])
-            and all(type(v[k]) is bool for k in ("pipelineReady","enableAvailable","jogAvailable","holdAvailable"))
+            and all(type(v[k]) is bool for k in ("pipelineReady","canConnectAvailable","enableAvailable","jogAvailable","holdAvailable"))
             and type(v["linearMax"]) is int and 1<=v["linearMax"]<=100
             and type(v["angularMax"]) is int and 1<=v["angularMax"]<=30)
 

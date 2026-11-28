@@ -22,7 +22,7 @@ def _copy(packet,convert):
     if stamp!=packet.timestamp or msg is not packet.msg:raise ValueError("changed feedback")
     return stamp,value
 
-def sdk_feedback(owner):
+def sdk_feedback(owner,*,require_can=True):
     try:
         robot=owner.agx_arm
         if tuple(owner.arm_joint_names)!=JOINTS or not robot.is_ok():return None
@@ -32,7 +32,7 @@ def sdk_feedback(owner):
         v=[_copy(robot.get_motor_states(i),lambda m:float(m.velocity)) for i in range(1,8)]
         f=Feedback(q,tuple(x[1] for x in v),jt,at,status,mask,mode,tuple(x[1] for x in d),
                    tuple(x[0] for x in d),tuple(x[0] for x in v))
-        return f if f.valid(time.time()) else None
+        return f if f.valid(time.time(),require_can=require_can) else None
     except Exception:return None
 
 class NativePorts:
@@ -63,6 +63,42 @@ class NativePorts:
     def start_aligned(self,feedback):
         return self.authority.start_aligned(feedback)
     def approve(self,intent):return self.approval.consume(intent["operationId"],255)
+    def _can_connect_feedback(self):
+        o=self.owner
+        # Same guarded CAN owner, no secondary SDK connection. The mode request
+        # does not require the motion pipeline, which itself requires CAN mode.
+        if not (o.vision_arbiter.mode.value=="LOCKED" and not o._stop_in_progress
+                and o.physical_hold_enabled and not o.fast_mode and not o.auto_enable and not o.control_enabled
+                and not o.get_parameter("auto_enable").value and not o.get_parameter("control_enabled").value
+                and not o._clear_commissioned):
+            return None
+        f=sdk_feedback(o,require_can=False)
+        if (f is None or not f.valid(time.time(),require_can=False) or f.arm_mask!=0 or f.arm_status not in (0,6)
+                or any(f.drive_status) or any(abs(v)>.001 for v in f.velocity)):
+            return None
+        return f
+
+    def can_connect_available(self):
+        f=self._can_connect_feedback()
+        return f is not None and f.control_mode in (0,3)
+
+    def connect_can(self):
+        before=self._can_connect_feedback()
+        if before is None or before.control_mode not in (0,3):
+            return False
+        sent=time.time()
+        # SDK V112/V120/V121 disable() first requests CAN_CTRL, then disables.
+        # Bounded nonblocking drive wait; verify actual new mode and all drives.
+        self.owner.agx_arm.disable(timeout=0.)
+        deadline=time.monotonic()+.30
+        while time.monotonic()<deadline:
+            f=self._can_connect_feedback()
+            if (f is not None and f.control_mode==1 and f.stamp_min()>sent
+                    and max(abs(a-b) for a,b in zip(f.q,before.q))<=.001):
+                return True
+            time.sleep(.01)
+        return False
+
     def enable(self):
         if not self.pipeline_ready():raise RuntimeError("manual interlock")
         f=self.read_feedback()

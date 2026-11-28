@@ -100,6 +100,14 @@ class CoreHost:
                     or self._runtime is not None or self._inspection._poisoned or self._inspection._marker_exists()):
                 return deny("NOT_COMMISSIONED")
             binding=(instance,intent["operationId"],operator)
+            if intent["action"]=="CONNECT_CAN":
+                if self._manual_binding is not None:return deny("INTERLOCK")
+                try:
+                    state=self._nero_manual_transport.status()
+                    if state["state"]!="IDLE" or not state["canConnectAvailable"]:
+                        return deny("INTERLOCK")
+                    return manual_envelope(instance,self._nero_manual_transport.command(intent))
+                except Exception:return deny("TRANSPORT_UNVERIFIED")
             if intent["action"]=="ENABLE":
                 # Only the authoritative owner can declare an old session idle.
                 try:state=self._nero_manual_transport.status()["state"]

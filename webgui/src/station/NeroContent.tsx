@@ -10,7 +10,7 @@ import type {NeroReport} from './neroContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 
 const armNames:Record<number,string>={0:'Normal',1:'Emergency stop',2:'No solution',3:'Singularity',4:'Target exceeds limit',5:'Joint communication error',6:'Joint brakes not released',7:'Collision detected',8:'Teaching overspeed',9:'Joint status error',10:'Other arm error',11:'Teaching recording',12:'Teaching execution',13:'Teaching paused',14:'Main controller overtemperature',15:'Brake resistor overtemperature'};
-const modeNames:Record<number,string>={0:'Standby',1:'CAN control',2:'Teaching mode',3:'Ethernet control',4:'Wi-Fi control',5:'Remote control',6:'Linkage teaching',7:'Offline trajectory',8:'TCP control'};
+const modeNames:Record<number,string>={0:'Standby',1:'CAN control',2:'Teaching mode',3:'WEB / Ethernet',4:'Wi-Fi control',5:'Remote control',6:'Linkage teaching',7:'Offline trajectory',8:'TCP control'};
 const faultNames:Record<typeof NERO_FAULTS[number],string>={undervoltage:'Undervoltage',motor_overtemp:'Motor overtemperature',driver_overcurrent:'Driver overcurrent',driver_overtemp:'Driver overtemperature',collision_tripped:'Collision protection',driver_error:'Driver error',stall_tripped:'Stall protection'};
 const toDegrees=(v:number|null|undefined)=>v==null?null:v*180/Math.PI;
 const fmt=(v:number|null|undefined,d=1)=>v==null?'—':v.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -78,6 +78,7 @@ export function NeroContent({station,active}:{station:StationPresentation;active
     <div><span>USB-CAN</span><Badge appearance="tint" color={report?.hardwareConnection==='USB_CAN_DETECTED'?'success':'informative'}>{t(report?.hardwareConnection==='USB_CAN_DETECTED'?'Detected':report?.hardwareConnection==='USB_CAN_NOT_DETECTED'?'Not detected':'Unknown')}</Badge></div>
     <div><span>{t('Robot feedback')}</span><Badge appearance="tint" color={good?'success':'warning'}>{t(good?'Live feedback':graph==='AMBIGUOUS'?'Ambiguous source':graph==='NO_NODE'?'Not detected':'Unverified feedback')}</Badge>{report?.node&&<small>ROS {report.node.domain}</small>}</div>
     <div><span>{t('Arm status')}</span><Badge appearance="tint" color={arm?arm.armStatus===0&&arm.errorCode===0?'success':'warning':'informative'}>{armText}</Badge></div>
+    <div><span>{t('Control mode')}</span><Badge appearance="tint" color={arm?.controlMode===1?'success':arm?'warning':'informative'}>{arm?t(modeNames[arm.controlMode]??'Unknown')+' · '+code(arm.controlMode):t('Unknown')}</Badge></div>
     <div><span>{t('Drive enable feedback')}</span><Badge appearance="tint" color={knownCount===7&&enableCount===7?'success':'informative'}>{driveText}</Badge></div>
    </div>
    {(!report||report.observer==='UNAVAILABLE')&&<MessageBar intent="warning"><MessageBarBody>{t(failed?'Device report unavailable.':'No current NERO observer report.')}</MessageBarBody></MessageBar>}
@@ -90,7 +91,7 @@ export function NeroContent({station,active}:{station:StationPresentation;active
    </TabList>
    {view==="diagnostics"&&<NeroDiagnostics key={owner} station={station} active={enabled}/>}
    {view==="history"&&<NeroFaultHistory key={owner} station={station} active={enabled}/>}
-   {view==="control"&&<NeroControl key={owner+String(enabled)} station={station} active={enabled}/>}
+   {view==="control"&&<NeroControl key={owner+String(enabled)} station={station} active={enabled} controlMode={arm?.controlMode??null}/>}
    {view==="telemetry"&&<>
    <section aria-label={t('Joint telemetry')}>
     <div className="luxonis-section-heading"><div><h2>{t('Joint telemetry')}</h2><p>{t('Actual ROS 2 feedback · J1–J7 · read only')}</p></div></div>

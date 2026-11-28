@@ -3,7 +3,7 @@ import {manualSpeedLimits,displayedManualSpeed} from '../src/station/neroManualC
 import type {ManualStatus} from '../src/station/neroManualContract';
 
 const status:ManualStatus={state:'IDLE',reason:'NO_SESSION',driveEnabled:Array(7).fill(false),
- pipelineReady:false,enableAvailable:false,jogAvailable:false,holdAvailable:false,
+ pipelineReady:false,canConnectAvailable:false,enableAvailable:false,jogAvailable:false,holdAvailable:false,
  linearMax:5,angularMax:2};
 
 it('uses owner limits rather than the old draft limits',()=>{

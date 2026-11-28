@@ -19,7 +19,7 @@ const controls=[
 ] as const;
 const presets=[{name:'Precision',linear:5,angular:2},{name:'Normal speed',linear:25,angular:10},{name:'Fast',linear:50,angular:20}];
 
-export function NeroControl({station,active}:{station:StationPresentation;active:boolean}){
+export function NeroControl({station,active,controlMode}:{station:StationPresentation;active:boolean;controlMode:number|null}){
  const {t}=useTranslation();
  const owner=station.report.instanceId;
  const [sample,setSample]=useState<{report:TcpReport;received:number}|null>(null);
@@ -89,13 +89,21 @@ export function NeroControl({station,active}:{station:StationPresentation;active
    <div className="luxonis-section-heading"><div><h2>{t('TCP control')}</h2><p>MoveIt Servo · Cartesian teleoperation</p></div><Badge appearance="tint" color={manual.status?.pipelineReady?'informative':'warning'}>{t(reviewOnly?'REVIEW_ONLY':manual.status?.state??'NOT_COMMISSIONED')}</Badge></div>
    {(!manual.status||reviewOnly)&&<MessageBar intent="warning"><MessageBarBody>{t('Physical control is not commissioned. The keyboard test does not send robot commands.')}</MessageBarBody></MessageBar>}
    {manual.status&&!reviewOnly&&<p className="fine-print">{t('Local maintenance session')} · {t(manual.status.reason)}</p>}
-   {manual.notice&&<MessageBar intent="warning"><MessageBarBody>{t(manual.notice)}</MessageBarBody></MessageBar>}
+   {manual.notice&&<MessageBar intent={manual.notice==='CAN_CONNECTED'?'success':'warning'}><MessageBarBody>{t(manual.notice)}</MessageBarBody></MessageBar>}
+   <section className="luxonis-settings-card" aria-label={t('CAN connection')}>
+     <h3>{t('CAN connection')}</h3>
+     <div className="nero-tcp-drive-row">
+       <div><Badge appearance="tint" color={controlMode===1?'success':controlMode===3?'warning':'informative'}>{controlMode===1?'CAN · 0x01':controlMode===3?'WEB · 0x03':controlMode===null?t('Unknown'):'0x'+controlMode.toString(16).padStart(2,'0')}</Badge><p className="fine-print">{t('Actual control mode feedback')}</p></div>
+       <Button appearance="primary" disabled={!enabled||controlMode===null||controlMode===1||!manual.status?.canConnectAvailable||manual.busy||manual.hasSession||!!manual.approval} onClick={()=>void manual.connectCan()}>{t('Connect CAN')}</Button>
+     </div>
+     <p className="fine-print">{t('Operator request only. Uses the factory disable command; requires all drives disabled and stationary.')}</p>
+   </section>
    <NeroJointPreflight check={check}/>
    <section className="luxonis-settings-card">
      <h3>{t('Drives')}</h3>
      <div className="nero-tcp-drive-row">
        <div><Badge appearance="tint" color={known&&enabledCount===7?'success':'informative'}>{known?enabledCount+'/7 '+t('Enabled'):t('Drive status unknown')}</Badge><p className="fine-print">{t('Actual drive enable feedback')}</p></div>
-       <Button appearance="primary" disabled={!available||!manual.status?.enableAvailable||manual.busy||manual.hasSession||!!manual.approval} onClick={manual.prepare}>{t('Enable drives')}</Button>
+       <Button appearance="primary" disabled={controlMode!==1||!available||!manual.status?.enableAvailable||manual.busy||manual.hasSession||!!manual.approval} onClick={manual.prepare}>{t('Enable drives')}</Button>
      </div>
      {manual.approval&&<div className="nero-clear-confirm"><p>{t('Confirm the manual session on the local VENTUNO console using the one-use approval tool. Then confirm here.')}</p><p><code>{manual.approval}</code></p><div className="nero-planned"><Button appearance="primary" disabled={manual.busy} onClick={()=>void manual.enable()}>{t('Confirm drive enable')}</Button><Button onClick={manual.cancelApproval}>{t('Cancel')}</Button></div></div>}
      {manual.hasSession&&<div className="nero-planned"><Button onClick={()=>{stop();setPhysical(false);manual.close();}}>{t('Close manual session')}</Button></div>}
