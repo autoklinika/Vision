@@ -7,12 +7,12 @@ from unittest.mock import patch, Mock
 import xml.etree.ElementTree as ET
 
 from vision_station.nero import NODE
-from vision_station.nero_manual import JOINTS, Profile
+from vision_station.nero_manual import JOINTS, Profile, Feedback
 from vision_station.nero_manual_station import Candidate, STATUS
 from vision_station.nero_manual_pipeline import Routes
 from vision_station.nero_manual_composition import (
     OwnerWiring, existing_owner_factory, review_profile, verify_tcp,
-    servo_parameters, planning_parameters, contract_for_loaded_model,
+    servo_parameters, planning_parameters, contract_for_loaded_model, prepare_owner_start,
 )
 
 
@@ -98,6 +98,53 @@ class CompositionTests(unittest.TestCase):
             OwnerWiring(replace(self.profile,linear_max=10),self.contract(Routes.physical()))
         with self.assertRaises(ValueError):
             OwnerWiring(replace(self.profile,tracking_error_max=.01),self.contract(Routes.physical()))
+
+    def start_wiring(self):
+        root=ET.fromstring(self.urdf)
+        ctrl=ET.SubElement(root,"ros2_control",name="FakeSystem",type="system")
+        ET.SubElement(ET.SubElement(ctrl,"hardware"),"plugin").text="mock_components/GenericSystem"
+        for name in JOINTS:
+            joint=ET.SubElement(ctrl,"joint",name=name)
+            ET.SubElement(joint,"command_interface",name="position")
+            interface=ET.SubElement(joint,"state_interface",name="position")
+            ET.SubElement(interface,"param",name="initial_value").text="0.0"
+            ET.SubElement(joint,"state_interface",name="velocity")
+        self.urdf=ET.tostring(root,encoding="unicode")
+        return OwnerWiring(self.profile,self.contract(Routes.physical()))
+
+    def feedback(self,q,t):
+        return Feedback(tuple(q),(0.,)*7,t,t,6,0,1,(0,)*7,(t,)*7,(t,)*7)
+
+    def test_prepare_current_position_changes_only_virtual_initial_values(self):
+        wiring=self.start_wiring()
+        original=dict(wiring.contract.parameters)
+        for q in ((.1,.2,-.1,.3,.4,-.2,.5),(-.5,-.4,.3,.2,-.1,.4,.6)):
+            prepared,seed=prepare_owner_start(wiring,self.feedback(q,99.94),
+                                              self.feedback(q,99.97),now=100.)
+            self.assertEqual(seed.q,q)
+            self.assertEqual(prepared.profile,wiring.profile)
+            self.assertEqual(prepared.contract.routes,wiring.contract.routes)
+            self.assertEqual(prepared.contract.scene_digest,wiring.contract.scene_digest)
+            params=dict(prepared.contract.parameters)
+            model=ET.fromstring(params.pop("robot_description"))
+            expected=ET.fromstring(original["robot_description"])
+            self.assertEqual(params,{k:v for k,v in original.items() if k!="robot_description"})
+            self.assertEqual([float(j.findtext("state_interface/param")) for j in model.findall("ros2_control/joint")],list(q))
+            for root in (model,expected):
+                for v in root.findall("ros2_control/joint/state_interface/param"):
+                    v.text="0.0"
+            self.assertEqual(ET.tostring(model),ET.tostring(expected))
+        self.assertEqual(dict(wiring.contract.parameters),original)
+
+    def test_prepare_owner_start_cannot_promote_review_or_stale_feedback(self):
+        wiring=self.start_wiring()
+        f=self.feedback((.1,)*7,99.94)
+        g=self.feedback((.1,)*7,99.97)
+        for bad in (self.candidate,None):
+            with self.assertRaises(ValueError):prepare_owner_start(bad,f,g,now=100.)
+        with self.assertRaises(ValueError):prepare_owner_start(wiring,f,g,now=100.2)
+        with self.assertRaises(ValueError):prepare_owner_start(wiring,g,g,now=100.)
+        with self.assertRaises(ValueError):prepare_owner_start(wiring,f,replace(g,control_mode=3),now=100.)
 
     def test_wiring_uses_same_owner_and_existing_runtime_once(self):
         wiring=OwnerWiring(self.profile,self.contract(Routes.physical()))

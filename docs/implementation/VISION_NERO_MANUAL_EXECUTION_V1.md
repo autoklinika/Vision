@@ -492,3 +492,43 @@ motion. The real CAN owner and operational services remain unchanged.
 The actual single-owner commissioning startup still has to call the
 live-seed builder and verify the resulting JTC context before admission.
 No physical manual runtime was installed or activated by this step.
+
+## Current-position initialization from live ROS observations
+
+The stationary shadow can now optionally start an official JTC backed
+only by mock_components/GenericSystem in its separate localhost domain
+232. It takes two distinct, fresh, stationary joint observations from
+the pinned real ROS feedback source and seeds the virtual initial
+position interfaces directly. No archived position is read for this
+startup. The virtual controller has no trajectory publisher, relay,
+physical driver or return path to CAN. The existing guarded owner and
+operational services are not changed.
+
+Acceptance: the live bootstrap and full PSM scene readback passed.
+348 distinct joint observations, 219 forwarded; maximum observed
+joint age 34.62 ms and maximum receipt gap 53.73 ms. The virtual JTC
+state/reference agreed with the real stationary measured position with
+zero numerical error both before and after the full scene readback.
+26,341 CAN frames received, no new dropped frames or errors, zero
+transmitted. This is a stationary live-data/virtual-controller test,
+not a physical execution or clearance acceptance.
+
+The pure prepare_owner_start function connects the current-position
+builder to an already reviewed OwnerWiring. It derives a new in-memory
+robot_description and the matching parameter contract from two fresh
+SDK Feedback observations; the static scene fingerprint, profile,
+TCP, moving joint geometry and routes remain unchanged. Candidate or
+replay receipts cannot supply the required OwnerWiring/SDK observations.
+The live owner still independently checks the current JTC reference and
+SDK state before enable/jog. No PARK/HOME target or automatic physical
+movement is introduced. Unit tests cover distinct starting positions,
+preservation of the rest of the approved contract, expired or repeated
+samples, wrong control mode and rejection of unapproved review objects.
+
+Validation: 107/107 NERO API tests and 6/6 ROS message/scene tests.
+The physical replacement owner remains uninstalled. The real arm was
+still in WEB mode with disabled drives, so this run used ROS joint-state
+measurements rather than claiming fresh independent CAN-mode per-axis
+SDK evidence. The physical commissioning entrypoint, fresh firmware
+limit provenance, actual clearance acceptance and supervised execution
+are not completed by this test.

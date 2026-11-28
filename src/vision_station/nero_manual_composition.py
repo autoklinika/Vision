@@ -5,7 +5,7 @@ starts a runtime or grants an enable token. A physical owner factory needs
 separately accepted commissioning inputs; the fixture is not such evidence.
 """
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import xml.etree.ElementTree as ET
 
@@ -174,6 +174,27 @@ class OwnerWiring:
             if (lo<lower or hi>upper or p.get(prefix+"has_velocity_limits") is not True
                     or p.get(prefix+"max_velocity")!=self.profile.joint_velocity_max[i]):
                 raise ValueError("profile/model joint limits mismatch")
+
+
+def prepare_owner_start(wiring, first, second, *, now):
+    """Derive the startup model and contract from fresh owner feedback.
+
+    Only an already reviewed OwnerWiring is accepted. No change to its
+    approved scene fingerprint, profile, robot geometry or Servo routing.
+    The returned seed is an observation, not a physical position command.
+    This pure preparation step neither starts a pipeline nor commissions
+    the robot. The live owner must recheck JTC/SDK agreement before ENABLE
+    and each JOG, even if the virtual controller took time to start.
+    """
+    from .nero_manual_start import initial_virtual_model
+    if not isinstance(wiring,OwnerWiring):
+        raise ValueError("reviewed owner wiring required")
+    model=dict(wiring.contract.parameters)["robot_description"]
+    seeded,seed=initial_virtual_model(model,first,second,profile=wiring.profile,now=now)
+    params=tuple((key,seeded if key=="robot_description" else value)
+                 for key,value in wiring.contract.parameters)
+    prepared=OwnerWiring(wiring.profile,replace(wiring.contract,parameters=params))
+    return prepared,seed
 
 
 def existing_owner_factory(wiring, *, approval_directory, socket_path, relay_binary,
