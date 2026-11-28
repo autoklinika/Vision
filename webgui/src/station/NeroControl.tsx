@@ -6,6 +6,7 @@ import {keyboardMap} from './neroTcpContract';
 import type {TcpReport,TcpIntent,TcpFrame} from './neroTcpContract';
 import {useTranslation} from '../i18n/LanguageProvider';
 import {useNeroManual} from './useNeroManual';
+import {manualSpeedLimits,displayedManualSpeed} from './neroManualContract';
 import {NeroJointPreflight} from './NeroJointPreflight';
 
 const controls=[
@@ -23,8 +24,8 @@ export function NeroControl({station,active}:{station:StationPresentation;active
  const owner=station.report.instanceId;
  const [sample,setSample]=useState<{report:TcpReport;received:number}|null>(null);
  const [tick,setTick]=useState(()=>performance.now());
- const [linear,setLinear]=useState(10);
- const [angular,setAngular]=useState(5);
+ const [requestedLinear,setLinear]=useState(10);
+ const [requestedAngular,setAngular]=useState(5);
  const [frame,setFrame]=useState<TcpFrame>('BASE');
  const [practice,setPractice]=useState(false);
  const [key,setKey]=useState<string|null>(null);
@@ -34,6 +35,16 @@ export function NeroControl({station,active}:{station:StationPresentation;active
  const manual=useNeroManual(owner,enabled&&station.identity.role==='operator');
  const [physical,setPhysical]=useState(false);
  const stop=()=>{held.current=null;setKey(null);manual.release();};
+ const {linearMax,angularMax}=manualSpeedLimits(manual.status);
+ const {linear,angular}=displayedManualSpeed(requestedLinear,requestedAngular,manual.status);
+ useEffect(()=>{
+  // A changed owner envelope must release input, not silently retarget a
+  // held command. Displayed and submitted values use the same upper bounds.
+  if(held.current!==null)stop();
+  setLinear(v=>Math.min(v,linearMax));
+  setAngular(v=>Math.min(v,angularMax));
+ },[linearMax,angularMax]);
+
  useEffect(()=>{if(!manual.hasSession){setPhysical(false);held.current=null;setKey(null);}},[manual.hasSession]);
  useEffect(()=>{
   if(!enabled)return;
@@ -93,13 +104,13 @@ export function NeroControl({station,active}:{station:StationPresentation;active
      <h3>{t('TCP speed declaration')}</h3>
      <div className="nero-tcp-speed-grid">
        <Field label={t('Linear speed (mm/s)')}>
-         <div className="nero-tcp-speed"><Slider aria-label={t('Linear speed (mm/s)')} min={1} max={100} value={linear} onChange={(_,d)=>{stop();setLinear(d.value);}}/><Input aria-label={t('Linear speed value')} type="number" min={1} max={100} value={String(linear)} onChange={(_,d)=>{const n=Number(d.value);if(Number.isInteger(n)&&n>=1&&n<=100){stop();setLinear(n);}}}/></div>
+         <div className="nero-tcp-speed"><Slider aria-label={t('Linear speed (mm/s)')} min={1} max={linearMax} disabled={linearMax===1} value={linear} onChange={(_,d)=>{stop();setLinear(d.value);}}/><Input aria-label={t('Linear speed value')} type="number" min={1} max={linearMax} value={String(linear)} onChange={(_,d)=>{const n=Number(d.value);if(Number.isInteger(n)&&n>=1&&n<=linearMax){stop();setLinear(n);}}}/></div>
        </Field>
        <Field label={t('Angular speed (°/s)')}>
-         <div className="nero-tcp-speed"><Slider aria-label={t('Angular speed (°/s)')} min={1} max={30} value={angular} onChange={(_,d)=>{stop();setAngular(d.value);}}/><Input aria-label={t('Angular speed value')} type="number" min={1} max={30} value={String(angular)} onChange={(_,d)=>{const n=Number(d.value);if(Number.isInteger(n)&&n>=1&&n<=30){stop();setAngular(n);}}}/></div>
+         <div className="nero-tcp-speed"><Slider aria-label={t('Angular speed (°/s)')} min={1} max={angularMax} disabled={angularMax===1} value={angular} onChange={(_,d)=>{stop();setAngular(d.value);}}/><Input aria-label={t('Angular speed value')} type="number" min={1} max={angularMax} value={String(angular)} onChange={(_,d)=>{const n=Number(d.value);if(Number.isInteger(n)&&n>=1&&n<=angularMax){stop();setAngular(n);}}}/></div>
        </Field>
      </div>
-     <div className="nero-planned">{presets.map(p=><Button key={p.name} appearance={linear===p.linear&&angular===p.angular?'primary':'secondary'} onClick={()=>{stop();setLinear(p.linear);setAngular(p.angular);}}>{t(p.name)}</Button>)}</div>
+     <div className="nero-planned">{presets.map(p=><Button key={p.name} disabled={p.linear>linearMax||p.angular>angularMax} appearance={linear===p.linear&&angular===p.angular?'primary':'secondary'} onClick={()=>{stop();setLinear(p.linear);setAngular(p.angular);}}>{t(p.name)}</Button>)}</div>
      <p className="fine-print">{manual.status?t('Accepted speed envelope')+': '+manual.status.linearMax+' mm/s · '+manual.status.angularMax+' °/s':t('Draft speed limits for commissioning; declaration is not applied to the real robot.')}</p>
      <dl className="nero-details"><dt>{t('Actual linear TCP speed')}</dt><dd>— mm/s</dd><dt>{t('Actual angular TCP speed')}</dt><dd>— °/s</dd></dl>
    </section>

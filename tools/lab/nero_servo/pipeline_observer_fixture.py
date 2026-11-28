@@ -9,20 +9,22 @@ from vision_station.ros_nero_manual_pipeline import (
 
 
 class ObservationFixture:
-    def __init__(self, node, params, station_candidate=None):
+    def __init__(self, node, params, station_candidate=None, profile=None):
         from sensor_msgs.msg import JointState
         from moveit_msgs.srv import GetPlanningScene
         from moveit_msgs.msg import PlanningScene
         self.node = node
         self.params = params
         self.station_candidate = station_candidate
+        self.profile = profile
         self.routes = Routes.fixture()
         self.msg_type = JointState
         self.pub = node.create_publisher(JointState, self.routes.feedback_topic, 10)
         self.get = node.create_client(GetPlanningScene, self.routes.namespace + "/get_planning_scene")
         self.request = GetPlanningScene.Request()
         self.request.components.components = 1023
-        self.scene_pub = node.create_publisher(PlanningScene, "/planning_scene", 10)
+        self.scene_pub = node.create_publisher(PlanningScene,
+                    params["moveit_servo"].get("monitored_planning_scene_topic","/planning_scene"),10)
         self.monitor = None
         self.observer_node = None
         self.observer_executor = None
@@ -152,8 +154,12 @@ class ObservationFixture:
         for key in ("linear","rotational","joint"):
             params["moveit_servo.scale."+key] = servo["scale"][key]
         # Fixture-only receipt based on its deliberately constructed scene.
-        self.contract = Contract(self.routes, scene_fingerprint(actual),
-                                 tuple(sorted(params.items())), .005)
+        if self.profile is None:
+            self.contract = Contract(self.routes, scene_fingerprint(actual),
+                                     tuple(sorted(params.items())), .005)
+        else:
+            from vision_station.nero_manual_composition import contract_for_loaded_model
+            self.contract=contract_for_loaded_model(self.routes,self.profile,self.params,scene_fingerprint(actual))
         for topic in (self.routes.feedback_topic,self.routes.synthetic_feedback_topic):
             print("OBSERVED_SUBSCRIBERS",topic,[(e.node_namespace,e.node_name,e.topic_type)
                   for e in self.node.get_subscriptions_info_by_topic(topic)],flush=True)

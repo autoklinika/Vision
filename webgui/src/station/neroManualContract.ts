@@ -30,3 +30,13 @@ export function isManualResult(v:unknown):v is ManualResult{
  return record(r,['operationId','action','sequence','accepted','reason','state'])&&id(r.operationId)&&one(r.action,actions)
  &&range(r.sequence,0,2147483647)&&typeof r.accepted==='boolean'&&reason(r.reason)&&(one(r.state,states)||r.state==='LOCKED'&&!r.accepted);
 }
+
+// The owner supplies actual session limits. Draft keyboard practice retains
+// its existing UI range. This is presentation only, never motion admission.
+export function manualSpeedLimits(status:ManualStatus|null){
+ return {linearMax:status?.linearMax??100,angularMax:status?.angularMax??30};
+}
+export function displayedManualSpeed(linear:number,angular:number,status:ManualStatus|null){
+ const {linearMax,angularMax}=manualSpeedLimits(status);
+ return {linear:Math.min(linear,linearMax),angular:Math.min(angular,angularMax)};
+}

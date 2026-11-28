@@ -362,3 +362,53 @@ still a review-only geometry/configuration. No live manual owner or
 production launch has been installed. The operator's TCP reference
 selection, explicit motion envelope, sufficient actual clearance and
 separate supervised commissioning remain required.
+
+## Single-owner composition and Precision V1 review profile
+
+The manual composition module now defines one explicit inventory for
+MoveIt Servo, the mechanical mount-face TCP and the owner-side Profile.
+The existing guarded-driver extension receives the same-owner factory;
+it constructs a RosPipelineMonitor and delegates to ManualRuntime with
+the same Profile, model, contract, native HOLD and private IPC socket.
+It does not instantiate a second SDK or CAN owner. The factory rejects a
+fixture contract, an unrelated HOLD callback or a repeated attachment.
+Its wiring tests use doubles, not an actual installed hardware owner.
+The factory is not a service, physical commissioning entrypoint or
+approval issuer. Only a separately commissioned caller may supply the
+physical OwnerWiring; no diagnostic receipt is promoted into approval.
+
+For the initial review, the operator selected the proposed mechanical
+mount-face TCP (factory flange axes, not an optical camera center).
+The provisional Precision V1 envelope is 5 mm/s linear, 2 deg/s angular,
+0.02 rad/s maximum joint-reference velocity, and 0.005 rad tracking
+limit. These are engineering choices for the software review, not
+verified physical operating speeds. The seven joint position limits
+come from the previously recorded intersection of SDK/URDF/firmware.
+MoveIt planning velocity parameters are narrowed to the same cap; the
+factory URDF, position bounds, manufacturer acceleration settings and
+existing collision thresholds remain unchanged. The owner independently
+checks references and measured feedback. Reference velocity is not
+a guarantee of the firmware's actual stopping time or velocity.
+
+The complete candidate fixture now reads back the explicit Servo,
+kinematics and joint-limit parameters, as well as the verified scene.
+MoveGroup request-default scaling parameters are not declared by Servo;
+they are not part of this Servo configuration. With the new profile the
+full isolated GenericSystem regression passed: 133 trajectory windows,
+269 JTC references and 280 relay references within the declared envelope,
+52 timestamp-aligned scene updates, feedback loss and scene change
+latches. Servo status 4 still indicates proximity deceleration. This is
+not a usable physical-speed or clearance acceptance.
+
+WebGUI consumes the maximum speed reported by the owner through Core,
+bounds the displayed declaration and disables presets exceeding it.
+An envelope change releases held input; the client is not an actuator
+authority. The legacy practice range remains available without an owner.
+
+Validation: 91/91 NERO API tests, 6/6 ROS message/scene tests, TypeScript
+typecheck, and 7/7 targeted WebGUI tests. Real NERO remained in WEB mode,
+all seven drives disabled, zero transmitted CAN frames. No operational
+service, physical configuration or baseline was changed. The actual
+owner still needs separate, supervised commissioning with verified
+as-built scene clearance, current firmware-limit provenance and a
+reviewed operating profile. No merge or deployment.

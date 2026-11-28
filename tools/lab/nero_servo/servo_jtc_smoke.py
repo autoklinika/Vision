@@ -118,6 +118,13 @@ def main():
             "scene_collision_proximity_threshold":.02,
         })
         params["use_sim_time"]=False
+    profile=None
+    if candidate is not None:
+        from vision_station.nero_manual_composition import review_profile,servo_parameters,planning_parameters
+        profile=review_profile(candidate)
+        params["moveit_servo"]=servo_parameters(Routes.fixture(),profile)
+        params.update(planning_parameters({"robot_description_planning":params["robot_description_planning"]},
+                                         params["robot_description"],profile))
     a.output.mkdir(parents=True,exist_ok=True)
     servo_file=a.output/"servo.yaml";servo_file.write_text(yaml.safe_dump({NS+"/servo_node":{"ros__parameters":params}}))
     ctrl_file=a.output/"controllers.yaml"
@@ -137,7 +144,7 @@ def main():
     node=rclpy.create_node("fixture",namespace=NS,context=ctx,start_parameter_services=False)
     executor=SingleThreadedExecutor(context=ctx);executor.add_node(node)
     children=[];logs=[];relay_socket=None;relay_samples=[]
-    observer=ObservationFixture(node,params,station_candidate=candidate) if a.observe_pipeline else None
+    observer=ObservationFixture(node,params,station_candidate=candidate,profile=profile) if a.observe_pipeline else None
     def spawn(name,cmd):
         log=(a.output/(name+".log")).open("w");logs.append(log)
         child=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT,env=env);children.append(child)
@@ -237,6 +244,16 @@ def main():
         valid=[s for s in samples[before:] if set(s.joint_names)==set(NAMES)
                and len(s.reference.positions)==7 and all(math.isfinite(x) for x in s.reference.positions)]
         if not valid:raise RuntimeError("no JTC reference")
+        if profile is not None:
+            # Check every JTC reference against the same candidate envelope
+            # that the guarded owner would enforce; no motion is executed.
+            for sample in valid:
+                positions=dict(zip(sample.joint_names,sample.reference.positions))
+                velocities=dict(zip(sample.joint_names,sample.reference.velocities))
+                assert profile.contains(tuple(positions[n] for n in NAMES))
+                assert len(velocities)==7 and all(math.isfinite(velocities[n]) and
+                           abs(velocities[n])<=limit+1e-8 for n,limit in zip(NAMES,profile.joint_velocity_max))
+            print("REVIEW_PROFILE_JTC_ENVELOPE_PASS",len(valid),flush=True)
         displacement=max(abs(q-start[n]) for s in valid for n,q in zip(s.joint_names,s.reference.positions))
         if displacement<=1e-5:raise RuntimeError("Servo trajectory not executed by JTC")
         print("SERVO_TO_JTC_PASS","windows",len(windows),"sampled_references",len(valid),
@@ -245,6 +262,12 @@ def main():
         if a.relay:
             if not relay_samples or not any(max(abs(q-p) for q,p in zip(s["positions"],pose))>1e-5 for s in relay_samples):
                 raise RuntimeError("native source-checked relay delivered no valid references")
+            if profile is not None:
+                for reference in relay_samples:
+                    assert profile.contains(reference["positions"])
+                    assert len(reference["velocities"])==7 and all(
+                        math.isfinite(x) and abs(x)<=limit+1e-8 for x,limit in zip(reference["velocities"],profile.joint_velocity_max))
+                print("REVIEW_PROFILE_RELAY_ENVELOPE_PASS",len(relay_samples),flush=True)
             print("NATIVE_GID_RELAY_PASS","samples",len(relay_samples),flush=True)
         if observer is not None:
             observer.check()
@@ -258,6 +281,7 @@ def main():
                 "sceneChangeLatched":True,"syntheticOnly":True,
                 "realStationAcceptance":False,
                 "matchedSceneUpdates":matched,"fullStationCandidate":candidate is not None,
+                "reviewProfileEnvelopeVerified":profile is not None,
                 "relaySamples":len(relay_samples)},indent=2)+"\n")
         print("OFFLINE_ONLY_NO_HARDWARE_OUTPUT",flush=True)
     finally:
